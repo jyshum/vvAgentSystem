@@ -57,11 +57,11 @@ def run_tracker(config: dict) -> tuple[list[dict], dict]:
 
             time.sleep(0.5)
 
-    scores = compute_scores(results, engines)
+    scores = compute_scores(results, engines, competitors)
     return results, scores
 
 
-def compute_scores(results: list[dict], engines: dict) -> dict:
+def compute_scores(results: list[dict], engines: dict, competitors: list[str] | None = None) -> dict:
     per_engine = {}
     for engine_name in engines:
         engine_results = [r for r in results if r["engine"] == engine_name]
@@ -80,8 +80,18 @@ def compute_scores(results: list[dict], engines: dict) -> dict:
     total_mentions = sum(1 for r in all_results if r["brand_mentioned"])
     total_citations = sum(1 for r in all_results if r["brand_cited"])
 
+    competitor_scores = {}
+    for comp in (competitors or []):
+        comp_mentions = sum(
+            1 for r in all_results if comp in r.get("competitor_mentions", [])
+        )
+        competitor_scores[comp] = {
+            "mention_rate": comp_mentions / total_all,
+        }
+
     return {
         "per_engine": per_engine,
         "aggregate_mention_rate": total_mentions / total_all,
         "aggregate_citation_rate": total_citations / total_all,
+        "competitor_scores": competitor_scores,
     }

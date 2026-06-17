@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.tracker import load_client_config, run_tracker
-from src.output import write_csv, write_json, format_summary
+from src.output import write_csv, write_json, write_html, format_summary
 
 
 def main():
@@ -38,11 +38,14 @@ def main():
 
     csv_path = output_dir / f"{slug}_{timestamp}.csv"
     json_path = output_dir / f"{slug}_{timestamp}.json"
+    html_path = output_dir / f"{slug}_{timestamp}.html"
 
     write_csv(results, csv_path)
     write_json(results, scores, client_name, json_path)
+    write_html(results, scores, client_name, html_path)
 
     print(format_summary(scores, client_name))
+    print(f"  HTML: {html_path}")
     print(f"  CSV:  {csv_path}")
     print(f"  JSON: {json_path}")
 
