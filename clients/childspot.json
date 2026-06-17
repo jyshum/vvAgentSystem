@@ -1,0 +1,14 @@
+{
+  "client_name": "ChildSpot",
+  "brand_name": "ChildSpot",
+  "brand_variations": ["ChildSpot", "Child Spot", "childspot.ca"],
+  "website_domain": "childspot.ca",
+  "target_queries": [
+    "best childcare finder in Ontario",
+    "how to find daycare near me Ontario",
+    "childcare waitlist Ontario",
+    "Ontario childcare registry",
+    "find licensed daycare Ontario"
+  ],
+  "competitors": ["OneList Ontario", "HiMama"]
+}
