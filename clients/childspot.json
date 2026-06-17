@@ -1,8 +1,9 @@
 {
   "client_name": "ChildSpot",
   "brand_name": "ChildSpot",
-  "brand_variations": ["ChildSpot", "Child Spot", "childspot.ca"],
-  "website_domain": "childspot.ca",
+  "brand_variations": ["ChildSpot", "Child Spot", "childspotapp.com"],
+  "website_domain": "childspotapp.com",
+  "supabase_client_id": "",
   "target_queries": [
     "best childcare finder in Ontario",
     "how to find daycare near me Ontario",

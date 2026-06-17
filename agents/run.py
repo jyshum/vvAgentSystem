@@ -18,6 +18,11 @@ def main():
         default="../output",
         help="Directory for output files (default: ../output)",
     )
+    parser.add_argument(
+        "--upload",
+        action="store_true",
+        help="Upload results to Supabase after run",
+    )
     args = parser.parse_args()
 
     config = load_client_config(args.config)
@@ -48,6 +53,16 @@ def main():
     print(f"  HTML: {html_path}")
     print(f"  CSV:  {csv_path}")
     print(f"  JSON: {json_path}")
+
+    if args.upload:
+        supabase_client_id = config.get("supabase_client_id")
+        if not supabase_client_id:
+            print("\n  ⚠ No supabase_client_id in config — skipping upload")
+        else:
+            from src.upload import upload_run
+
+            print()
+            upload_run(supabase_client_id, results, scores)
 
 
 if __name__ == "__main__":
