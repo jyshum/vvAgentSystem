@@ -3,3 +3,8 @@ output/
 __pycache__/
 *.egg-info/
 .venv/
+
+# Dashboard
+node_modules/
+.next/
+.env.local
