@@ -33,7 +33,7 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%b-%d-%Y_%I-%M%p").lower()
     slug = client_name.lower().replace(" ", "_")
 
     csv_path = output_dir / f"{slug}_{timestamp}.csv"
