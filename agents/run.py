@@ -1,4 +1,5 @@
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -8,11 +9,60 @@ load_dotenv()
 
 from src.tracker import load_client_config, run_tracker
 from src.output import write_csv, write_json, write_html, format_summary
+from supabase import create_client
+
+
+def fetch_config_from_supabase(client_id: str) -> dict:
+    url = os.environ["SUPABASE_URL"]
+    key = os.environ["SUPABASE_SERVICE_KEY"]
+    supabase = create_client(url, key)
+    result = supabase.table("clients").select("*").eq("id", client_id).single().execute()
+    row = result.data
+    return {
+        "client_name": row["brand_name"],
+        "brand_name": row["brand_name"],
+        "website_domain": row["website_domain"],
+        "brand_variations": row["brand_variations"] or [],
+        "target_queries": row["target_queries"] or [],
+        "competitors": row["competitors"] or [],
+    }
+
+
+def write_results_to_supabase(client_id: str, scores: dict, results: list) -> str:
+    url = os.environ["SUPABASE_URL"]
+    key = os.environ["SUPABASE_SERVICE_KEY"]
+    supabase = create_client(url, key)
+
+    run_row = supabase.table("tracker_runs").insert({
+        "client_id": client_id,
+        "aggregate_mention_rate": scores.get("aggregate_mention_rate", 0),
+        "aggregate_citation_rate": scores.get("aggregate_citation_rate", 0),
+        "per_engine_scores": scores.get("per_engine_scores", {}),
+        "competitor_scores": scores.get("competitor_scores", {}),
+    }).execute()
+
+    run_id = run_row.data[0]["id"]
+
+    result_rows = [{
+        "run_id": run_id,
+        "query": r["query"],
+        "engine": r["engine"],
+        "model": r.get("model", ""),
+        "brand_mentioned": r["brand_mentioned"],
+        "brand_cited": r["brand_cited"],
+        "citation_url": r.get("citation_url"),
+        "competitor_mentions": r.get("competitor_mentions", []),
+        "response_text": r.get("response_text", ""),
+    } for r in results]
+
+    supabase.table("tracker_results").insert(result_rows).execute()
+    return run_id
 
 
 def main():
     parser = argparse.ArgumentParser(description="GEO Tracker Agent")
-    parser.add_argument("config", help="Path to client config JSON file")
+    parser.add_argument("config", nargs="?", help="Path to client config JSON file")
+    parser.add_argument("--client-id", help="Supabase client UUID (fetches config from DB)")
     parser.add_argument(
         "--output-dir",
         default="../output",
@@ -25,7 +75,10 @@ def main():
     )
     args = parser.parse_args()
 
-    config = load_client_config(args.config)
+    if args.client_id:
+        config = fetch_config_from_supabase(args.client_id)
+    else:
+        config = load_client_config(args.config)
     client_name = config["client_name"]
 
     print(f"\n  GEO Tracker — {client_name}")
@@ -34,6 +87,10 @@ def main():
     print()
 
     results, scores = run_tracker(config)
+
+    if args.client_id:
+        run_id = write_results_to_supabase(args.client_id, scores, results)
+        print(f"Results written to Supabase. Run ID: {run_id}")
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
