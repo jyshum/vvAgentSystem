@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { scoreColor, formatRate, formatDelta } from "@/lib/utils";
 import type { Client, TrackerRun, Report } from "@/lib/types";
@@ -95,13 +97,15 @@ export function ClientRow({ client, latestRun, previousRun, latestReport }: Clie
       </div>
 
       {/* Latest report */}
-      <div>
+      <div onClick={(e) => e.stopPropagation()}>
         {latestReport ? (
-          <span className="font-mono text-[9px] tracking-[0.1em] py-1.5 px-3 transition-colors"
+          <Link
+            href={`/admin/clients/${client.id}/reports/${latestReport.id}/view`}
+            className="font-mono text-[9px] tracking-[0.1em] py-1.5 px-3 transition-colors hover:text-white"
             style={{ color: "var(--faint)", border: "1px solid var(--ghost)" }}
-            onClick={(e) => { e.preventDefault(); window.location.href = `/admin/clients/${client.id}/reports/${latestReport.id}/view`; }}>
+          >
             VIEW ↗
-          </span>
+          </Link>
         ) : (
           <span className="font-mono text-[9px]" style={{ color: "var(--faint)", opacity: 0.4 }}>no report yet</span>
         )}
