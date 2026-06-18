@@ -1,23 +1,26 @@
 {
   "client_name": "ChildSpot",
   "brand_name": "ChildSpot",
-  "brand_variations": ["ChildSpot", "Child Spot", "childspotapp.com"],
+  "brand_variations": ["ChildSpot", "Child Spot", "childspotapp.com", "childspotapp"],
   "website_domain": "childspotapp.com",
   "supabase_client_id": "",
   "target_queries": [
-    "best childcare finder in Ontario",
-    "how to find daycare near me Ontario",
-    "childcare waitlist Ontario",
-    "Ontario childcare registry",
-    "find licensed daycare Ontario"
+    "find daycare near me Ontario",
+    "licensed daycare options in Ontario",
+    "best way to find childcare in Ontario",
+    "daycare with immediate availability Ontario",
+    "book daycare online without waitlist Ontario",
+    "CWELCC daycare spots available Ontario",
+    "how to fill empty daycare spots Ontario",
+    "attract more families to my daycare centre"
   ],
   "competitors": [
     "Wee Watch",
     "KinderPage",
     "Daycare Radar",
     "Care.com",
-    "RateYourDaycare",
+    "HiMama",
     "OneList Ontario",
-    "HiMama"
+    "KinderSurf"
   ]
 }
