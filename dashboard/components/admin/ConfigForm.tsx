@@ -13,11 +13,13 @@ export function ConfigForm({ client }: { client: Client }) {
   const [competitors, setCompetitors] = useState<string[]>(client.competitors || []);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function save() {
     setSaving(true);
+    setSaveError(null);
     const supabase = createClient();
-    await supabase.from("clients").update({
+    const { error } = await supabase.from("clients").update({
       brand_name: brandName,
       website_domain: domain,
       brand_variations: variations,
@@ -25,6 +27,10 @@ export function ConfigForm({ client }: { client: Client }) {
       competitors: competitors,
     }).eq("id", client.id);
     setSaving(false);
+    if (error) {
+      setSaveError(error.message);
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -94,6 +100,11 @@ export function ConfigForm({ client }: { client: Client }) {
       >
         {saving ? "SAVING…" : saved ? "SAVED ✓" : "SAVE CONFIG"}
       </button>
+      {saveError && (
+        <p className="font-mono text-[9px] mt-3" style={{ color: "var(--neg)" }}>
+          Save failed: {saveError}
+        </p>
+      )}
     </div>
   );
 }

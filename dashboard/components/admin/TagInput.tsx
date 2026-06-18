@@ -50,7 +50,6 @@ export function TagInput({ label, values, onChange, placeholder }: TagInputProps
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={onKey}
-        onBlur={add}
         placeholder={placeholder || "Type and press Enter"}
       />
     </div>
