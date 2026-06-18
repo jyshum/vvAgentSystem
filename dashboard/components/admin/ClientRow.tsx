@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { scoreColor, formatRate, formatDelta } from "@/lib/utils";
 import type { Client, TrackerRun, Report } from "@/lib/types";
 
@@ -12,6 +13,7 @@ interface ClientRowProps {
 }
 
 export function ClientRow({ client, latestRun, previousRun, latestReport }: ClientRowProps) {
+  const router = useRouter();
   const mentionDelta = latestRun && previousRun
     ? formatDelta(latestRun.aggregate_mention_rate, previousRun.aggregate_mention_rate)
     : null;
@@ -21,14 +23,14 @@ export function ClientRow({ client, latestRun, previousRun, latestReport }: Clie
     : true;
 
   return (
-    <Link
-      href={`/admin/clients/${client.id}/runs`}
-      className="grid items-center py-5 px-4 border-b transition-all duration-200 group"
+    <div
+      className="grid items-center py-5 px-4 border-b transition-all duration-200 group cursor-pointer"
       style={{
         gridTemplateColumns: "2fr 1fr 1fr 1.4fr 1fr",
         gap: "16px",
         borderColor: "var(--hair)",
       }}
+      onClick={() => router.push(`/admin/clients/${client.id}/runs`)}
     >
       {/* Client name + domain */}
       <div className="group-hover:pl-3 transition-all duration-200">
@@ -110,6 +112,6 @@ export function ClientRow({ client, latestRun, previousRun, latestReport }: Clie
           <span className="font-mono text-[9px]" style={{ color: "var(--faint)", opacity: 0.4 }}>no report yet</span>
         )}
       </div>
-    </Link>
+    </div>
   );
 }
