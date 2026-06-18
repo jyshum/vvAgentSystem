@@ -21,7 +21,7 @@ export default async function ReportEditorPage({
   if (!report) notFound();
   const typedReport = report as Report;
 
-  const [{ data: client }, runResult, resultsResult] = await Promise.all([
+  const [{ data: client }, runResult, resultsResult, { data: previousRuns }] = await Promise.all([
     supabase.from("clients").select("*").eq("id", id).single(),
     typedReport.run_id
       ? supabase.from("tracker_runs").select("*").eq("id", typedReport.run_id).single()
@@ -34,14 +34,8 @@ export default async function ReportEditorPage({
           )
           .eq("run_id", typedReport.run_id)
       : Promise.resolve({ data: [] }),
+    supabase.from("tracker_runs").select("*").eq("client_id", id).order("ran_at", { ascending: false }).limit(5),
   ]);
-
-  const { data: previousRuns } = await supabase
-    .from("tracker_runs")
-    .select("*")
-    .eq("client_id", id)
-    .order("ran_at", { ascending: false })
-    .limit(5);
 
   if (!client) notFound();
 
