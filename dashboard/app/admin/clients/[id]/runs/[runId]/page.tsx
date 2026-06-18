@@ -12,7 +12,7 @@ export default async function RunDetailPage({
   const supabase = await createClient();
 
   const [{ data: run }, { data: results }, { data: client }] = await Promise.all([
-    supabase.from("tracker_runs").select("*").eq("id", runId).single(),
+    supabase.from("tracker_runs").select("*").eq("id", runId).eq("client_id", id).single(),
     supabase.from("tracker_results").select("*").eq("run_id", runId).order("queried_at"),
     supabase.from("clients").select("*").eq("id", id).single(),
   ]);
