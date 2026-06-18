@@ -1,0 +1,57 @@
+import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+
+const RAILWAY_API = "https://backboard.railway.app/graphql/v2";
+
+async function railwayGraphQL(query: string, variables: Record<string, unknown>) {
+  const res = await fetch(RAILWAY_API, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.RAILWAY_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  return json.data;
+}
+
+export async function POST(req: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { clientId } = await req.json();
+  if (!clientId) return NextResponse.json({ error: "clientId required" }, { status: 400 });
+
+  // Verify client exists
+  const { data: client } = await supabase.from("clients").select("id").eq("id", clientId).single();
+  if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+
+  // Set CLIENT_ID variable on Railway service
+  await railwayGraphQL(`
+    mutation variableUpsert($input: VariableUpsertInput!) {
+      variableUpsert(input: $input)
+    }
+  `, {
+    input: {
+      serviceId: process.env.RAILWAY_SERVICE_ID,
+      environmentId: process.env.RAILWAY_ENVIRONMENT_ID,
+      name: "CLIENT_ID",
+      value: clientId,
+    },
+  });
+
+  // Trigger redeployment
+  const data = await railwayGraphQL(`
+    mutation serviceInstanceRedeploy($serviceId: String!, $environmentId: String!) {
+      serviceInstanceRedeploy(serviceId: $serviceId, environmentId: $environmentId)
+    }
+  `, {
+    serviceId: process.env.RAILWAY_SERVICE_ID!,
+    environmentId: process.env.RAILWAY_ENVIRONMENT_ID!,
+  });
+
+  return NextResponse.json({ ok: true, data });
+}
