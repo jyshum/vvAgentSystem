@@ -18,8 +18,8 @@ export function TriggerRunButton({ clientId }: { clientId: string }) {
       if (!res.ok) throw new Error(await res.text());
       setState("done");
       setTimeout(() => {
-        setState("idle");
         router.refresh();
+        setState("idle");
       }, 3000);
     } catch {
       setState("error");
