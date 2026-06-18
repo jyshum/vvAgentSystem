@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 export function SubTab({ label, href }: { label: string; href: string }) {
   const pathname = usePathname();
-  const isActive = pathname.startsWith(href);
+  const isActive = pathname === href || pathname.startsWith(href + "/");
 
   return (
     <Link
