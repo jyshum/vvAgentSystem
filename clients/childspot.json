@@ -3,7 +3,7 @@
   "brand_name": "ChildSpot",
   "brand_variations": ["ChildSpot", "Child Spot", "childspotapp.com", "childspotapp"],
   "website_domain": "childspotapp.com",
-  "supabase_client_id": "",
+  "supabase_client_id": "302eb603-3a0c-4429-bd8e-191ac30a965a",
   "target_queries": [
     "find daycare near me Ontario",
     "licensed daycare options in Ontario",
