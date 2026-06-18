@@ -1,0 +1,86 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+:root {
+  /* ── Colors: VV Landing Page (globals.css) ── */
+  --ink: #0e0e0f;
+  --ink-soft: #141416;
+  --ink-2: #19191c;
+  --white: #f5f4f1;
+  --paper: #f1ede4;
+  --paper-ink: #17150f;
+  --mute: rgba(245, 244, 241, 0.58);
+  --faint: rgba(245, 244, 241, 0.36);
+  --ghost: rgba(245, 244, 241, 0.13);
+  --hair: rgba(245, 244, 241, 0.11);
+
+  /* ── Accent/Status: VV Report Generator (styles.css) ── */
+  --pos: #84d8ab;
+  --neg: #e89aa0;
+  --accent: #f5f4f1;
+
+  /* ── Typography: VV Landing Page (layout.tsx) ── */
+  --serif: "Newsreader", Georgia, serif;
+  --sans: "Schibsted Grotesk", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--ink);
+  color: var(--white);
+  font-family: var(--serif);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Scrollbars (from report generator) ── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ghost);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--faint);
+}
+
+/* ── Print CSS for PDF export ── */
+@media print {
+  @page {
+    margin: 0;
+  }
+  html,
+  body {
+    height: auto;
+    overflow: visible;
+    background: var(--ink) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
