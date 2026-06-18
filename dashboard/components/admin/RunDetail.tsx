@@ -222,61 +222,68 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
       </div>
 
       {/* Competitor SoV */}
-      {competitors.length > 0 && (
-        <div className="mb-10">
-          <div className="font-mono text-[8px] tracking-[0.18em] uppercase mb-4" style={{ color: "var(--faint)" }}>
-            COMPETITOR SHARE OF VOICE
-          </div>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b" style={{ borderColor: "var(--hair)" }}>
-                {["BRAND", "APPEARANCES", "RATE"].map((h) => (
-                  <th
-                    key={h}
-                    className="font-mono text-[8px] tracking-[0.12em] uppercase pb-2.5 text-left font-normal"
-                    style={{ color: "var(--faint)" }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Brand row first */}
-              <tr className="border-b" style={{ borderColor: "var(--hair)" }}>
-                <td className="py-3 font-serif text-sm" style={{ color: "var(--pos)" }}>{client.brand_name}</td>
+      <div className="mb-10">
+        <div className="font-mono text-[8px] tracking-[0.18em] uppercase mb-4" style={{ color: "var(--faint)" }}>
+          COMPETITOR SHARE OF VOICE
+        </div>
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b" style={{ borderColor: "var(--hair)" }}>
+              {["BRAND", "APPEARANCES", "RATE"].map((h) => (
+                <th
+                  key={h}
+                  className="font-mono text-[8px] tracking-[0.12em] uppercase pb-2.5 text-left font-normal"
+                  style={{ color: "var(--faint)" }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {/* Brand row - always shown */}
+            <tr className="border-b" style={{ borderColor: "var(--hair)" }}>
+              <td className="py-3 font-serif text-sm" style={{ color: "var(--pos)" }}>{client.brand_name}</td>
+              <td className="py-3 pr-8">
+                <div
+                  className="h-0.5"
+                  style={{ width: `${run.aggregate_mention_rate * 200}px`, maxWidth: 200, background: "var(--pos)" }}
+                />
+              </td>
+              <td className="py-3 font-mono text-[10px]" style={{ color: "var(--pos)" }}>
+                {formatRate(run.aggregate_mention_rate)}
+              </td>
+            </tr>
+            {/* Competitor rows - only when there are competitors */}
+            {competitors.map(([name, count]) => (
+              <tr key={name} className="border-b" style={{ borderColor: "var(--hair)" }}>
+                <td className="py-3 font-serif text-sm" style={{ color: "var(--mute)" }}>{name}</td>
                 <td className="py-3 pr-8">
                   <div
                     className="h-0.5"
-                    style={{ width: `${run.aggregate_mention_rate * 200}px`, maxWidth: 200, background: "var(--pos)" }}
+                    style={{
+                      width: `${(count / maxCompMentions) * 200 * 0.7}px`,
+                      maxWidth: 200,
+                      background: "var(--ghost)",
+                    }}
                   />
                 </td>
-                <td className="py-3 font-mono text-[10px]" style={{ color: "var(--pos)" }}>
-                  {formatRate(run.aggregate_mention_rate)}
+                <td className="py-3 font-mono text-[10px]" style={{ color: "var(--faint)" }}>
+                  {Math.round((count / results.length) * 100)}%
                 </td>
               </tr>
-              {competitors.map(([name, count]) => (
-                <tr key={name} className="border-b" style={{ borderColor: "var(--hair)" }}>
-                  <td className="py-3 font-serif text-sm" style={{ color: "var(--mute)" }}>{name}</td>
-                  <td className="py-3 pr-8">
-                    <div
-                      className="h-0.5"
-                      style={{
-                        width: `${(count / maxCompMentions) * 200 * 0.7}px`,
-                        maxWidth: 200,
-                        background: "var(--ghost)",
-                      }}
-                    />
-                  </td>
-                  <td className="py-3 font-mono text-[10px]" style={{ color: "var(--faint)" }}>
-                    {Math.round((count / results.length) * 100)}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+            {/* Empty state when no competitors */}
+            {competitors.length === 0 && (
+              <tr>
+                <td colSpan={3} className="py-4 font-mono text-[9px]" style={{ color: "var(--faint)" }}>
+                  No competitor mentions detected this run.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* Citation URLs */}
       <div className="mb-10">
