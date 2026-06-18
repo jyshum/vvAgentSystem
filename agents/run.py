@@ -13,8 +13,10 @@ from supabase import create_client
 
 
 def fetch_config_from_supabase(client_id: str) -> dict:
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_SERVICE_KEY"]
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_KEY")
+    if not url or not key:
+        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment")
     supabase = create_client(url, key)
     result = supabase.table("clients").select("*").eq("id", client_id).single().execute()
     row = result.data
@@ -29,15 +31,17 @@ def fetch_config_from_supabase(client_id: str) -> dict:
 
 
 def write_results_to_supabase(client_id: str, scores: dict, results: list) -> str:
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_SERVICE_KEY"]
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_KEY")
+    if not url or not key:
+        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment")
     supabase = create_client(url, key)
 
     run_row = supabase.table("tracker_runs").insert({
         "client_id": client_id,
         "aggregate_mention_rate": scores.get("aggregate_mention_rate", 0),
         "aggregate_citation_rate": scores.get("aggregate_citation_rate", 0),
-        "per_engine_scores": scores.get("per_engine_scores", {}),
+        "per_engine_scores": scores.get("per_engine", {}),
         "competitor_scores": scores.get("competitor_scores", {}),
     }).execute()
 
@@ -74,6 +78,9 @@ def main():
         help="Upload results to Supabase after run",
     )
     args = parser.parse_args()
+
+    if not args.client_id and not args.config:
+        parser.error("Either a config file path or --client-id is required.")
 
     if args.client_id:
         config = fetch_config_from_supabase(args.client_id)
