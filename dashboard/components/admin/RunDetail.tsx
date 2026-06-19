@@ -162,23 +162,31 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
       </div>
 
       {/* KPI strip */}
-      <div className="grid grid-cols-4 mb-10" style={{ gap: 1, background: "var(--hair)" }}>
-        {[
-          { n: formatRate(run.aggregate_mention_rate), l: "MENTION RATE", color: scoreColor(run.aggregate_mention_rate) },
-          { n: formatRate(run.aggregate_citation_rate), l: "CITATION RATE", color: scoreColor(run.aggregate_citation_rate) },
-          { n: String(results.length), l: "RESPONSES", color: "var(--mute)" },
-          { n: String(results.filter((r) => r.brand_cited).length), l: "CITATIONS", color: "var(--mute)" },
-        ].map(({ n, l, color }) => (
-          <div key={l} className="py-5 px-5" style={{ background: "var(--ink)" }}>
-            <div className="font-display text-[40px] font-light leading-none mb-2" style={{ color }}>{n}</div>
-            <div className="font-mono text-[8px] tracking-[0.14em]" style={{ color: "var(--faint)" }}>{l}</div>
+      <div className="grid grid-cols-4 mb-10" style={{ gap: 1, background: "var(--hair)", border: "1px solid var(--hair)" }}>
+        {(() => {
+          const citedCount = results.filter((r) => r.brand_cited).length;
+          const topComp = Object.entries(compCounts).sort((a, b) => b[1] - a[1])[0];
+          const topCompRate = topComp ? Math.round((topComp[1] / results.length) * 100) + "%" : "—";
+          const topCompLabel = topComp ? `${topComp[0]} · ${topComp[1]} mention${topComp[1] !== 1 ? "s" : ""}` : "no competitors detected";
+          const mentionedCount = results.filter((r) => r.brand_mentioned || r.brand_cited).length;
+          return [
+            { n: formatRate(run.aggregate_mention_rate), l: "MENTION RATE", d: `${mentionedCount} of ${results.length} responses`, color: scoreColor(run.aggregate_mention_rate) },
+            { n: formatRate(run.aggregate_citation_rate), l: "CITATION RATE", d: citedCount > 0 ? `${citedCount} URL${citedCount !== 1 ? "s" : ""} cited this run` : "no URLs cited this run", color: scoreColor(run.aggregate_citation_rate) },
+            { n: topCompRate, l: "TOP COMPETITOR", d: topCompLabel, color: "var(--mute)" },
+            { n: String(citedCount), l: "CITATIONS FOUND", d: citedCount > 0 ? `across ${results.filter(r=>r.brand_cited).map(r=>r.engine).filter((v,i,a)=>a.indexOf(v)===i).length} engine${results.filter(r=>r.brand_cited).map(r=>r.engine).filter((v,i,a)=>a.indexOf(v)===i).length!==1?"s":""}` : "—", color: "var(--faint)" },
+          ];
+        })().map(({ n, l, d, color }) => (
+          <div key={l} className="py-4 px-5" style={{ background: "var(--ink)" }}>
+            <div className="font-display text-[36px] font-light leading-none mb-1.5" style={{ color }}>{n}</div>
+            <div className="font-mono text-[8px] tracking-[0.14em] mb-1" style={{ color: "var(--faint)" }}>{l}</div>
+            <div className="font-mono text-[8px]" style={{ color: "var(--faint)" }}>{d}</div>
           </div>
         ))}
       </div>
 
       {/* Per-engine breakdown */}
-      <div className="font-mono text-[8px] tracking-[0.18em] uppercase mb-4" style={{ color: "var(--faint)" }}>
-        PER-ENGINE BREAKDOWN
+      <div className="font-mono text-[9px] tracking-[0.18em] uppercase pb-3 mb-5 border-b" style={{ color: "var(--faint)", borderColor: "var(--hair)", marginTop: 40 }}>
+        PER-ENGINE BREAKDOWN <span style={{ fontSize: 8, letterSpacing: "0.06em", opacity: 0.7, marginLeft: 10 }}>{results.length / 4 >= 1 ? Math.round(results.length / ENGINES.length) : "?"} queries each</span>
       </div>
       <div className="grid grid-cols-4 gap-3 mb-10">
         {engineStats.map(({ engine, cited, mentioned, notFound, total }) => {
@@ -223,7 +231,7 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
 
       {/* Competitor SoV */}
       <div className="mb-10">
-        <div className="font-mono text-[8px] tracking-[0.18em] uppercase mb-4" style={{ color: "var(--faint)" }}>
+        <div className="font-mono text-[9px] tracking-[0.18em] uppercase pb-3 mb-5 border-b" style={{ color: "var(--faint)", borderColor: "var(--hair)", marginTop: 40 }}>
           COMPETITOR SHARE OF VOICE
         </div>
         <table className="w-full border-collapse">
@@ -287,7 +295,7 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
 
       {/* Citation URLs */}
       <div className="mb-10">
-        <div className="font-mono text-[8px] tracking-[0.18em] uppercase mb-4" style={{ color: "var(--faint)" }}>
+        <div className="font-mono text-[9px] tracking-[0.18em] uppercase pb-3 mb-5 border-b" style={{ color: "var(--faint)", borderColor: "var(--hair)", marginTop: 40 }}>
           CITATION URLS DISCOVERED
         </div>
         {Object.keys(citationsByUrl).length === 0 ? (
@@ -314,12 +322,43 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
       </div>
 
       {/* Query results */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
-          QUERY RESULTS
-          <span className="ml-3" style={{ opacity: 0.5 }}>
-            {queries.length} quer{queries.length !== 1 ? "ies" : "y"} · {results.length} responses
-          </span>
+      <div className="font-mono text-[9px] tracking-[0.18em] mb-4 pb-3 border-b flex items-center justify-between" style={{ color: "var(--faint)", borderColor: "var(--hair)", marginTop: 40 }}>
+        <span>QUERY RESULTS <span style={{ opacity: 0.45, fontSize: 9, marginLeft: 8 }}>{queries.length} quer{queries.length !== 1 ? "ies" : "y"} · {results.length} responses</span></span>
+      </div>
+
+      {/* Overview matrix */}
+      <div className="overflow-x-auto mb-7">
+        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--mono)", fontSize: 9 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", padding: "8px 12px 8px 0", color: "var(--faint)", fontWeight: 400, borderBottom: "1px solid var(--hair)" }}>QUERY</th>
+              {["GPT", "PERP", "CLAUDE", "GEMINI"].map(e => (
+                <th key={e} style={{ padding: "8px 12px", color: "var(--faint)", fontWeight: 400, borderBottom: "1px solid var(--hair)", textAlign: "center" }}>{e}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {queries.map((query) => {
+              const qResults = byQuery(query);
+              const cellFor = (eng: string) => {
+                const r = qResults.find(r => r.engine === eng);
+                if (!r) return <td key={eng} style={{ padding: "10px 12px", textAlign: "center", color: "var(--faint)", fontSize: 7 }}>N/A</td>;
+                if (r.brand_cited) return <td key={eng} style={{ padding: "10px 12px", textAlign: "center", color: "var(--pos)", fontWeight: 500 }}>C</td>;
+                if (r.brand_mentioned) return <td key={eng} style={{ padding: "10px 12px", textAlign: "center", color: "var(--pos)", fontWeight: 500 }}>M</td>;
+                return <td key={eng} style={{ padding: "10px 12px", textAlign: "center", color: "var(--faint)" }}>—</td>;
+              };
+              return (
+                <tr key={query} style={{ borderBottom: "1px solid var(--hair)", cursor: "pointer" }}
+                  className="hover:bg-[rgba(245,244,241,0.03)] transition-colors">
+                  <td style={{ padding: "10px 12px 10px 0", color: "var(--mute)" }}>{query}</td>
+                  {["chatgpt", "perplexity", "claude", "gemini"].map(eng => cellFor(eng))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="font-mono mt-2" style={{ fontSize: 8, color: "var(--faint)", letterSpacing: "0.06em" }}>
+          M = mentioned &nbsp;·&nbsp; C = cited &nbsp;·&nbsp; — = not found &nbsp;·&nbsp; N/A = engine skipped
         </div>
       </div>
 

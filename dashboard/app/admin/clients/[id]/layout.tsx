@@ -32,24 +32,28 @@ export default async function ClientLayout({
   return (
     <div>
       {/* Breadcrumb */}
-      <Link
-        href="/admin"
-        className="font-mono text-[11px] tracking-[0.16em] uppercase inline-block mb-6 opacity-60 hover:opacity-100 transition-opacity"
-        style={{ color: "var(--faint)" }}
-      >
-        &larr; Clients
-      </Link>
+      <div className="flex items-center gap-2.5 mb-0 pb-3.5 border-b font-mono text-[9px] tracking-[0.14em]" style={{ borderColor: "var(--hair)" }}>
+        <Link
+          href="/admin"
+          className="uppercase transition-colors hover:text-[var(--white)]"
+          style={{ color: "var(--faint)" }}
+        >
+          CLIENTS
+        </Link>
+        <span style={{ color: "var(--faint)", opacity: 0.4 }}>/</span>
+        <span className="uppercase" style={{ color: "var(--mute)" }}>{c.name}</span>
+      </div>
 
       {/* Client header */}
-      <div className="mb-6">
+      <div className="pt-8 mb-0">
         <h1
-          className="font-display text-[clamp(34px,4.8vw,60px)] font-light leading-[1.02] tracking-[-0.02em]"
+          className="font-display text-[48px] font-light leading-[0.95]"
           style={{ color: "var(--white)" }}
         >
           {c.name}
         </h1>
         <div
-          className="font-mono text-[10px] tracking-[0.1em] uppercase mt-1"
+          className="font-mono text-[10px] tracking-[0.1em] mt-1.5"
           style={{ color: "var(--faint)" }}
         >
           {c.website_domain}
@@ -58,7 +62,7 @@ export default async function ClientLayout({
 
       {/* Sub-nav */}
       <div
-        className="flex gap-0 mb-10 border-b"
+        className="flex gap-0 mt-[22px] border-b mb-10"
         style={{ borderColor: "var(--hair)" }}
       >
         {tabs.map((tab) => (

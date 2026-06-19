@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { weekRangeLabel } from "@/lib/utils";
-import type { Report } from "@/lib/types";
+import { weekRangeLabel, formatRate, scoreColor } from "@/lib/utils";
+import type { Report, TrackerRun } from "@/lib/types";
 
 export default async function ReportsPage({
   params,
@@ -19,16 +19,26 @@ export default async function ReportsPage({
 
   const allReports = (reports as Report[]) || [];
 
+  // Fetch runs for reports that have a run_id
+  const runIds = allReports.map((r) => r.run_id).filter(Boolean) as string[];
+  const runsById: Record<string, TrackerRun> = {};
+  if (runIds.length > 0) {
+    const { data: runs } = await supabase
+      .from("tracker_runs")
+      .select("id, aggregate_mention_rate, aggregate_citation_rate")
+      .in("id", runIds);
+    if (runs) {
+      (runs as TrackerRun[]).forEach((run) => { runsById[run.id] = run; });
+    }
+  }
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
-          {allReports.length} report{allReports.length !== 1 ? "s" : ""}
-        </div>
+      <div className="flex items-center justify-end mb-8">
         <Link
           href={`/api/admin/create-report?clientId=${id}`}
-          className="font-mono text-[9px] tracking-[0.14em] uppercase py-3 px-5 transition-colors hover:text-white"
-          style={{ color: "var(--faint)", border: "1px solid var(--hair)" }}
+          className="font-mono text-[9px] tracking-[0.14em] uppercase py-3 px-5 transition-all duration-200 hover:bg-[var(--white)] hover:text-[var(--ink)]"
+          style={{ color: "var(--faint)", border: "1px solid var(--hair)", background: "transparent" }}
         >
           + NEW BLANK REPORT
         </Link>
@@ -40,63 +50,96 @@ export default async function ReportsPage({
         </p>
       ) : (
         <>
-          <div className="grid pb-3 border-b font-mono text-[8px] tracking-[0.18em] uppercase"
+          {/* Table header */}
+          <div
+            className="grid pb-2.5 border-b font-mono text-[8px] tracking-[0.14em] uppercase"
             style={{
-              gridTemplateColumns: "1fr 120px auto",
+              gridTemplateColumns: "1.5fr 1fr 1fr 1fr 120px",
               gap: "16px",
               borderColor: "var(--hair)",
               color: "var(--faint)",
-            }}>
+            }}
+          >
             <span>WEEK</span>
+            <span>MENTION</span>
+            <span>CITATION</span>
             <span>STATUS</span>
-            <span></span>
+            <span>ACTIONS</span>
           </div>
 
-          {allReports.map((report) => (
-            <div
-              key={report.id}
-              className="grid items-center py-4 border-b"
-              style={{
-                gridTemplateColumns: "1fr 120px auto",
-                gap: "16px",
-                borderColor: "var(--hair)",
-              }}
-            >
-              <Link
-                href={`/admin/clients/${id}/reports/${report.id}`}
-                className="font-serif italic text-base hover:text-white transition-colors"
-                style={{ color: "var(--mute)" }}
+          {allReports.map((report) => {
+            const run = report.run_id ? runsById[report.run_id] : null;
+            return (
+              <div
+                key={report.id}
+                className="grid items-center py-[17px] border-b transition-all duration-200 group hover:pl-2.5 cursor-pointer"
+                style={{
+                  gridTemplateColumns: "1.5fr 1fr 1fr 1fr 120px",
+                  gap: "16px",
+                  borderColor: "var(--hair)",
+                }}
+                onClick={() => { window.location.href = `/admin/clients/${id}/reports/${report.id}`; }}
               >
-                {weekRangeLabel(report.week_start) || "Untitled report"}
-              </Link>
-              <span
-                className="font-mono text-[8px] tracking-[0.1em] uppercase py-1 px-2 inline-block text-center"
-                style={
-                  report.status === "published"
-                    ? { color: "var(--pos)", border: "1px solid rgba(132,216,171,0.3)", background: "rgba(132,216,171,0.08)" }
-                    : { color: "var(--faint)", border: "1px solid var(--hair)" }
-                }
-              >
-                {report.status}
-              </span>
-              <div className="flex gap-2 justify-end">
-                <Link
-                  href={`/admin/clients/${id}/reports/${report.id}`}
-                  className="font-mono text-[8px] tracking-[0.1em] uppercase py-1.5 px-3 transition-colors hover:text-white"
-                  style={{ color: "var(--faint)", border: "1px solid var(--hair)" }}
-                >
-                  EDIT
-                </Link>
-                <Link
-                  href={`/admin/clients/${id}/reports/${report.id}/view`}
-                  className="font-mono text-[8px] tracking-[0.1em] uppercase py-1.5 px-3 transition-colors hover:text-white"
-                  style={{ color: "var(--faint)", border: "1px solid var(--hair)" }}
-                >
-                  VIEW ↗
-                </Link>
+                {/* Week */}
+                <div>
+                  <div className="font-serif text-[16px]" style={{ color: "var(--white)" }}>
+                    {weekRangeLabel(report.week_start) || "Untitled report"}
+                  </div>
+                  <div className="font-mono text-[8px] mt-0.5" style={{ color: "var(--faint)" }}>
+                    {report.status === "published" ? "● Published" : "Draft"}
+                  </div>
+                </div>
+
+                {/* Mention rate */}
+                <div>
+                  {run ? (
+                    <div className="font-display font-light text-[22px] leading-none"
+                      style={{ color: scoreColor(run.aggregate_mention_rate) }}>
+                      {formatRate(run.aggregate_mention_rate)}
+                    </div>
+                  ) : (
+                    <span className="font-mono text-[11px]" style={{ color: "var(--faint)" }}>—</span>
+                  )}
+                </div>
+
+                {/* Citation rate */}
+                <div>
+                  {run ? (
+                    <div className="font-display font-light text-[22px] leading-none"
+                      style={{ color: scoreColor(run.aggregate_citation_rate) }}>
+                      {formatRate(run.aggregate_citation_rate)}
+                    </div>
+                  ) : (
+                    <span className="font-mono text-[11px]" style={{ color: "var(--faint)" }}>—</span>
+                  )}
+                </div>
+
+                {/* Status */}
+                <div className="font-mono text-[9px]" style={{ color: "var(--mute)" }}>
+                  {new Date(report.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  {report.run_id ? " · from run" : " · blank"}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <Link
+                    href={`/admin/clients/${id}/reports/${report.id}`}
+                    className="font-mono text-[8px] tracking-[0.08em] py-1.5 px-2.5 transition-all duration-200 hover:text-white hover:border-[var(--ghost)]"
+                    style={{ color: "var(--faint)", border: "1px solid var(--hair)" }}
+                  >
+                    EDIT
+                  </Link>
+                  <Link
+                    href={`/admin/clients/${id}/reports/${report.id}/view`}
+                    className="font-mono text-[8px] tracking-[0.08em] py-1.5 px-2.5 transition-all duration-200 hover:text-white hover:border-[var(--ghost)]"
+                    style={{ color: "var(--faint)", border: "1px solid var(--hair)" }}
+                  >
+                    VIEW ↗
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </>
       )}
     </div>
