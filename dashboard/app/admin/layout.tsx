@@ -39,7 +39,7 @@ export default async function AdminLayout({
         </form>
       </nav>
 
-      <main className="max-w-[1280px] mx-auto px-14 py-12">
+      <main style={{ maxWidth: 1080, margin: "0 auto", padding: "56px 56px 100px" }}>
         {children}
       </main>
     </div>
