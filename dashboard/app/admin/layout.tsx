@@ -14,14 +14,6 @@ export default async function AdminLayout({
 
   if (!user) redirect("/login");
 
-  const { data: clientUser } = await supabase
-    .from("client_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!clientUser || clientUser.role !== "admin") redirect("/dashboard");
-
   return (
     <div className="min-h-screen" style={{ background: "var(--ink)" }}>
       <nav
