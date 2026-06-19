@@ -33,8 +33,8 @@ def upload_run(
             "competitor_scores": scores.get("competitor_scores", {}),
         }
 
-        run_resp = sb.from_("tracker_runs").insert(run_row).select().single().execute()
-        run_id = run_resp.data["id"]
+        run_resp = sb.from_("tracker_runs").insert(run_row).execute()
+        run_id = run_resp.data[0]["id"]
 
         result_rows = []
         for r in results:

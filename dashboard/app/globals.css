@@ -26,13 +26,8 @@
   --display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* box-sizing + reset handled by Tailwind v4 base layer — do NOT add a custom
+   unlayered * reset here, it would override all Tailwind padding/margin utilities */
 
 html,
 body {

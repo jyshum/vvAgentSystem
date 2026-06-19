@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
+// Handles OAuth/magic-link callbacks (not used for password auth, kept for safety)
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -8,25 +9,10 @@ export async function GET(request: Request) {
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-
     if (!error) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const { data: clientUser } = await supabase
-          .from("client_users")
-          .select("role")
-          .eq("user_id", user.id)
-          .single();
-
-        const dest =
-          clientUser?.role === "admin" ? "/admin" : "/dashboard";
-        return NextResponse.redirect(`${origin}${dest}`);
-      }
+      return NextResponse.redirect(`${origin}/admin`);
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  return NextResponse.redirect(`${origin}/login`);
 }

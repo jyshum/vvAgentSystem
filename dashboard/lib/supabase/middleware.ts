@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const ALLOWED_EMAILS = (process.env.ADMIN_EMAILS ?? "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -13,7 +18,7 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
           supabaseResponse = NextResponse.next({ request });
@@ -33,43 +38,28 @@ export async function updateSession(request: NextRequest) {
 
   // Public routes
   if (path === "/login" || path.startsWith("/login/")) {
-    if (user) {
-      const { data: clientUser } = await supabase
-        .from("client_users")
-        .select("role")
-        .eq("user_id", user.id)
-        .single();
-
-      const dest =
-        clientUser?.role === "admin" ? "/admin" : "/dashboard";
-      return NextResponse.redirect(new URL(dest, request.url));
+    if (user && isAdmin(user.email)) {
+      return NextResponse.redirect(new URL("/admin", request.url));
     }
     return supabaseResponse;
   }
 
-  // Protected routes — must be logged in
-  if (!user) {
+  // Must be logged in and in the allowlist
+  if (!user || !isAdmin(user.email)) {
+    await supabase.auth.signOut();
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Role-based access
-  const { data: clientUser } = await supabase
-    .from("client_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!clientUser) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  if (path.startsWith("/admin") && clientUser.role !== "admin") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  if (path.startsWith("/dashboard") && clientUser.role !== "client") {
+  // Redirect legacy /dashboard routes to admin
+  if (path.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }
 
   return supabaseResponse;
+}
+
+function isAdmin(email: string | undefined): boolean {
+  if (!email) return false;
+  if (ALLOWED_EMAILS.length === 0) return false;
+  return ALLOWED_EMAILS.includes(email.toLowerCase());
 }

@@ -14,14 +14,6 @@ export default async function AdminLayout({
 
   if (!user) redirect("/login");
 
-  const { data: clientUser } = await supabase
-    .from("client_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!clientUser || clientUser.role !== "admin") redirect("/dashboard");
-
   return (
     <div className="min-h-screen" style={{ background: "var(--ink)" }}>
       <nav
@@ -32,45 +24,22 @@ export default async function AdminLayout({
           borderBottom: "1px solid var(--hair)",
         }}
       >
-        <div className="flex items-center gap-3">
-          <span
-            className="font-serif text-[21px] tracking-[0.01em]"
-            style={{ color: "var(--white)" }}
-          >
-            Victory Velocity
-          </span>
-          <span
-            className="font-mono text-[8px] tracking-[0.2em] uppercase py-[3px] px-[7px]"
-            style={{
-              color: "var(--mute)",
-              border: "1px solid var(--ghost)",
-            }}
-          >
-            Admin
-          </span>
+        <div className="font-display text-[22px]" style={{ color: "var(--white)" }}>
+          Victory<em style={{ fontStyle: "italic", color: "var(--mute)" }}>Velocity</em>
         </div>
 
-        <div className="flex items-center gap-[30px]">
-          <Link
-            href="/admin"
-            className="font-sans text-[12.5px] font-medium tracking-[0.08em] transition-colors hover:text-[var(--white)]"
-            style={{ color: "var(--mute)" }}
+        <form action="/api/auth/signout" method="POST">
+          <button
+            type="submit"
+            className="font-mono text-[10px] tracking-[0.12em] uppercase bg-transparent border-none cursor-pointer transition-colors hover:text-[var(--white)]"
+            style={{ color: "var(--faint)" }}
           >
-            Clients
-          </Link>
-          <form action="/api/auth/signout" method="POST">
-            <button
-              type="submit"
-              className="font-sans text-[12.5px] font-medium tracking-[0.08em] transition-colors bg-transparent border-none cursor-pointer hover:text-[var(--white)]"
-              style={{ color: "var(--faint)" }}
-            >
-              Sign Out
-            </button>
-          </form>
-        </div>
+            SIGN OUT
+          </button>
+        </form>
       </nav>
 
-      <main className="max-w-[1280px] mx-auto px-14 py-12">
+      <main style={{ maxWidth: 1080, margin: "0 auto", padding: "56px 56px 100px" }}>
         {children}
       </main>
     </div>

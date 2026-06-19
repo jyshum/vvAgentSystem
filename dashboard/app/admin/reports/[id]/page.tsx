@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import { ReportEditor } from "@/components/admin/ReportEditor";
 import type {
@@ -14,7 +14,7 @@ export default async function AdminReportEditorPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: report } = await supabase
     .from("reports")

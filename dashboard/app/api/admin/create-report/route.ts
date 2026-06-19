@@ -3,11 +3,11 @@ import { redirect } from "next/navigation";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const runId = searchParams.get("runId");
+  const runId = searchParams.get("runId"); // can be null for blank reports
   const clientId = searchParams.get("clientId");
 
-  if (!runId || !clientId) {
-    return new Response("Missing params", { status: 400 });
+  if (!clientId) {
+    return new Response("Missing clientId", { status: 400 });
   }
 
   const supabase = await createClient();
@@ -27,19 +27,30 @@ export async function GET(request: Request) {
     return new Response("Forbidden", { status: 403 });
   }
 
-  const { data: run } = await supabase
-    .from("tracker_runs")
-    .select("ran_at")
-    .eq("id", runId)
-    .single();
+  let weekStart: string;
 
-  if (!run) return new Response("Run not found", { status: 404 });
+  if (runId) {
+    const { data: run } = await supabase
+      .from("tracker_runs")
+      .select("ran_at")
+      .eq("id", runId)
+      .single();
 
-  const ranDate = new Date(run.ran_at);
-  const day = ranDate.getDay();
-  const monday = new Date(ranDate);
-  monday.setDate(ranDate.getDate() - ((day + 6) % 7));
-  const weekStart = monday.toISOString().split("T")[0];
+    if (!run) return new Response("Run not found", { status: 404 });
+
+    const ranDate = new Date(run.ran_at);
+    const day = ranDate.getDay();
+    const monday = new Date(ranDate);
+    monday.setDate(ranDate.getDate() - ((day + 6) % 7));
+    weekStart = monday.toISOString().split("T")[0];
+  } else {
+    // Blank report: use this week's Monday
+    const today = new Date();
+    const day = today.getDay();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((day + 6) % 7));
+    weekStart = monday.toISOString().split("T")[0];
+  }
 
   const { data: report, error } = await supabase
     .from("reports")
@@ -56,5 +67,5 @@ export async function GET(request: Request) {
     return new Response(error.message, { status: 500 });
   }
 
-  redirect(`/admin/reports/${report.id}`);
+  redirect(`/admin/clients/${clientId}/reports/${report.id}`);
 }
