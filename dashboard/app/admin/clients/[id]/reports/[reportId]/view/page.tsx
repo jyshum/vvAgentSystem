@@ -30,7 +30,7 @@ export default async function ReportViewPage({
       ? supabase
           .from("tracker_results")
           .select(
-            "id, run_id, query, engine, model, brand_mentioned, brand_cited, citation_url, competitor_mentions, queried_at"
+            "id, run_id, query, engine, model, brand_mentioned, brand_cited, citation_url, competitor_mentions, response_text, queried_at"
           )
           .eq("run_id", typedReport.run_id)
       : Promise.resolve({ data: [] }),
@@ -43,20 +43,45 @@ export default async function ReportViewPage({
   ]);
 
   return (
-    <div style={{ background: "var(--ink)", minHeight: "60vh" }}>
-      {/* Top bar */}
+    <div
+      className="no-print-wrapper"
+      style={{
+        position: "fixed",
+        top: "78px",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 40,
+        display: "flex",
+        flexDirection: "column",
+        background: "#080809",
+      }}
+    >
+      {/* Chrome bar */}
       <div
-        className="no-print flex items-center justify-between py-3 px-4 mb-8 border-b"
-        style={{ borderColor: "var(--hair)" }}
+        className="no-print flex items-center justify-between px-6 flex-shrink-0"
+        style={{
+          height: "48px",
+          borderBottom: "1px solid var(--hair)",
+          background: "rgba(14,14,15,0.7)",
+        }}
       >
-        <Link
-          href={`/admin/clients/${id}/reports`}
-          className="font-mono text-[9px] tracking-[0.12em] uppercase transition-opacity hover:opacity-100 opacity-60"
-          style={{ color: "var(--faint)" }}
-        >
-          ← Reports
-        </Link>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-4">
+          <Link
+            href={`/admin/clients/${id}/reports`}
+            className="font-mono text-[9px] tracking-[0.12em] uppercase transition-opacity hover:opacity-100 opacity-60"
+            style={{ color: "var(--faint)" }}
+          >
+            ← Reports
+          </Link>
+          <span
+            className="font-mono text-[9px] tracking-[0.12em] uppercase"
+            style={{ color: "var(--faint)" }}
+          >
+            {typedClient.name}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
           <Link
             href={`/admin/clients/${id}/reports/${reportId}`}
             className="font-mono text-[9px] tracking-[0.1em] uppercase py-1.5 px-4 transition-colors hover:text-white"
@@ -68,16 +93,21 @@ export default async function ReportViewPage({
         </div>
       </div>
 
-      {/* Report content */}
-      <ReportView
-        report={typedReport}
-        run={(runResult?.data as TrackerRun) ?? null}
-        results={(resultsResult?.data as TrackerResultClient[]) ?? []}
-        clientName={typedClient.name}
-        brandName={typedClient.brand_name}
-        domain={typedClient.website_domain}
-        previousRuns={(prevRunsResult?.data as TrackerRun[]) ?? []}
-      />
+      {/* Scrollable report area */}
+      <div
+        className="flex-1 overflow-y-auto"
+        style={{ padding: "40px 24px 80px" }}
+      >
+        <ReportView
+          report={typedReport}
+          run={(runResult?.data as TrackerRun) ?? null}
+          results={(resultsResult?.data as TrackerResultClient[]) ?? []}
+          clientName={typedClient.name}
+          brandName={typedClient.brand_name}
+          domain={typedClient.website_domain}
+          previousRuns={(prevRunsResult?.data as TrackerRun[]) ?? []}
+        />
+      </div>
     </div>
   );
 }

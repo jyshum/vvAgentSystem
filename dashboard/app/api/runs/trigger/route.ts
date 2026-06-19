@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { RAILWAY_API_TOKEN, RAILWAY_SERVICE_ID, RAILWAY_ENVIRONMENT_ID } = process.env;
-  if (!RAILWAY_API_TOKEN || !RAILWAY_SERVICE_ID || !RAILWAY_ENVIRONMENT_ID) {
+  const { RAILWAY_API_TOKEN, RAILWAY_SERVICE_ID, RAILWAY_ENVIRONMENT_ID, RAILWAY_PROJECT_ID } = process.env;
+  if (!RAILWAY_API_TOKEN || !RAILWAY_SERVICE_ID || !RAILWAY_ENVIRONMENT_ID || !RAILWAY_PROJECT_ID) {
     return NextResponse.json({ error: "Railway not configured" }, { status: 503 });
   }
 
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       }
     `, {
       input: {
+        projectId: RAILWAY_PROJECT_ID,
         serviceId: RAILWAY_SERVICE_ID,
         environmentId: RAILWAY_ENVIRONMENT_ID,
         name: "CLIENT_ID",

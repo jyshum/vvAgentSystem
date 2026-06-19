@@ -5,32 +5,45 @@ import { useRouter } from "next/navigation";
 
 export function TriggerRunButton({ clientId }: { clientId: string }) {
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const router = useRouter();
 
   async function trigger() {
     setState("loading");
+    setErrorMsg(null);
     try {
       const res = await fetch("/api/runs/trigger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientId }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        let msg = "Railway API error";
+        try {
+          const body = await res.json();
+          msg = body.error ?? msg;
+        } catch {
+          msg = (await res.text()) || msg;
+        }
+        throw new Error(msg);
+      }
       setState("done");
       setTimeout(() => {
         router.refresh();
         setState("idle");
       }, 3000);
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setErrorMsg(msg);
       setState("error");
-      setTimeout(() => setState("idle"), 3000);
+      setTimeout(() => setState("idle"), 5000);
     }
   }
 
   const labels = {
-    idle: "▷ RUN NOW",
-    loading: "◌ RUNNING…",
-    done: "TRIGGERED ✓",
+    idle: "RUN NOW",
+    loading: "RUNNING...",
+    done: "TRIGGERED",
     error: "ERROR — RETRY",
   };
 
@@ -42,7 +55,7 @@ export function TriggerRunButton({ clientId }: { clientId: string }) {
   };
 
   return (
-    <>
+    <div className="flex flex-col items-end gap-1">
       <style>{`@keyframes vv-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}`}</style>
       <button
         onClick={trigger}
@@ -52,6 +65,14 @@ export function TriggerRunButton({ clientId }: { clientId: string }) {
       >
         {labels[state]}
       </button>
-    </>
+      {state === "error" && errorMsg && (
+        <div
+          className="font-mono text-[8px] tracking-[0.04em] max-w-[280px] text-right leading-relaxed"
+          style={{ color: "var(--neg)" }}
+        >
+          {errorMsg}
+        </div>
+      )}
+    </div>
   );
 }
