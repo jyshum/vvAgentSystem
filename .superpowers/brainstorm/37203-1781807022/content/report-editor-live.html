@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Report Editor — Live Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,300;1,6..72,300;1,6..72,400&family=Schibsted+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0e0e0f;
+    --ink-soft: #141416;
+    --ink-2: #19191c;
+    --white: #f5f4f1;
+    --paper: #f1ede4;
+    --paper-ink: #17150f;
+    --mute: rgba(245,244,241,0.58);
+    --faint: rgba(245,244,241,0.36);
+    --ghost: rgba(245,244,241,0.13);
+    --hair: rgba(245,244,241,0.11);
+    --p-mute: rgba(23,21,15,0.58);
+    --p-faint: rgba(23,21,15,0.36);
+    --p-ghost: rgba(23,21,15,0.13);
+    --p-hair: rgba(23,21,15,0.11);
+    --pos: #84d8ab;
+    --neg: #e89aa0;
+    --pos-paper: #2d7a52;
+    --neg-paper: #b03a3a;
+    --serif: 'Newsreader', Georgia, serif;
+    --sans: 'Schibsted Grotesk', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --display: 'Cormorant Garamond', Georgia, serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--ink);
+    color: var(--white);
+    font-family: var(--serif);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ── Nav ── */
+  .nav {
+    height: 56px;
+    background: rgba(14,14,15,0.94);
+    border-bottom: 1px solid var(--hair);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  .nav-mark {
+    font-family: var(--serif);
+    font-size: 18px;
+    letter-spacing: 0.01em;
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .nav-badge {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    color: var(--mute);
+    border: 1px solid var(--ghost);
+    padding: 2px 6px;
+  }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .nav-link {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--mute);
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .nav-link:hover { color: var(--white); }
+
+  /* ── Breadcrumb ── */
+  .breadcrumb {
+    height: 34px;
+    background: var(--ink);
+    border-bottom: 1px solid rgba(245,244,241,0.06);
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    flex-shrink: 0;
+  }
+  .bc-link { color: var(--faint); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; transition: color 0.2s; }
+  .bc-link:hover { color: var(--mute); }
+  .bc-sep { color: var(--ghost); }
+  .bc-current { color: var(--white); }
+
+  /* ── Split layout ── */
+  .split {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    height: calc(100vh - 56px - 34px);
+    overflow: hidden;
+  }
+
+  /* ── Left: Edit panel ── */
+  .edit-panel {
+    background: var(--ink-soft);
+    border-right: 1px solid var(--hair);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .edit-header {
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid var(--hair);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    background: var(--ink-soft);
+    z-index: 2;
+  }
+
+  .status-badge {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    padding: 4px 9px;
+  }
+  .status-badge.draft {
+    color: var(--mute);
+    border: 1px solid rgba(245,244,241,0.42);
+  }
+  .status-badge.published {
+    color: var(--ink);
+    background: var(--pos);
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 7px 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.25s;
+    border: 1px solid;
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--white);
+    border-color: var(--ghost);
+  }
+  .btn-outline:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
+  .btn-solid {
+    background: var(--white);
+    color: var(--ink);
+    border-color: var(--white);
+  }
+  .btn-solid:hover { background: transparent; color: var(--white); border-color: var(--ghost); }
+
+  .edit-body { padding: 20px; flex: 1; }
+
+  .field-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--mute);
+    margin-bottom: 8px;
+    margin-top: 20px;
+    display: block;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 6px;
+  }
+  .field-label:first-child { margin-top: 0; }
+
+  .edit-textarea {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--ghost);
+    color: var(--white);
+    font-family: var(--serif);
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 10px 12px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+    font-style: italic;
+  }
+  .edit-textarea:focus { border-color: rgba(245,244,241,0.42); }
+
+  .list-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .list-input {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--ghost);
+    color: var(--white);
+    font-family: var(--serif);
+    font-size: 12px;
+    padding: 6px 10px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .list-input:focus { border-color: rgba(245,244,241,0.42); }
+  .remove-btn {
+    background: transparent;
+    border: none;
+    color: var(--faint);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 4px;
+    transition: color 0.2s;
+  }
+  .remove-btn:hover { color: var(--neg); }
+  .add-btn {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    color: var(--mute);
+    background: transparent;
+    border: 1px solid var(--ghost);
+    padding: 6px 12px;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: all 0.2s;
+    display: inline-block;
+  }
+  .add-btn:hover { color: var(--white); border-color: rgba(245,244,241,0.42); }
+
+  .prio-num {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--faint);
+    min-width: 20px;
+    text-align: center;
+  }
+
+  /* ── Right: Report preview ── */
+  .preview-panel {
+    overflow-y: auto;
+    background: var(--ink);
+    padding: 32px 24px;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* The paper document */
+  .report-paper {
+    width: 100%;
+    max-width: 620px;
+    background: var(--paper);
+    color: var(--paper-ink);
+    padding: 56px 64px;
+    font-family: var(--display);
+    min-height: 100%;
+    box-shadow: 0 8px 48px rgba(0,0,0,0.4);
+  }
+
+  .rp-eyebrow {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    color: var(--p-mute);
+    margin-bottom: 14px;
+  }
+  .rp-title {
+    font-family: var(--display);
+    font-size: 64px;
+    font-weight: 300;
+    line-height: 0.96;
+    letter-spacing: -0.015em;
+    color: var(--paper-ink);
+    margin-bottom: 12px;
+  }
+  .rp-date {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 18px;
+    color: var(--p-mute);
+    margin-bottom: 4px;
+  }
+  .rp-meta {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--p-faint);
+    margin-bottom: 0;
+  }
+  .rp-divider {
+    height: 1px;
+    background: var(--p-hair);
+    margin: 28px 0;
+  }
+  .rp-section {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    color: var(--p-mute);
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--p-hair);
+    margin-bottom: 16px;
+    margin-top: 32px;
+    text-transform: uppercase;
+  }
+  .rp-section:first-of-type { margin-top: 0; }
+  .rp-summary {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 300;
+    font-size: 19px;
+    line-height: 1.55;
+    color: rgba(23,21,15,0.78);
+  }
+  .rp-kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--p-hair);
+    border: 1px solid var(--p-hair);
+    margin-bottom: 0;
+  }
+  .rp-kpi-cell {
+    background: var(--paper);
+    padding: 16px 18px;
+  }
+  .rp-kpi-num {
+    font-family: var(--display);
+    font-weight: 300;
+    font-size: 48px;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .rp-kpi-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    color: var(--p-faint);
+  }
+  .rp-kpi-delta {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--p-faint);
+    margin-top: 3px;
+  }
+  .rp-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--p-hair);
+    font-family: var(--display);
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--paper-ink);
+  }
+  .rp-marker { color: var(--p-faint); flex-shrink: 0; }
+  .rp-num { font-family: var(--mono); font-size: 9px; color: var(--p-faint); flex-shrink: 0; min-width: 20px; padding-top: 2px; }
+
+  .rp-footer {
+    margin-top: 48px;
+    padding-top: 14px;
+    border-top: 1px solid var(--p-hair);
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    color: var(--p-faint);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Live sync highlight */
+  .synced {
+    animation: syncPulse 0.4s ease;
+  }
+  @keyframes syncPulse {
+    0% { background: rgba(132,216,171,0.15); }
+    100% { background: transparent; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<div class="nav">
+  <div class="nav-mark">
+    Victory Velocity
+    <span class="nav-badge">ADMIN</span>
+  </div>
+  <div class="nav-links">
+    <span class="nav-link">Clients</span>
+    <span class="nav-link" style="color:var(--faint);">Sign Out</span>
+  </div>
+</div>
+
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+  <span class="bc-link">CLIENTS</span>
+  <span class="bc-sep">/</span>
+  <span class="bc-link">CHILDSPOT</span>
+  <span class="bc-sep">/</span>
+  <span class="bc-current">REPORTS</span>
+</div>
+
+<!-- Split -->
+<div class="split">
+
+  <!-- LEFT: Edit Panel -->
+  <div class="edit-panel">
+    <div class="edit-header">
+      <span class="status-badge draft" id="status-badge">DRAFT</span>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="saveDoc()">Save</button>
+        <button class="btn btn-solid" id="pub-btn" onclick="togglePublish()">Publish</button>
+      </div>
+    </div>
+
+    <div class="edit-body">
+
+      <span class="field-label">Executive Summary</span>
+      <textarea class="edit-textarea" rows="4" id="summary" oninput="syncSummary()"
+        placeholder="One short paragraph: the headline story of the week...">Mention rate climbed to 68% this week, the highest since onboarding. ChatGPT now cites the domain in 3 of 5 tracked queries. Competitor Daycare.com lost two citation positions.</textarea>
+
+      <span class="field-label">Highlights / Wins</span>
+      <div id="highlights-list">
+        <div class="list-item">
+          <input class="list-input" value="ChatGPT cited childspot.com in 'best daycare apps' query for first time" oninput="syncHighlights()">
+          <button class="remove-btn" onclick="removeHighlight(this)">×</button>
+        </div>
+        <div class="list-item">
+          <input class="list-input" value="Perplexity mention rate up to 80%, highest of all engines" oninput="syncHighlights()">
+          <button class="remove-btn" onclick="removeHighlight(this)">×</button>
+        </div>
+      </div>
+      <button class="add-btn" onclick="addHighlight()">+ Add Highlight</button>
+
+      <span class="field-label">Next Week Priorities</span>
+      <div id="priorities-list">
+        <div class="list-item">
+          <span class="prio-num">01</span>
+          <input class="list-input" value="Submit updated schema markup to Google Search Console" oninput="syncPriorities()">
+          <button class="remove-btn" onclick="removePriority(this)">×</button>
+        </div>
+        <div class="list-item">
+          <span class="prio-num">02</span>
+          <input class="list-input" value="Draft FAQ content targeting 'best childcare app' queries" oninput="syncPriorities()">
+          <button class="remove-btn" onclick="removePriority(this)">×</button>
+        </div>
+      </div>
+      <button class="add-btn" onclick="addPriority()">+ Add Priority</button>
+
+      <span class="field-label">Blockers / Risks</span>
+      <div id="blockers-list">
+        <div class="list-item">
+          <input class="list-input" value="Client blog hasn't published in 3 weeks — content gap risk" oninput="syncBlockers()">
+          <button class="remove-btn" onclick="removeBlocker(this)">×</button>
+        </div>
+      </div>
+      <button class="add-btn" onclick="addBlocker()">+ Add Blocker</button>
+
+    </div>
+  </div>
+
+  <!-- RIGHT: Paper Preview -->
+  <div class="preview-panel">
+    <div class="report-paper">
+
+      <div class="rp-eyebrow">GEO &middot; WEEKLY PERFORMANCE REPORT</div>
+      <div class="rp-title">ChildSpot</div>
+      <div class="rp-date">Week of Jun 9–15, 2026</div>
+      <div class="rp-meta">childspot.com &middot; Prepared by Victory Velocity</div>
+      <div class="rp-divider"></div>
+
+      <!-- Summary -->
+      <div class="rp-section">Executive Summary</div>
+      <div class="rp-summary" id="preview-summary">Mention rate climbed to 68% this week, the highest since onboarding. ChatGPT now cites the domain in 3 of 5 tracked queries. Competitor Daycare.com lost two citation positions.</div>
+
+      <!-- KPIs -->
+      <div class="rp-section" style="margin-top:32px;">AI Visibility</div>
+      <div class="rp-kpi-grid">
+        <div class="rp-kpi-cell">
+          <div class="rp-kpi-num" style="color:var(--pos-paper);">68%</div>
+          <div class="rp-kpi-label">MENTION RATE</div>
+          <div class="rp-kpi-delta">↑ +4pp vs last week</div>
+        </div>
+        <div class="rp-kpi-cell">
+          <div class="rp-kpi-num" style="color:var(--pos-paper);">41%</div>
+          <div class="rp-kpi-label">CITATION RATE</div>
+          <div class="rp-kpi-delta">↑ +2pp vs last week</div>
+        </div>
+      </div>
+
+      <!-- Highlights -->
+      <div class="rp-section">Highlights / Wins</div>
+      <div id="preview-highlights">
+        <div class="rp-list-item"><span class="rp-marker">—</span><span>ChatGPT cited childspot.com in 'best daycare apps' query for first time</span></div>
+        <div class="rp-list-item"><span class="rp-marker">—</span><span>Perplexity mention rate up to 80%, highest of all engines</span></div>
+      </div>
+
+      <!-- Priorities -->
+      <div class="rp-section">Next Week Priorities</div>
+      <div id="preview-priorities">
+        <div class="rp-list-item"><span class="rp-num">01</span><span>Submit updated schema markup to Google Search Console</span></div>
+        <div class="rp-list-item"><span class="rp-num">02</span><span>Draft FAQ content targeting 'best childcare app' queries</span></div>
+      </div>
+
+      <!-- Blockers -->
+      <div class="rp-section">Blockers / Risks</div>
+      <div id="preview-blockers">
+        <div class="rp-list-item"><span class="rp-marker" style="color:#b03a3a;">—</span><span>Client blog hasn't published in 3 weeks — content gap risk</span></div>
+      </div>
+
+      <div class="rp-footer">
+        <span>Prepared by Victory Velocity &middot; victoryvelocity.ca</span>
+        <span>Week of Jun 9–15, 2026</span>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Live sync: summary
+  function syncSummary() {
+    const el = document.getElementById('preview-summary');
+    el.textContent = document.getElementById('summary').value;
+    flash(el);
+  }
+
+  // Live sync: highlights
+  function syncHighlights() {
+    const inputs = document.querySelectorAll('#highlights-list .list-input');
+    const container = document.getElementById('preview-highlights');
+    container.innerHTML = '';
+    inputs.forEach(inp => {
+      if (inp.value.trim()) {
+        const div = document.createElement('div');
+        div.className = 'rp-list-item';
+        div.innerHTML = `<span class="rp-marker">—</span><span>${inp.value}</span>`;
+        container.appendChild(div);
+      }
+    });
+    flash(container);
+  }
+
+  function syncPriorities() {
+    const inputs = document.querySelectorAll('#priorities-list .list-input');
+    const container = document.getElementById('preview-priorities');
+    container.innerHTML = '';
+    inputs.forEach((inp, i) => {
+      if (inp.value.trim()) {
+        const div = document.createElement('div');
+        div.className = 'rp-list-item';
+        div.innerHTML = `<span class="rp-num">${String(i+1).padStart(2,'0')}</span><span>${inp.value}</span>`;
+        container.appendChild(div);
+      }
+    });
+    flash(container);
+  }
+
+  function syncBlockers() {
+    const inputs = document.querySelectorAll('#blockers-list .list-input');
+    const container = document.getElementById('preview-blockers');
+    container.innerHTML = '';
+    inputs.forEach(inp => {
+      if (inp.value.trim()) {
+        const div = document.createElement('div');
+        div.className = 'rp-list-item';
+        div.innerHTML = `<span class="rp-marker" style="color:#b03a3a;">—</span><span>${inp.value}</span>`;
+        container.appendChild(div);
+      }
+    });
+    flash(container);
+  }
+
+  function flash(el) {
+    el.classList.remove('synced');
+    void el.offsetWidth;
+    el.classList.add('synced');
+  }
+
+  // Add / remove helpers
+  function addHighlight() {
+    const list = document.getElementById('highlights-list');
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    div.innerHTML = `<input class="list-input" placeholder="Win or highlight..." oninput="syncHighlights()"><button class="remove-btn" onclick="removeHighlight(this)">×</button>`;
+    list.appendChild(div);
+    div.querySelector('input').focus();
+  }
+  function removeHighlight(btn) {
+    btn.parentElement.remove();
+    syncHighlights();
+  }
+  function addPriority() {
+    const list = document.getElementById('priorities-list');
+    const n = list.children.length + 1;
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    div.innerHTML = `<span class="prio-num">${String(n).padStart(2,'0')}</span><input class="list-input" placeholder="Priority..." oninput="syncPriorities()"><button class="remove-btn" onclick="removePriority(this)">×</button>`;
+    list.appendChild(div);
+    div.querySelector('input').focus();
+  }
+  function removePriority(btn) {
+    btn.parentElement.remove();
+    // renumber
+    document.querySelectorAll('#priorities-list .prio-num').forEach((el,i) => el.textContent = String(i+1).padStart(2,'0'));
+    syncPriorities();
+  }
+  function addBlocker() {
+    const list = document.getElementById('blockers-list');
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    div.innerHTML = `<input class="list-input" placeholder="Blocker or risk..." oninput="syncBlockers()"><button class="remove-btn" onclick="removeBlocker(this)">×</button>`;
+    list.appendChild(div);
+    div.querySelector('input').focus();
+  }
+  function removeBlocker(btn) {
+    btn.parentElement.remove();
+    syncBlockers();
+  }
+
+  // Publish toggle
+  let published = false;
+  function togglePublish() {
+    published = !published;
+    const badge = document.getElementById('status-badge');
+    const btn = document.getElementById('pub-btn');
+    if (published) {
+      badge.textContent = 'PUBLISHED';
+      badge.className = 'status-badge published';
+      btn.textContent = 'Unpublish';
+      btn.className = 'btn btn-outline';
+    } else {
+      badge.textContent = 'DRAFT';
+      badge.className = 'status-badge draft';
+      btn.textContent = 'Publish';
+      btn.className = 'btn btn-solid';
+    }
+  }
+
+  function saveDoc() {
+    const btn = event.target;
+    btn.textContent = 'Saved ✓';
+    btn.style.color = 'var(--pos)';
+    setTimeout(() => { btn.textContent = 'Save'; btn.style.color = ''; }, 1200);
+  }
+</script>
+
+</body>
+</html>

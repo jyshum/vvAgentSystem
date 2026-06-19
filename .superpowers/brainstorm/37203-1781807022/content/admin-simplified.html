@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VV Admin — Simplified</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0e0e0f;
+    --white: #f5f4f1;
+    --mute: rgba(245,244,241,0.5);
+    --faint: rgba(245,244,241,0.3);
+    --ghost: rgba(245,244,241,0.15);
+    --hair: rgba(245,244,241,0.08);
+    --pos: #84d8ab;
+    --neg: #e89aa0;
+    --serif: 'Newsreader', Georgia, serif;
+    --sans: 'Schibsted Grotesk', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --display: 'Cormorant Garamond', serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--ink); color: var(--white); font-family: var(--sans); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+  /* ── Nav ── */
+  nav {
+    position: sticky; top: 0; z-index: 200; height: 78px; padding: 0 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(14,14,15,0.9); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--hair);
+  }
+  .nav-logo { font-family: var(--display); font-size: 22px; color: var(--white); }
+  .nav-logo em { font-style: italic; color: var(--mute); }
+  .nav-signout { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--faint); cursor: pointer; background: transparent; border: none; transition: color 0.2s; }
+  .nav-signout:hover { color: var(--white); }
+
+  /* ── Page switcher (simulates real routing) ── */
+  .pages { display: none; }
+  .pages.active { display: block; }
+
+  /* ── Clients list page ── */
+  .page-shell { max-width: 1080px; margin: 0 auto; padding: 56px 56px 100px; }
+  .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 44px; }
+  .page-title { font-family: var(--display); font-size: 52px; font-weight: 300; line-height: 0.96; }
+  .page-sub { font-family: var(--serif); font-style: italic; font-size: 16px; color: var(--mute); margin-top: 8px; }
+
+  .cta-btn {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    padding: 11px 22px; border: 1px solid var(--ghost); background: transparent;
+    color: var(--white); cursor: pointer; transition: all 0.25s;
+  }
+  .cta-btn:hover { background: var(--white); border-color: var(--white); color: var(--ink); }
+
+  /* Stats strip */
+  .stats-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--hair); border: 1px solid var(--hair); margin-bottom: 44px; }
+  .stat-cell { background: var(--ink); padding: 18px 22px; }
+  .stat-num { font-family: var(--display); font-weight: 300; font-size: 38px; line-height: 1; margin-bottom: 6px; }
+  .stat-label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.14em; color: var(--faint); }
+
+  /* Client list table */
+  .table-head { display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 80px; gap: 16px; padding: 0 16px 12px; border-bottom: 1px solid var(--hair); margin-bottom: 4px; }
+  .col-label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.18em; color: var(--faint); }
+  .client-row {
+    display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 80px; gap: 16px;
+    align-items: center; padding: 20px 16px; border-bottom: 1px solid var(--hair);
+    cursor: pointer; transition: padding-left 0.2s cubic-bezier(.2,.8,.2,1), background 0.2s;
+  }
+  .client-row:hover { padding-left: 28px; background: rgba(245,244,241,0.02); }
+  .client-name { font-family: var(--serif); font-size: 18px; }
+  .client-domain { font-family: var(--mono); font-size: 9px; color: var(--faint); margin-top: 3px; }
+  .metric-val { font-family: var(--display); font-weight: 300; font-size: 26px; line-height: 1; }
+  .metric-delta { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 4px; }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
+  .last-run { font-family: var(--mono); font-size: 10px; color: var(--mute); }
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 7px; letter-spacing: 0.1em; padding: 2px 7px; border-radius: 2px; margin-top: 4px; }
+  .pill-ok { background: rgba(132,216,171,0.1); color: var(--pos); border: 1px solid rgba(132,216,171,0.2); }
+  .pill-stale { background: rgba(232,154,160,0.08); color: var(--neg); border: 1px solid rgba(232,154,160,0.18); }
+  .pill-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+  .open-btn { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--faint); border: 1px solid var(--hair); padding: 6px 12px; cursor: pointer; background: transparent; transition: all 0.2s; }
+  .client-row:hover .open-btn { color: var(--white); border-color: var(--ghost); }
+
+  /* ── Breadcrumb ── */
+  .breadcrumb { padding: 16px 56px; display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; border-bottom: 1px solid var(--hair); }
+  .bc-link { color: var(--faint); cursor: pointer; transition: color 0.2s; }
+  .bc-link:hover { color: var(--white); }
+  .bc-sep { color: var(--faint); opacity: 0.4; }
+  .bc-current { color: var(--mute); }
+
+  /* ── Sub-nav (separate pages) ── */
+  .sub-nav { display: flex; padding: 0 56px; border-bottom: 1px solid var(--hair); gap: 0; }
+  .sub-tab {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em;
+    padding: 14px 20px; color: var(--faint); cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .sub-tab:hover { color: var(--mute); }
+  .sub-tab.active { color: var(--white); border-bottom-color: var(--white); }
+
+  /* ── Inner page shell ── */
+  .inner-shell { max-width: 960px; margin: 0 auto; padding: 48px 56px 100px; }
+  .inner-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 44px; }
+  .client-big-name { font-family: var(--display); font-size: 52px; font-weight: 300; line-height: 0.95; }
+  .client-big-domain { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--faint); margin-top: 8px; }
+
+  /* ── CONFIG PAGE ── */
+  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .field-group { display: flex; flex-direction: column; gap: 6px; }
+  .field-label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.14em; color: var(--faint); }
+  .field-input {
+    font-family: var(--serif); font-size: 15px; color: var(--white);
+    background: rgba(245,244,241,0.04); border: 1px solid var(--hair);
+    padding: 10px 14px; line-height: 1.4; width: 100%;
+    transition: border-color 0.2s;
+  }
+  .field-input:focus { outline: none; border-color: var(--ghost); }
+  .field-input.mono { font-family: var(--mono); font-size: 12px; }
+  .field-full { grid-column: 1 / -1; }
+  .tag-editor { display: flex; flex-direction: column; gap: 8px; }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em; padding: 5px 9px; border: 1px solid var(--ghost); color: var(--mute); }
+  .tag-x { cursor: pointer; opacity: 0.5; font-size: 10px; transition: opacity 0.2s; }
+  .tag-x:hover { opacity: 1; }
+  .tag-add-row { display: flex; gap: 8px; }
+  .tag-input { flex: 1; font-family: var(--mono); font-size: 11px; background: rgba(245,244,241,0.04); border: 1px solid var(--hair); color: var(--white); padding: 8px 12px; }
+  .tag-input::placeholder { color: var(--faint); }
+  .tag-input:focus { outline: none; border-color: var(--ghost); }
+  .tag-add-btn { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; padding: 8px 14px; border: 1px solid var(--ghost); background: transparent; color: var(--mute); cursor: pointer; transition: all 0.2s; }
+  .tag-add-btn:hover { color: var(--white); border-color: var(--ghost); }
+  .section-divider { height: 1px; background: var(--hair); margin: 32px 0; grid-column: 1 / -1; }
+
+  /* ── RUNS PAGE ── */
+  .run-trigger-box {
+    border: 1px solid var(--hair); padding: 28px 32px; margin-bottom: 40px;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  }
+  .run-trigger-info { }
+  .run-trigger-title { font-family: var(--serif); font-size: 18px; margin-bottom: 6px; }
+  .run-trigger-sub { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--faint); line-height: 1.6; }
+  .run-trigger-sub .railway { color: rgba(172,255,100,0.7); }
+  .run-now-btn {
+    flex-shrink: 0; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    padding: 13px 28px; border: 1px solid var(--ghost); background: transparent;
+    color: var(--white); cursor: pointer; transition: all 0.25s; white-space: nowrap;
+  }
+  .run-now-btn:hover { background: var(--white); border-color: var(--white); color: var(--ink); }
+  .run-now-btn.running {
+    border-color: var(--pos); color: var(--pos);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+
+  .runs-head { display: grid; grid-template-columns: 1.5fr 1fr 1fr 80px 1fr 100px; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--hair); margin-bottom: 4px; }
+  .run-row { display: grid; grid-template-columns: 1.5fr 1fr 1fr 80px 1fr 100px; gap: 16px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--hair); }
+  .run-date { font-family: var(--serif); font-size: 15px; }
+  .run-time { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 2px; }
+  .run-metric { font-family: var(--display); font-weight: 300; font-size: 22px; line-height: 1; }
+  .run-metric-delta { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 3px; }
+  .run-queries { font-family: var(--mono); font-size: 10px; color: var(--mute); }
+  .run-status-badge { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 7px; letter-spacing: 0.1em; padding: 3px 8px; border-radius: 2px; }
+  .s-ok { background: rgba(132,216,171,0.1); color: var(--pos); border: 1px solid rgba(132,216,171,0.2); }
+  .s-err { background: rgba(232,154,160,0.08); color: var(--neg); border: 1px solid rgba(232,154,160,0.18); }
+  .s-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+  .promote-btn { font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em; padding: 6px 11px; border: 1px solid var(--hair); background: transparent; color: var(--faint); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .promote-btn:hover { color: var(--white); border-color: var(--ghost); }
+  .promote-btn.done { color: var(--pos); border-color: rgba(132,216,171,0.25); cursor: default; }
+
+  /* Running state overlay */
+  .run-live-indicator {
+    display: none; align-items: center; gap: 10px; padding: 14px 20px;
+    background: rgba(132,216,171,0.06); border: 1px solid rgba(132,216,171,0.2);
+    margin-bottom: 24px; font-family: var(--mono); font-size: 10px; color: var(--pos);
+    letter-spacing: 0.1em;
+  }
+  .run-live-indicator.show { display: flex; }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── REPORTS PAGE ── */
+  .reports-head { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 120px; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--hair); margin-bottom: 4px; }
+  .report-row-item { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 120px; gap: 16px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--hair); cursor: pointer; transition: padding-left 0.2s cubic-bezier(.2,.8,.2,1), background 0.2s; }
+  .report-row-item:hover { padding-left: 10px; background: rgba(245,244,241,0.02); }
+  .rpt-week { font-family: var(--serif); font-size: 16px; }
+  .rpt-status { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 3px; }
+  .rpt-rate { font-family: var(--display); font-weight: 300; font-size: 22px; line-height: 1; }
+  .rpt-delta { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 3px; }
+  .rpt-created { font-family: var(--mono); font-size: 9px; color: var(--mute); }
+  .rpt-actions { display: flex; gap: 6px; }
+  .rpt-btn { font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em; padding: 6px 10px; border: 1px solid var(--hair); background: transparent; color: var(--faint); cursor: pointer; transition: all 0.2s; }
+  .rpt-btn:hover { color: var(--white); border-color: var(--ghost); }
+  .empty-state { padding: 60px 0; text-align: center; }
+  .empty-state-title { font-family: var(--display); font-size: 28px; font-weight: 300; color: var(--mute); margin-bottom: 10px; }
+  .empty-state-sub { font-family: var(--mono); font-size: 9px; color: var(--faint); letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Victory<em>Velocity</em></div>
+  <button class="nav-signout">SIGN OUT</button>
+</nav>
+
+<!-- ════════════════════════════════ PAGE: CLIENTS LIST ════════════════════════════════ -->
+<div class="pages active" id="p-clients">
+  <div class="page-shell">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Clients</div>
+        <div class="page-sub">3 active accounts</div>
+      </div>
+      <button class="cta-btn">+ ADD CLIENT</button>
+    </div>
+
+    <div class="stats-strip">
+      <div class="stat-cell">
+        <div class="stat-num">3</div>
+        <div class="stat-label">ACTIVE CLIENTS</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num" style="color:var(--pos);">71%</div>
+        <div class="stat-label">AVG MENTION RATE</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num" style="color:var(--pos);">44%</div>
+        <div class="stat-label">AVG CITATION RATE</div>
+      </div>
+    </div>
+
+    <div class="table-head">
+      <div class="col-label">CLIENT</div>
+      <div class="col-label">MENTION</div>
+      <div class="col-label">CITATION</div>
+      <div class="col-label">LAST RUN</div>
+      <div class="col-label"></div>
+    </div>
+
+    <div class="client-row" onclick="goTo('config')">
+      <div><div class="client-name">ChildSpot</div><div class="client-domain">childspotapp.com</div></div>
+      <div><div class="metric-val pos">68%</div><div class="metric-delta">↑ +4pp</div></div>
+      <div><div class="metric-val pos">41%</div><div class="metric-delta">↑ +2pp</div></div>
+      <div><div class="last-run">Jun 15, 2026</div><div class="pill pill-ok"><span class="pill-dot"></span>CURRENT</div></div>
+      <div><button class="open-btn">OPEN →</button></div>
+    </div>
+    <div class="client-row">
+      <div><div class="client-name">Northfield Law</div><div class="client-domain">northfieldlaw.ca</div></div>
+      <div><div class="metric-val pos">82%</div><div class="metric-delta">↑ +7pp</div></div>
+      <div><div class="metric-val pos">55%</div><div class="metric-delta">↑ +3pp</div></div>
+      <div><div class="last-run">Jun 14, 2026</div><div class="pill pill-ok"><span class="pill-dot"></span>CURRENT</div></div>
+      <div><button class="open-btn">OPEN →</button></div>
+    </div>
+    <div class="client-row">
+      <div><div class="client-name">Verdana Health</div><div class="client-domain">verdanahealth.com</div></div>
+      <div><div class="metric-val" style="color:var(--faint);">—</div><div class="metric-delta">no data</div></div>
+      <div><div class="metric-val" style="color:var(--faint);">—</div><div class="metric-delta">no data</div></div>
+      <div><div class="last-run" style="color:var(--faint);">Jun 1, 2026</div><div class="pill pill-stale"><span class="pill-dot"></span>STALE</div></div>
+      <div><button class="open-btn">OPEN →</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ SHARED: BREADCRUMB + SUB-NAV ════════════════════════════════ -->
+<div id="client-chrome" style="display:none;">
+  <div class="breadcrumb">
+    <span class="bc-link" onclick="goTo('clients')">CLIENTS</span>
+    <span class="bc-sep">/</span>
+    <span class="bc-current">CHILDSPOT</span>
+  </div>
+  <div class="inner-header" style="padding:32px 56px 0;max-width:1072px;margin:0 auto;">
+    <div>
+      <div class="client-big-name">ChildSpot</div>
+      <div class="client-big-domain">childspotapp.com</div>
+    </div>
+  </div>
+  <div class="sub-nav" style="margin-top:24px;">
+    <div class="sub-tab" id="tab-config" onclick="goTo('config')">CONFIG</div>
+    <div class="sub-tab" id="tab-runs" onclick="goTo('runs')">RUNS</div>
+    <div class="sub-tab" id="tab-reports" onclick="goTo('reports')">REPORTS</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ PAGE: CONFIG ════════════════════════════════ -->
+<div class="pages" id="p-config">
+  <div class="inner-shell">
+    <div class="config-grid">
+      <div class="field-group">
+        <div class="field-label">CLIENT NAME</div>
+        <input class="field-input" value="ChildSpot">
+      </div>
+      <div class="field-group">
+        <div class="field-label">DOMAIN</div>
+        <input class="field-input mono" value="childspotapp.com">
+      </div>
+      <div class="field-group">
+        <div class="field-label">BRAND NAME</div>
+        <input class="field-input" value="ChildSpot">
+      </div>
+      <div class="field-group field-full">
+        <div class="field-label">BRAND VARIATIONS (for mention detection)</div>
+        <div class="tag-editor">
+          <div class="tag-list">
+            <span class="tag">ChildSpot <span class="tag-x">×</span></span>
+            <span class="tag">Child Spot <span class="tag-x">×</span></span>
+            <span class="tag">childspotapp.com <span class="tag-x">×</span></span>
+            <span class="tag">childspotapp <span class="tag-x">×</span></span>
+          </div>
+          <div class="tag-add-row">
+            <input class="tag-input" placeholder="add variation…">
+            <button class="tag-add-btn">+ ADD</button>
+          </div>
+        </div>
+      </div>
+      <div class="section-divider"></div>
+      <div class="field-group field-full">
+        <div class="field-label">TARGET QUERIES</div>
+        <div class="tag-editor">
+          <div class="tag-list">
+            <span class="tag">find daycare near me Ontario <span class="tag-x">×</span></span>
+            <span class="tag">licensed daycare options in Ontario <span class="tag-x">×</span></span>
+            <span class="tag">best way to find childcare in Ontario <span class="tag-x">×</span></span>
+            <span class="tag">daycare with immediate availability Ontario <span class="tag-x">×</span></span>
+            <span class="tag">book daycare online without waitlist Ontario <span class="tag-x">×</span></span>
+            <span class="tag">CWELCC daycare spots available Ontario <span class="tag-x">×</span></span>
+            <span class="tag">how to fill empty daycare spots Ontario <span class="tag-x">×</span></span>
+            <span class="tag">attract more families to my daycare centre <span class="tag-x">×</span></span>
+          </div>
+          <div class="tag-add-row">
+            <input class="tag-input" placeholder="add query…">
+            <button class="tag-add-btn">+ ADD</button>
+          </div>
+        </div>
+      </div>
+      <div class="field-group field-full">
+        <div class="field-label">COMPETITORS</div>
+        <div class="tag-editor">
+          <div class="tag-list">
+            <span class="tag">Wee Watch <span class="tag-x">×</span></span>
+            <span class="tag">KinderPage <span class="tag-x">×</span></span>
+            <span class="tag">Daycare Radar <span class="tag-x">×</span></span>
+            <span class="tag">Care.com <span class="tag-x">×</span></span>
+            <span class="tag">HiMama <span class="tag-x">×</span></span>
+            <span class="tag">OneList Ontario <span class="tag-x">×</span></span>
+            <span class="tag">KinderSurf <span class="tag-x">×</span></span>
+          </div>
+          <div class="tag-add-row">
+            <input class="tag-input" placeholder="add competitor…">
+            <button class="tag-add-btn">+ ADD</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:36px;">
+      <button class="cta-btn">SAVE CONFIG</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ PAGE: RUNS ════════════════════════════════ -->
+<div class="pages" id="p-runs">
+  <div class="inner-shell">
+
+    <!-- Railway trigger box -->
+    <div class="run-trigger-box">
+      <div class="run-trigger-info">
+        <div class="run-trigger-title">Run AI Visibility Tracker</div>
+        <div class="run-trigger-sub">
+          Queries all 4 engines (ChatGPT · Perplexity · Claude · Gemini) against ChildSpot's 8 tracked queries.<br>
+          Runs on <span class="railway">Railway</span> — results saved automatically when complete (~2–4 min).
+        </div>
+      </div>
+      <button class="run-now-btn" id="run-btn" onclick="triggerRun()">▷ RUN NOW</button>
+    </div>
+
+    <!-- Live indicator (shows while running) -->
+    <div class="run-live-indicator" id="run-indicator">
+      <span class="spin">◌</span> Tracker running on Railway — 8 queries × 4 engines · Est. 2–4 min
+    </div>
+
+    <!-- Run history -->
+    <div class="runs-head">
+      <div class="col-label">DATE</div>
+      <div class="col-label">MENTION</div>
+      <div class="col-label">CITATION</div>
+      <div class="col-label">QUERIES</div>
+      <div class="col-label">STATUS</div>
+      <div class="col-label">REPORT</div>
+    </div>
+
+    <div class="run-row">
+      <div><div class="run-date">Jun 15, 2026</div><div class="run-time">11:02 AM · 3m 14s</div></div>
+      <div><div class="run-metric pos">68%</div><div class="run-metric-delta">↑ +4pp</div></div>
+      <div><div class="run-metric pos">41%</div><div class="run-metric-delta">↑ +2pp</div></div>
+      <div><div class="run-queries">8 / 8</div></div>
+      <div><span class="run-status-badge s-ok"><span class="s-dot"></span>OK</span></div>
+      <div><button class="promote-btn done">✓ REPORTED</button></div>
+    </div>
+    <div class="run-row">
+      <div><div class="run-date">Jun 8, 2026</div><div class="run-time">10:55 AM · 2m 48s</div></div>
+      <div><div class="run-metric pos">64%</div><div class="run-metric-delta">↑ +2pp</div></div>
+      <div><div class="run-metric pos">39%</div><div class="run-metric-delta">—</div></div>
+      <div><div class="run-queries">8 / 8</div></div>
+      <div><span class="run-status-badge s-ok"><span class="s-dot"></span>OK</span></div>
+      <div><button class="promote-btn" onclick="promoteRun(this)">→ MAKE REPORT</button></div>
+    </div>
+    <div class="run-row">
+      <div><div class="run-date">Jun 1, 2026</div><div class="run-time">11:14 AM · 3m 02s</div></div>
+      <div><div class="run-metric" style="color:var(--mute);">62%</div><div class="run-metric-delta">↑ +1pp</div></div>
+      <div><div class="run-metric" style="color:var(--mute);">39%</div><div class="run-metric-delta">↑ +3pp</div></div>
+      <div><div class="run-queries">8 / 8</div></div>
+      <div><span class="run-status-badge s-ok"><span class="s-dot"></span>OK</span></div>
+      <div><button class="promote-btn" onclick="promoteRun(this)">→ MAKE REPORT</button></div>
+    </div>
+    <div class="run-row">
+      <div><div class="run-date">May 25, 2026</div><div class="run-time">10:41 AM · 4m 11s</div></div>
+      <div><div class="run-metric" style="color:var(--mute);">61%</div><div class="run-metric-delta">↓ −2pp</div></div>
+      <div><div class="run-metric" style="color:var(--mute);">36%</div><div class="run-metric-delta">↓ −2pp</div></div>
+      <div><div class="run-queries">8 / 8</div></div>
+      <div><span class="run-status-badge s-ok"><span class="s-dot"></span>OK</span></div>
+      <div><button class="promote-btn" onclick="promoteRun(this)">→ MAKE REPORT</button></div>
+    </div>
+    <div class="run-row">
+      <div><div class="run-date">May 18, 2026</div><div class="run-time">9:08 AM · 1m 03s</div></div>
+      <div><div class="run-metric" style="color:var(--faint);">—</div></div>
+      <div><div class="run-metric" style="color:var(--faint);">—</div></div>
+      <div><div class="run-queries" style="color:var(--neg);">3 / 8</div></div>
+      <div><span class="run-status-badge s-err"><span class="s-dot"></span>ERROR</span></div>
+      <div><span style="font-family:var(--mono);font-size:8px;color:var(--faint);opacity:0.4;">—</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════ PAGE: REPORTS ════════════════════════════════ -->
+<div class="pages" id="p-reports">
+  <div class="inner-shell">
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:32px;">
+      <button class="cta-btn">+ NEW BLANK REPORT</button>
+    </div>
+
+    <div class="reports-head">
+      <div class="col-label">WEEK / TITLE</div>
+      <div class="col-label">MENTION</div>
+      <div class="col-label">CITATION</div>
+      <div class="col-label">CREATED</div>
+      <div class="col-label">ACTIONS</div>
+    </div>
+
+    <div class="report-row-item">
+      <div>
+        <div class="rpt-week">Jun 9–15, 2026</div>
+        <div class="rpt-status" style="color:var(--pos);">● Published</div>
+      </div>
+      <div><div class="rpt-rate pos">68%</div><div class="rpt-delta">↑ +4pp</div></div>
+      <div><div class="rpt-rate pos">41%</div><div class="rpt-delta">↑ +2pp</div></div>
+      <div><div class="rpt-created">Jun 16 · from run</div></div>
+      <div class="rpt-actions"><button class="rpt-btn">EDIT</button><button class="rpt-btn">VIEW ↗</button></div>
+    </div>
+    <div class="report-row-item">
+      <div>
+        <div class="rpt-week">May 26 – Jun 1, 2026</div>
+        <div class="rpt-status">Draft</div>
+      </div>
+      <div><div class="rpt-rate" style="color:var(--mute);">62%</div><div class="rpt-delta">↑ +1pp</div></div>
+      <div><div class="rpt-rate" style="color:var(--mute);">39%</div><div class="rpt-delta">↑ +3pp</div></div>
+      <div><div class="rpt-created">Jun 2 · from run</div></div>
+      <div class="rpt-actions"><button class="rpt-btn">EDIT</button><button class="rpt-btn">VIEW ↗</button></div>
+    </div>
+    <div class="report-row-item">
+      <div>
+        <div class="rpt-week">May 19–25, 2026</div>
+        <div class="rpt-status">Draft</div>
+      </div>
+      <div><div class="rpt-rate" style="color:var(--faint);">61%</div><div class="rpt-delta">↓ −2pp</div></div>
+      <div><div class="rpt-rate" style="color:var(--faint);">36%</div><div class="rpt-delta">↓ −2pp</div></div>
+      <div><div class="rpt-created">May 26 · blank</div></div>
+      <div class="rpt-actions"><button class="rpt-btn">EDIT</button><button class="rpt-btn">VIEW ↗</button></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function goTo(page) {
+    // Hide all pages
+    document.querySelectorAll('.pages').forEach(p => p.classList.remove('active'));
+    document.getElementById('client-chrome').style.display = 'none';
+    document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+
+    if (page === 'clients') {
+      document.getElementById('p-clients').classList.add('active');
+    } else {
+      document.getElementById('client-chrome').style.display = 'block';
+      document.getElementById('p-' + page).classList.add('active');
+      document.getElementById('tab-' + page).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  function triggerRun() {
+    const btn = document.getElementById('run-btn');
+    const indicator = document.getElementById('run-indicator');
+    btn.textContent = '◌ RUNNING…';
+    btn.classList.add('running');
+    indicator.classList.add('show');
+    // Simulate completion after 4s
+    setTimeout(() => {
+      btn.textContent = '▷ RUN NOW';
+      btn.classList.remove('running');
+      indicator.classList.remove('show');
+      alert('Run complete — results saved. Check Runs history.');
+    }, 4000);
+  }
+
+  function promoteRun(btn) {
+    btn.textContent = '✓ REPORTED';
+    btn.classList.add('done');
+    btn.onclick = null;
+  }
+</script>
+
+</body>
+</html>

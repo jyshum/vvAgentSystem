@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VV Admin — Full Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:#0e0e0f;--white:#f5f4f1;--mute:rgba(245,244,241,0.5);--faint:rgba(245,244,241,0.3);
+  --ghost:rgba(245,244,241,0.15);--hair:rgba(245,244,241,0.08);
+  --pos:#84d8ab;--neg:#e89aa0;
+  --paper:#f1ede4;--paper-ink:#17150f;--p-mute:rgba(23,21,15,0.55);--p-faint:rgba(23,21,15,0.35);
+  --p-ghost:rgba(23,21,15,0.12);--p-hair:rgba(23,21,15,0.09);
+  --pos-paper:#2d7a52;--neg-paper:#b03a3a;
+  --serif:'Newsreader',Georgia,serif;--sans:'Schibsted Grotesk',sans-serif;
+  --mono:'IBM Plex Mono',monospace;--display:'Cormorant Garamond',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--ink);color:var(--white);font-family:var(--sans);-webkit-font-smoothing:antialiased;min-height:100vh;}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:300;height:78px;padding:0 56px;display:flex;align-items:center;justify-content:space-between;background:rgba(14,14,15,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--hair);}
+.nav-logo{font-family:var(--display);font-size:22px;color:var(--white);}
+.nav-logo em{font-style:italic;color:var(--mute);}
+.nav-signout{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:var(--faint);cursor:pointer;background:transparent;border:none;transition:color 0.2s;}
+.nav-signout:hover{color:var(--white);}
+
+/* PAGE VISIBILITY */
+.pg{display:none;}
+.pg.active{display:block;}
+
+/* SHARED */
+.cta-btn{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;padding:11px 22px;border:1px solid var(--ghost);background:transparent;color:var(--white);cursor:pointer;transition:all 0.25s;}
+.cta-btn:hover{background:var(--white);border-color:var(--white);color:var(--ink);}
+.col-label{font-family:var(--mono);font-size:8px;letter-spacing:0.18em;color:var(--faint);}
+
+/* BREADCRUMB */
+.breadcrumb{padding:14px 56px;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:9px;letter-spacing:0.14em;border-bottom:1px solid var(--hair);}
+.bc-link{color:var(--faint);cursor:pointer;transition:color 0.2s;}
+.bc-link:hover{color:var(--white);}
+.bc-sep{color:var(--faint);opacity:0.4;}
+.bc-cur{color:var(--mute);}
+
+/* SUB-NAV */
+.sub-nav{display:flex;padding:0 56px;border-bottom:1px solid var(--hair);}
+.sub-tab{font-family:var(--mono);font-size:9px;letter-spacing:0.16em;padding:13px 20px;color:var(--faint);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color 0.2s,border-color 0.2s;}
+.sub-tab:hover{color:var(--mute);}
+.sub-tab.active{color:var(--white);border-bottom-color:var(--white);}
+
+/* CLIENT HEADER */
+.client-hdr{padding:32px 56px 0;max-width:1072px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;}
+.client-big{font-family:var(--display);font-size:48px;font-weight:300;line-height:0.95;}
+.client-dom{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;color:var(--faint);margin-top:7px;}
+
+/* ═══ CLIENTS LIST ═══ */
+.page-shell{max-width:1080px;margin:0 auto;padding:56px 56px 100px;}
+.page-hdr{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;}
+.page-title{font-family:var(--display);font-size:52px;font-weight:300;line-height:0.96;}
+.page-sub{font-family:var(--serif);font-style:italic;font-size:16px;color:var(--mute);margin-top:8px;}
+.stats-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair);margin-bottom:40px;}
+.stat-cell{background:var(--ink);padding:18px 22px;}
+.stat-num{font-family:var(--display);font-weight:300;font-size:38px;line-height:1;margin-bottom:6px;}
+.stat-lbl{font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);}
+.tbl-head{display:grid;grid-template-columns:2fr 1fr 1fr 1.2fr 80px;gap:16px;padding:0 16px 12px;border-bottom:1px solid var(--hair);margin-bottom:4px;}
+.c-row{display:grid;grid-template-columns:2fr 1fr 1fr 1.2fr 80px;gap:16px;align-items:center;padding:20px 16px;border-bottom:1px solid var(--hair);cursor:pointer;transition:padding-left 0.2s cubic-bezier(.2,.8,.2,1),background 0.2s;}
+.c-row:hover{padding-left:28px;background:rgba(245,244,241,0.02);}
+.c-name{font-family:var(--serif);font-size:18px;}
+.c-dom{font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:3px;}
+.mv{font-family:var(--display);font-weight:300;font-size:26px;line-height:1;}
+.md{font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:4px;}
+.pos{color:var(--pos);}
+.pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:7px;letter-spacing:0.1em;padding:2px 7px;border-radius:2px;margin-top:4px;}
+.pill-ok{background:rgba(132,216,171,0.1);color:var(--pos);border:1px solid rgba(132,216,171,0.2);}
+.pill-stale{background:rgba(232,154,160,0.08);color:var(--neg);border:1px solid rgba(232,154,160,0.18);}
+.pd{width:4px;height:4px;border-radius:50%;background:currentColor;}
+.open-btn{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;color:var(--faint);border:1px solid var(--hair);padding:6px 12px;cursor:pointer;background:transparent;transition:all 0.2s;}
+.c-row:hover .open-btn{color:var(--white);border-color:var(--ghost);}
+
+/* ═══ CONFIG ═══ */
+.inner-shell{max-width:900px;margin:0 auto;padding:40px 56px 100px;}
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+.fg{display:flex;flex-direction:column;gap:6px;}
+.fl{font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);}
+.fi{font-family:var(--serif);font-size:15px;color:var(--white);background:rgba(245,244,241,0.04);border:1px solid var(--hair);padding:10px 14px;width:100%;transition:border-color 0.2s;}
+.fi:focus{outline:none;border-color:var(--ghost);}
+.fi.mono{font-family:var(--mono);font-size:12px;}
+.full{grid-column:1/-1;}
+.divider{height:1px;background:var(--hair);margin:8px 0;grid-column:1/-1;}
+.tag-editor{display:flex;flex-direction:column;gap:8px;}
+.tag-list{display:flex;flex-wrap:wrap;gap:6px;min-height:28px;}
+.tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:8px;letter-spacing:0.08em;padding:5px 9px;border:1px solid var(--ghost);color:var(--mute);}
+.tx{cursor:pointer;opacity:0.5;font-size:10px;transition:opacity 0.2s;}
+.tx:hover{opacity:1;}
+.tag-add-row{display:flex;gap:8px;}
+.ti{flex:1;font-family:var(--mono);font-size:11px;background:rgba(245,244,241,0.04);border:1px solid var(--hair);color:var(--white);padding:8px 12px;}
+.ti::placeholder{color:var(--faint);}
+.ti:focus{outline:none;border-color:var(--ghost);}
+.ta-btn{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;padding:8px 14px;border:1px solid var(--ghost);background:transparent;color:var(--mute);cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.ta-btn:hover{color:var(--white);}
+.save-note{font-family:var(--mono);font-size:8px;color:var(--faint);margin-left:14px;letter-spacing:0.08em;}
+
+/* ═══ RUNS ═══ */
+.run-box{border:1px solid var(--hair);padding:24px 28px;margin-bottom:36px;display:flex;align-items:center;justify-content:space-between;gap:24px;}
+.run-box-info .rt{font-family:var(--serif);font-size:17px;margin-bottom:5px;}
+.run-box-info .rs{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:0.06em;line-height:1.6;}
+.run-now{flex-shrink:0;font-family:var(--mono);font-size:10px;letter-spacing:0.14em;padding:13px 28px;border:1px solid var(--ghost);background:transparent;color:var(--white);cursor:pointer;transition:all 0.25s;white-space:nowrap;}
+.run-now:hover{background:var(--white);border-color:var(--white);color:var(--ink);}
+.run-now.running{border-color:var(--pos);color:var(--pos);animation:pulse 1.2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.live-bar{display:none;align-items:center;gap:10px;padding:12px 18px;background:rgba(132,216,171,0.06);border:1px solid rgba(132,216,171,0.18);margin-bottom:24px;font-family:var(--mono);font-size:10px;color:var(--pos);letter-spacing:0.1em;}
+.live-bar.show{display:flex;}
+.spin{display:inline-block;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.rh{display:grid;grid-template-columns:1.5fr 1fr 1fr 80px 1fr 110px;gap:16px;padding-bottom:10px;border-bottom:1px solid var(--hair);margin-bottom:4px;}
+.rr{display:grid;grid-template-columns:1.5fr 1fr 1fr 80px 1fr 110px;gap:16px;align-items:center;padding:17px 0;border-bottom:1px solid var(--hair);}
+.rd{font-family:var(--serif);font-size:15px;}
+.rt2{font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:2px;}
+.rm{font-family:var(--display);font-weight:300;font-size:22px;line-height:1;}
+.rmd{font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;}
+.rq{font-family:var(--mono);font-size:10px;color:var(--mute);}
+.sbadge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:7px;letter-spacing:0.1em;padding:3px 8px;border-radius:2px;}
+.s-ok{background:rgba(132,216,171,0.1);color:var(--pos);border:1px solid rgba(132,216,171,0.2);}
+.s-err{background:rgba(232,154,160,0.08);color:var(--neg);border:1px solid rgba(232,154,160,0.18);}
+.sdot{width:4px;height:4px;border-radius:50%;background:currentColor;}
+.mkr-btn{font-family:var(--mono);font-size:8px;letter-spacing:0.08em;padding:6px 11px;border:1px solid var(--hair);background:transparent;color:var(--faint);cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.mkr-btn:hover{color:var(--white);border-color:var(--ghost);}
+.mkr-btn.done{color:var(--pos);border-color:rgba(132,216,171,0.25);cursor:default;}
+
+/* ═══ RUN DETAIL ═══ */
+.run-detail-shell{max-width:960px;margin:0 auto;padding:40px 56px 100px;}
+.mat-row { cursor:pointer; transition:background 0.15s; }
+.mat-row:hover { background:rgba(245,244,241,0.03); }
+.run-kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair);margin-bottom:40px;}
+.run-kpi-cell{background:var(--ink);padding:16px 20px;}
+.run-kpi-n{font-family:var(--display);font-weight:300;font-size:36px;line-height:1;margin-bottom:5px;}
+.run-kpi-l{font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);}
+.run-kpi-d{font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:4px;}
+.rd-sec{font-family:var(--mono);font-size:9px;letter-spacing:0.18em;color:var(--faint);padding-bottom:11px;border-bottom:1px solid var(--hair);margin-bottom:20px;margin-top:40px;}
+.eng-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair);}
+.eng-cell{background:var(--ink);padding:16px 18px;}
+.eng-lbl{font-family:var(--mono);font-size:8px;letter-spacing:0.12em;color:var(--faint);margin-bottom:10px;}
+.eng-score{font-family:var(--display);font-weight:300;font-size:32px;line-height:1;margin-bottom:2px;}
+.eng-sub{font-family:var(--mono);font-size:7px;letter-spacing:0.1em;color:var(--faint);}
+.eng-cite{font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:6px;}
+.comp-tbl{width:100%;border-collapse:collapse;}
+.comp-tbl th{font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);text-align:left;padding-bottom:10px;border-bottom:1px solid var(--hair);font-weight:400;}
+.comp-tbl td{padding:11px 0;border-bottom:1px solid var(--hair);vertical-align:middle;}
+.comp-nm{font-family:var(--serif);font-size:15px;}
+.comp-bar-w{width:140px;height:3px;background:var(--hair);border-radius:2px;position:relative;}
+.comp-bar{height:100%;border-radius:2px;background:var(--mute);}
+.comp-bar.brand{background:var(--pos);}
+.comp-rt{font-family:var(--serif);font-size:15px;text-align:right;}
+.url-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--hair);gap:16px;}
+.url-path{font-family:var(--mono);font-size:11px;color:var(--pos);letter-spacing:0.04em;}
+.url-eng{font-family:var(--mono);font-size:8px;color:var(--faint);}
+.url-cnt{font-family:var(--mono);font-size:9px;color:var(--faint);}
+.q-block{border-bottom:1px solid var(--hair);padding:18px 0;}
+.q-block:last-child{border-bottom:none;}
+.q-text{font-family:var(--serif);font-style:italic;font-size:16px;color:var(--white);margin-bottom:14px;line-height:1.4;}
+.q-engine-rows{display:flex;flex-direction:column;gap:10px;}
+.q-eng-row{display:grid;grid-template-columns:90px 72px 1fr;gap:12px;align-items:flex-start;}
+.q-eng-lbl{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;color:var(--faint);padding-top:3px;}
+.qbadge{font-family:var(--mono);font-size:7px;letter-spacing:0.1em;padding:3px 7px;border-radius:2px;white-space:nowrap;align-self:flex-start;margin-top:2px;}
+.qb-cited{background:rgba(132,216,171,0.1);color:var(--pos);border:1px solid rgba(132,216,171,0.2);}
+.qb-mentioned{background:rgba(245,244,241,0.05);color:var(--mute);border:1px solid var(--hair);}
+.qb-none{font-family:var(--mono);font-size:9px;color:var(--faint);opacity:0.45;padding-top:3px;}
+.excerpt-preview{font-family:var(--serif);font-style:italic;font-size:13px;line-height:1.6;color:var(--mute);}
+.excerpt-preview mark{background:transparent;color:var(--white);font-style:normal;border-bottom:1px solid rgba(245,244,241,0.3);padding-bottom:1px;}
+.xbtn{display:inline-flex;align-items:center;gap:5px;margin-top:5px;font-family:var(--mono);font-size:8px;letter-spacing:0.1em;color:var(--faint);cursor:pointer;background:transparent;border:none;padding:0;transition:color 0.2s;}
+.xbtn:hover{color:var(--white);}
+.excerpt-full{display:none;margin-top:10px;padding:13px 16px;background:rgba(245,244,241,0.03);border-left:2px solid rgba(245,244,241,0.1);font-family:var(--serif);font-style:italic;font-size:13px;line-height:1.75;color:var(--mute);}
+.excerpt-full mark{background:rgba(132,216,171,0.1);color:var(--pos);font-style:normal;padding:0 2px;}
+.excerpt-full.open{display:block;animation:rev .2s ease;}
+@keyframes rev{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+.xcollapse{display:none;margin-top:6px;font-family:var(--mono);font-size:8px;letter-spacing:0.1em;color:var(--faint);cursor:pointer;background:transparent;border:none;padding:0;transition:color 0.2s;}
+.xcollapse:hover{color:var(--white);}
+.xcollapse.show{display:inline-block;}
+.cite-chip{display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-family:var(--mono);font-size:8px;color:var(--pos);opacity:0.7;}
+
+/* ═══ REPORTS LIST ═══ */
+.rph{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 120px;gap:16px;padding-bottom:10px;border-bottom:1px solid var(--hair);margin-bottom:4px;}
+.rprow{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 120px;gap:16px;align-items:center;padding:17px 0;border-bottom:1px solid var(--hair);cursor:pointer;transition:padding-left 0.2s cubic-bezier(.2,.8,.2,1),background 0.2s;}
+.rprow:hover{padding-left:10px;background:rgba(245,244,241,0.02);}
+.rpw{font-family:var(--serif);font-size:16px;}
+.rps{font-family:var(--mono);font-size:8px;margin-top:3px;}
+.rpr{font-family:var(--display);font-weight:300;font-size:22px;line-height:1;}
+.rpd{font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;}
+.rpc{font-family:var(--mono);font-size:9px;color:var(--mute);}
+.rpa{display:flex;gap:6px;}
+.rpb{font-family:var(--mono);font-size:8px;letter-spacing:0.08em;padding:6px 10px;border:1px solid var(--hair);background:transparent;color:var(--faint);cursor:pointer;transition:all 0.2s;}
+.rpb:hover{color:var(--white);border-color:var(--ghost);}
+
+/* ═══ REPORT EDITOR ═══ */
+#pg-editor{display:none;height:calc(100vh - 78px);}
+#pg-editor.active{display:flex;flex-direction:column;}
+.ed-chrome{height:48px;padding:0 24px;border-bottom:1px solid var(--hair);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:rgba(14,14,15,0.7);}
+.ed-bc{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:9px;letter-spacing:0.12em;}
+.ed-bc .bc-link{color:var(--faint);}
+.ed-bc .bc-link:hover{color:var(--white);}
+.ed-actions{display:flex;gap:8px;}
+.ed-btn{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;padding:7px 16px;border:1px solid var(--hair);background:transparent;color:var(--faint);cursor:pointer;transition:all 0.2s;}
+.ed-btn:hover{color:var(--white);border-color:var(--ghost);}
+.ed-btn.pub{border-color:var(--ghost);color:var(--white);}
+.ed-btn.pub:hover{background:var(--white);color:var(--ink);}
+.ed-body{display:flex;flex:1;overflow:hidden;}
+
+/* Editor sidebar */
+.ed-sidebar{width:380px;flex-shrink:0;border-right:1px solid var(--hair);overflow-y:auto;padding:28px 24px;}
+.ed-sidebar::-webkit-scrollbar{width:4px;}
+.ed-sidebar::-webkit-scrollbar-track{background:transparent;}
+.ed-sidebar::-webkit-scrollbar-thumb{background:var(--hair);}
+.ed-field{margin-bottom:22px;}
+.ed-label{font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);margin-bottom:7px;}
+.ed-textarea{width:100%;font-family:var(--serif);font-style:italic;font-size:14px;line-height:1.6;background:rgba(245,244,241,0.04);border:1px solid var(--hair);color:var(--white);padding:10px 13px;resize:vertical;min-height:90px;transition:border-color 0.2s;}
+.ed-textarea:focus{outline:none;border-color:var(--ghost);}
+.ed-sep{height:1px;background:var(--hair);margin:20px 0;}
+.list-field{display:flex;flex-direction:column;gap:6px;}
+.list-item{display:flex;align-items:flex-start;gap:8px;}
+.list-item input{flex:1;font-family:var(--serif);font-size:13px;background:rgba(245,244,241,0.04);border:1px solid var(--hair);color:var(--white);padding:8px 10px;transition:border-color 0.2s;}
+.list-item input:focus{outline:none;border-color:var(--ghost);}
+.list-item input::placeholder{color:var(--faint);}
+.del-item{background:transparent;border:none;color:var(--faint);cursor:pointer;font-size:14px;padding:8px 4px;transition:color 0.2s;flex-shrink:0;}
+.del-item:hover{color:var(--neg);}
+.add-item-btn{font-family:var(--mono);font-size:8px;letter-spacing:0.1em;color:var(--faint);background:transparent;border:1px solid var(--hair);padding:6px 12px;cursor:pointer;transition:all 0.2s;margin-top:4px;width:100%;}
+.add-item-btn:hover{color:var(--white);border-color:var(--ghost);}
+.gsc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.gsc-fi{font-family:var(--mono);font-size:12px;background:rgba(245,244,241,0.04);border:1px solid var(--hair);color:var(--white);padding:8px 10px;width:100%;transition:border-color 0.2s;}
+.gsc-fi:focus{outline:none;border-color:var(--ghost);}
+.gsc-fi::placeholder{color:var(--faint);}
+.gsc-sub{font-family:var(--mono);font-size:7px;letter-spacing:0.1em;color:var(--faint);margin-top:4px;}
+
+/* Editor preview */
+.ed-preview{flex:1;background:#080809;overflow-y:auto;padding:32px 24px 60px;}
+.ed-preview::-webkit-scrollbar{width:4px;}
+.ed-preview::-webkit-scrollbar-track{background:transparent;}
+.ed-preview::-webkit-scrollbar-thumb{background:rgba(245,244,241,0.1);}
+
+/* Paper */
+.paper{background:#f1ede4;color:#17150f;width:100%;max-width:640px;padding:56px 64px 64px;font-family:var(--display);box-shadow:0 12px 60px rgba(0,0,0,0.5);margin:0 auto;}
+.p-eye{font-family:var(--mono);font-size:8px;letter-spacing:0.18em;color:var(--p-mute);margin-bottom:14px;}
+.p-title{font-family:var(--display);font-size:64px;font-weight:300;line-height:0.94;letter-spacing:-0.015em;margin-bottom:10px;}
+.p-date{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--p-mute);margin-bottom:4px;}
+.p-meta{font-family:var(--mono);font-size:8px;letter-spacing:0.1em;color:var(--p-faint);}
+.p-div{height:1px;background:var(--p-hair);margin:28px 0;}
+.p-sec{font-family:var(--mono);font-size:8px;letter-spacing:0.18em;color:var(--p-mute);padding-bottom:10px;border-bottom:1px solid var(--p-hair);margin-bottom:18px;margin-top:34px;text-transform:uppercase;}
+.p-exec{font-family:var(--display);font-style:italic;font-weight:300;font-size:18px;line-height:1.58;color:rgba(23,21,15,0.78);}
+.p-placeholder{font-family:var(--mono);font-size:9px;color:var(--p-faint);font-style:italic;opacity:0.5;}
+.kpi-grid-p{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--p-hair);border:1px solid var(--p-hair);}
+.kpi-cell-p{background:var(--paper);padding:16px 18px;}
+.kpi-n{font-family:var(--display);font-weight:300;font-size:44px;line-height:1;margin-bottom:5px;}
+.kpi-l{font-family:var(--mono);font-size:7px;letter-spacing:0.14em;color:var(--p-faint);}
+.kpi-d{font-family:var(--mono);font-size:8px;color:var(--p-faint);margin-top:4px;}
+.checklist-p{list-style:none;}
+.check-row-p{display:flex;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid var(--p-hair);font-family:var(--display);font-size:14px;line-height:1.5;color:var(--paper-ink);}
+.check-row-p:last-child{border-bottom:none;}
+.chk{width:13px;height:13px;border:1px solid rgba(23,21,15,0.3);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;}
+.chk.done{background:var(--paper-ink);border-color:var(--paper-ink);}
+.chk.done::after{content:'';width:5px;height:3px;border-left:1px solid var(--paper);border-bottom:1px solid var(--paper);transform:rotate(-45deg) translateY(-1px);display:block;}
+.prio-n{font-family:var(--mono);font-size:8px;color:var(--p-faint);flex-shrink:0;min-width:20px;padding-top:2px;}
+.blk-dash{color:var(--neg-paper);flex-shrink:0;}
+.gsc-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--p-hair);border:1px solid var(--p-hair);}
+.gsc-cell-p{background:var(--paper);padding:13px 14px;}
+.gsc-n{font-family:var(--display);font-weight:300;font-size:28px;line-height:1;margin-bottom:4px;}
+.gsc-l{font-family:var(--mono);font-size:7px;letter-spacing:0.12em;color:var(--p-faint);}
+.p-footer{margin-top:44px;padding-top:14px;border-top:1px solid var(--p-hair);display:flex;justify-content:space-between;font-family:var(--mono);font-size:7px;letter-spacing:0.1em;color:var(--p-faint);}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Victory<em>Velocity</em></div>
+  <button class="nav-signout">SIGN OUT</button>
+</nav>
+
+<!-- ═══════════ PAGE: CLIENTS LIST ═══════════ -->
+<div class="pg active" id="pg-clients">
+<div class="page-shell">
+  <div class="page-hdr">
+    <div><div class="page-title">Clients</div><div class="page-sub">3 active accounts</div></div>
+    <button class="cta-btn">+ ADD CLIENT</button>
+  </div>
+  <div class="stats-strip">
+    <div class="stat-cell"><div class="stat-num">3</div><div class="stat-lbl">ACTIVE CLIENTS</div></div>
+    <div class="stat-cell"><div class="stat-num pos">71%</div><div class="stat-lbl">AVG MENTION RATE</div></div>
+    <div class="stat-cell"><div class="stat-num pos">44%</div><div class="stat-lbl">AVG CITATION RATE</div></div>
+  </div>
+  <div class="tbl-head">
+    <div class="col-label">CLIENT</div><div class="col-label">MENTION</div>
+    <div class="col-label">CITATION</div><div class="col-label">LAST RUN</div><div class="col-label"></div>
+  </div>
+  <div class="c-row" onclick="goClient('config')">
+    <div><div class="c-name">ChildSpot</div><div class="c-dom">childspotapp.com</div></div>
+    <div><div class="mv pos">68%</div><div class="md">↑ +4pp</div></div>
+    <div><div class="mv pos">41%</div><div class="md">↑ +2pp</div></div>
+    <div><div style="font-family:var(--mono);font-size:10px;color:var(--mute);">Jun 15, 2026</div><div class="pill pill-ok"><span class="pd"></span>CURRENT</div></div>
+    <div><button class="open-btn">OPEN →</button></div>
+  </div>
+  <div class="c-row">
+    <div><div class="c-name">Northfield Law</div><div class="c-dom">northfieldlaw.ca</div></div>
+    <div><div class="mv pos">82%</div><div class="md">↑ +7pp</div></div>
+    <div><div class="mv pos">55%</div><div class="md">↑ +3pp</div></div>
+    <div><div style="font-family:var(--mono);font-size:10px;color:var(--mute);">Jun 14, 2026</div><div class="pill pill-ok"><span class="pd"></span>CURRENT</div></div>
+    <div><button class="open-btn">OPEN →</button></div>
+  </div>
+  <div class="c-row">
+    <div><div class="c-name">Verdana Health</div><div class="c-dom">verdanahealth.com</div></div>
+    <div><div class="mv" style="color:var(--faint);">—</div><div class="md">no data</div></div>
+    <div><div class="mv" style="color:var(--faint);">—</div><div class="md">no data</div></div>
+    <div><div style="font-family:var(--mono);font-size:10px;color:var(--faint);">Jun 1, 2026</div><div class="pill pill-stale"><span class="pd"></span>STALE</div></div>
+    <div><button class="open-btn">OPEN →</button></div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════ CLIENT CHROME (breadcrumb + header + subnav) ═══════════ -->
+<div id="client-chrome" style="display:none;">
+  <div class="breadcrumb">
+    <span class="bc-link" onclick="goClients()">CLIENTS</span>
+    <span class="bc-sep">/</span><span class="bc-cur">CHILDSPOT</span>
+  </div>
+  <div class="client-hdr">
+    <div><div class="client-big">ChildSpot</div><div class="client-dom">childspotapp.com</div></div>
+  </div>
+  <div class="sub-nav" style="margin-top:22px;">
+    <div class="sub-tab" id="tab-config" onclick="goClient('config')">CONFIG</div>
+    <div class="sub-tab" id="tab-runs" onclick="goClient('runs')">RUNS</div>
+    <div class="sub-tab" id="tab-reports" onclick="goClient('reports')">REPORTS</div>
+  </div>
+</div>
+
+<!-- ═══════════ PAGE: CONFIG ═══════════ -->
+<div class="pg" id="pg-config">
+<div class="inner-shell">
+  <div class="cfg-grid">
+    <div class="fg"><div class="fl">CLIENT NAME</div><input class="fi" value="ChildSpot"></div>
+    <div class="fg"><div class="fl">DOMAIN</div><input class="fi mono" value="childspotapp.com"></div>
+    <div class="fg"><div class="fl">BRAND NAME</div><input class="fi" value="ChildSpot"></div>
+    <div class="divider"></div>
+    <div class="fg full">
+      <div class="fl">BRAND VARIATIONS <span style="font-weight:400;opacity:0.6;">— used for mention detection</span></div>
+      <div class="tag-editor">
+        <div class="tag-list" id="vars-tags">
+          <span class="tag">ChildSpot <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">Child Spot <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">childspotapp.com <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">childspotapp <span class="tx" onclick="removeTag(this)">×</span></span>
+        </div>
+        <div class="tag-add-row"><input class="ti" id="vars-input" placeholder="add variation…"><button class="ta-btn" onclick="addTag('vars')">+ ADD</button></div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="fg full">
+      <div class="fl">TARGET QUERIES <span style="font-weight:400;opacity:0.6;">— tracker uses these on next run</span></div>
+      <div class="tag-editor">
+        <div class="tag-list" id="queries-tags">
+          <span class="tag">find daycare near me Ontario <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">licensed daycare options in Ontario <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">best way to find childcare in Ontario <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">daycare with immediate availability Ontario <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">book daycare online without waitlist Ontario <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">CWELCC daycare spots available Ontario <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">how to fill empty daycare spots Ontario <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">attract more families to my daycare centre <span class="tx" onclick="removeTag(this)">×</span></span>
+        </div>
+        <div class="tag-add-row"><input class="ti" id="queries-input" placeholder="add query…"><button class="ta-btn" onclick="addTag('queries')">+ ADD</button></div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="fg full">
+      <div class="fl">COMPETITORS</div>
+      <div class="tag-editor">
+        <div class="tag-list" id="comps-tags">
+          <span class="tag">Wee Watch <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">KinderPage <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">Daycare Radar <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">Care.com <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">HiMama <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">OneList Ontario <span class="tx" onclick="removeTag(this)">×</span></span>
+          <span class="tag">KinderSurf <span class="tx" onclick="removeTag(this)">×</span></span>
+        </div>
+        <div class="tag-add-row"><input class="ti" id="comps-input" placeholder="add competitor…"><button class="ta-btn" onclick="addTag('comps')">+ ADD</button></div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:32px;display:flex;align-items:center;">
+    <button class="cta-btn" onclick="saveConfig()">SAVE CONFIG</button>
+    <span class="save-note" id="save-note" style="display:none;">✓ Saved — changes apply on next tracker run</span>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════ PAGE: RUNS ═══════════ -->
+<div class="pg" id="pg-runs">
+<div class="inner-shell">
+  <div class="run-box">
+    <div class="run-box-info">
+      <div class="rt">Run AI Visibility Tracker</div>
+      <div class="rs">Queries all 4 engines (ChatGPT · Perplexity · Claude · Gemini) against ChildSpot's 8 tracked queries.<br>Results are saved automatically when complete.</div>
+    </div>
+    <button class="run-now" id="run-btn" onclick="triggerRun()">▷ RUN NOW</button>
+  </div>
+  <div class="live-bar" id="live-bar"><span class="spin">◌</span> Tracker running — 8 queries × 4 engines · Est. 2–4 min</div>
+  <div class="rh">
+    <div class="col-label">DATE</div><div class="col-label">MENTION</div>
+    <div class="col-label">CITATION</div><div class="col-label">QUERIES</div>
+    <div class="col-label">STATUS</div><div class="col-label">REPORT</div>
+  </div>
+  <div class="rr" style="cursor:pointer;transition:padding-left 0.2s cubic-bezier(.2,.8,.2,1),background 0.2s;" onmouseover="this.style.paddingLeft='12px';this.style.background='rgba(245,244,241,0.02)'" onmouseout="this.style.paddingLeft='';this.style.background=''" onclick="goRunDetail()">
+    <div><div class="rd">Jun 15, 2026</div><div class="rt2">11:02 AM · 3m 14s</div></div>
+    <div><div class="rm pos">68%</div><div class="rmd">↑ +4pp</div></div>
+    <div><div class="rm pos">41%</div><div class="rmd">↑ +2pp</div></div>
+    <div><div class="rq">8 / 8</div></div>
+    <div><span class="sbadge s-ok"><span class="sdot"></span>OK</span></div>
+    <div><button class="mkr-btn done" onclick="event.stopPropagation()">✓ REPORTED</button></div>
+  </div>
+  <div class="rr">
+    <div><div class="rd">Jun 8, 2026</div><div class="rt2">10:55 AM · 2m 48s</div></div>
+    <div><div class="rm pos">64%</div><div class="rmd">↑ +2pp</div></div>
+    <div><div class="rm pos">39%</div><div class="rmd">—</div></div>
+    <div><div class="rq">8 / 8</div></div>
+    <div><span class="sbadge s-ok"><span class="sdot"></span>OK</span></div>
+    <div><button class="mkr-btn" onclick="promoteRun(this)">→ MAKE REPORT</button></div>
+  </div>
+  <div class="rr">
+    <div><div class="rd">Jun 1, 2026</div><div class="rt2">11:14 AM · 3m 02s</div></div>
+    <div><div class="rm" style="color:var(--mute);">62%</div><div class="rmd">↑ +1pp</div></div>
+    <div><div class="rm" style="color:var(--mute);">39%</div><div class="rmd">↑ +3pp</div></div>
+    <div><div class="rq">8 / 8</div></div>
+    <div><span class="sbadge s-ok"><span class="sdot"></span>OK</span></div>
+    <div><button class="mkr-btn" onclick="promoteRun(this)">→ MAKE REPORT</button></div>
+  </div>
+  <div class="rr">
+    <div><div class="rd">May 18, 2026</div><div class="rt2">9:08 AM · 1m 03s</div></div>
+    <div><div class="rm" style="color:var(--faint);">—</div></div>
+    <div><div class="rm" style="color:var(--faint);">—</div></div>
+    <div><div class="rq" style="color:var(--neg);">3 / 8</div></div>
+    <div><span class="sbadge s-err"><span class="sdot"></span>ERROR</span></div>
+    <div><span style="font-family:var(--mono);font-size:8px;color:var(--faint);opacity:0.4;">—</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════ PAGE: REPORTS LIST ═══════════ -->
+<div class="pg" id="pg-reports">
+<div class="inner-shell">
+  <div class="rph">
+    <div class="col-label">WEEK</div><div class="col-label">MENTION</div>
+    <div class="col-label">CITATION</div><div class="col-label">STATUS</div><div class="col-label">ACTIONS</div>
+  </div>
+  <div id="reports-list">
+  <div class="rprow">
+    <div><div class="rpw">Jun 9–15, 2026</div><div class="rps" style="color:var(--pos);">● Published</div></div>
+    <div><div class="rpr pos">68%</div><div class="rpd">↑ +4pp</div></div>
+    <div><div class="rpr pos">41%</div><div class="rpd">↑ +2pp</div></div>
+    <div><div class="rpc">Jun 16 · from run</div></div>
+    <div class="rpa"><button class="rpb" onclick="goEditor()">EDIT</button><button class="rpb" onclick="goView()">VIEW ↗</button></div>
+  </div>
+  <div class="rprow">
+    <div><div class="rpw">May 26–Jun 1, 2026</div><div class="rps" style="color:var(--faint);">Draft</div></div>
+    <div><div class="rpr" style="color:var(--mute);">62%</div><div class="rpd">↑ +1pp</div></div>
+    <div><div class="rpr" style="color:var(--mute);">39%</div><div class="rpd">↑ +3pp</div></div>
+    <div><div class="rpc">Jun 2 · from run</div></div>
+    <div class="rpa"><button class="rpb" onclick="goEditor()">EDIT</button><button class="rpb" onclick="goView()">VIEW ↗</button></div>
+  </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════ PAGE: RUN DETAIL ═══════════ -->
+<div class="pg" id="pg-run-detail" style="padding-bottom:100px;">
+  <div class="breadcrumb">
+    <span class="bc-link" onclick="goClients()">CLIENTS</span><span class="bc-sep">/</span>
+    <span class="bc-link" onclick="goClient('runs')">CHILDSPOT</span><span class="bc-sep">/</span>
+    <span class="bc-cur">RUN · JUN 17, 2026</span>
+  </div>
+  <div class="run-detail-shell">
+
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:32px;">
+      <div>
+        <div style="font-family:var(--display);font-size:36px;font-weight:300;">Jun 17, 2026</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:6px;letter-spacing:0.1em;">11:46 PM · 8 queries · 31 responses · Gemini skipped 1 query</div>
+      </div>
+      <button class="cta-btn" onclick="promoteFromDetail()">→ MAKE REPORT</button>
+    </div>
+
+    <div class="run-kpi-strip">
+      <div class="run-kpi-cell"><div class="run-kpi-n" style="color:var(--neg);">16%</div><div class="run-kpi-l">MENTION RATE</div><div class="run-kpi-d">5 of 31 responses</div></div>
+      <div class="run-kpi-cell"><div class="run-kpi-n" style="color:var(--faint);">0%</div><div class="run-kpi-l">CITATION RATE</div><div class="run-kpi-d">no URLs cited this run</div></div>
+      <div class="run-kpi-cell"><div class="run-kpi-n" style="color:var(--mute);">13%</div><div class="run-kpi-l">TOP COMPETITOR</div><div class="run-kpi-d">Care.com · 4 mentions</div></div>
+      <div class="run-kpi-cell"><div class="run-kpi-n" style="color:var(--faint);">0</div><div class="run-kpi-l">CITATIONS FOUND</div><div class="run-kpi-d">—</div></div>
+    </div>
+
+    <div class="rd-sec">PER-ENGINE BREAKDOWN <span style="font-size:8px;letter-spacing:0.06em;color:var(--faint);font-family:var(--mono);margin-left:10px;">8 queries each</span></div>
+    <div class="eng-grid">
+
+      <!-- ChatGPT: 1 mentioned, 0 cited, 7 not found -->
+      <div class="eng-cell">
+        <div class="eng-lbl">CHATGPT</div>
+        <div style="display:flex;height:4px;border-radius:2px;overflow:hidden;margin:8px 0 14px;">
+          <div style="width:12.5%;background:rgba(132,216,171,0.35);"></div>
+          <div style="width:87.5%;background:var(--hair);"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--pos);">● CITED</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">0 / 8</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--mute);">● MENTIONED</span><span style="font-family:var(--mono);font-size:9px;color:var(--white);">1 / 8</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--faint);">● NOT FOUND</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">7 / 8</span></div>
+        </div>
+      </div>
+
+      <!-- Perplexity: 0 mentioned, 0 cited, 8 not found -->
+      <div class="eng-cell">
+        <div class="eng-lbl">PERPLEXITY</div>
+        <div style="display:flex;height:4px;border-radius:2px;overflow:hidden;margin:8px 0 14px;">
+          <div style="width:100%;background:var(--hair);"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--pos);">● CITED</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">0 / 8</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--mute);">● MENTIONED</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">0 / 8</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--faint);">● NOT FOUND</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">8 / 8</span></div>
+        </div>
+      </div>
+
+      <!-- Claude: 0 mentioned, 0 cited, 8 not found -->
+      <div class="eng-cell">
+        <div class="eng-lbl">CLAUDE</div>
+        <div style="display:flex;height:4px;border-radius:2px;overflow:hidden;margin:8px 0 14px;">
+          <div style="width:100%;background:var(--hair);"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--pos);">● CITED</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">0 / 8</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--mute);">● MENTIONED</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">0 / 8</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--faint);">● NOT FOUND</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">8 / 8</span></div>
+        </div>
+      </div>
+
+      <!-- Gemini: 4 mentioned, 0 cited, 3 not found (ran 7 queries) -->
+      <div class="eng-cell">
+        <div class="eng-lbl">GEMINI</div>
+        <div style="display:flex;height:4px;border-radius:2px;overflow:hidden;margin:8px 0 14px;">
+          <div style="width:57%;background:rgba(132,216,171,0.35);"></div>
+          <div style="width:43%;background:var(--hair);"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--pos);">● CITED</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">0 / 7</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--mute);">● MENTIONED</span><span style="font-family:var(--mono);font-size:9px;color:var(--white);">4 / 7</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="font-family:var(--mono);font-size:8px;color:var(--faint);">● NOT FOUND</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);">3 / 7</span></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:7px;color:var(--faint);margin-top:8px;opacity:0.6;">skipped 1 query</div>
+      </div>
+
+    </div>
+
+    <div class="rd-sec">COMPETITOR SHARE OF VOICE</div>
+    <table class="comp-tbl">
+      <thead><tr><th style="width:40%;">BRAND</th><th>APPEARANCES</th><th style="text-align:right;">RATE</th></tr></thead>
+      <tbody>
+        <tr><td><div class="comp-nm" style="color:var(--pos);">ChildSpot</div></td><td><div class="comp-bar-w"><div class="comp-bar brand" style="width:16%;"></div></div></td><td><div class="comp-rt pos">16%</div></td></tr>
+        <tr><td><div class="comp-nm">Care.com</div></td><td><div class="comp-bar-w"><div class="comp-bar" style="width:13%;"></div></div></td><td><div class="comp-rt">13%</div></td></tr>
+        <tr><td><div class="comp-nm">Wee Watch</div></td><td><div class="comp-bar-w"><div class="comp-bar" style="width:10%;"></div></div></td><td><div class="comp-rt">10%</div></td></tr>
+        <tr><td><div class="comp-nm">Daycare Radar</div></td><td><div class="comp-bar-w"><div class="comp-bar" style="width:6%;"></div></div></td><td><div class="comp-rt">6%</div></td></tr>
+        <tr><td><div class="comp-nm">KinderPage</div></td><td><div class="comp-bar-w"><div class="comp-bar" style="width:6%;"></div></div></td><td><div class="comp-rt">6%</div></td></tr>
+        <tr><td><div class="comp-nm" style="color:var(--faint);">HiMama</div></td><td><div class="comp-bar-w"></div></td><td><div class="comp-rt" style="color:var(--faint);">0%</div></td></tr>
+        <tr><td><div class="comp-nm" style="color:var(--faint);">OneList Ontario</div></td><td><div class="comp-bar-w"></div></td><td><div class="comp-rt" style="color:var(--faint);">0%</div></td></tr>
+      </tbody>
+    </table>
+
+    <div class="rd-sec">CITATION URLS DISCOVERED</div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--faint);padding:16px 0;letter-spacing:0.08em;">No URLs cited this run — zero citations across all engines.</div>
+
+    <div class="rd-sec" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>QUERY RESULTS <span style="opacity:0.45;font-size:9px;margin-left:8px;">8 queries · 31 responses</span></span>
+    </div>
+
+    <!-- Quick overview matrix -->
+    <div style="overflow-x:auto;margin-bottom:28px;">
+      <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:9px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:8px 12px 8px 0;color:var(--faint);font-weight:400;border-bottom:1px solid var(--hair);">QUERY</th>
+            <th style="padding:8px 12px;color:var(--faint);font-weight:400;border-bottom:1px solid var(--hair);text-align:center;">GPT</th>
+            <th style="padding:8px 12px;color:var(--faint);font-weight:400;border-bottom:1px solid var(--hair);text-align:center;">PERP</th>
+            <th style="padding:8px 12px;color:var(--faint);font-weight:400;border-bottom:1px solid var(--hair);text-align:center;">CLAUDE</th>
+            <th style="padding:8px 12px;color:var(--faint);font-weight:400;border-bottom:1px solid var(--hair);text-align:center;">GEMINI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--hair);" onclick="scrollToQuery(0)" class="mat-row"><td style="padding:10px 12px 10px 0;color:var(--mute);">find daycare near me Ontario</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td></tr>
+          <tr style="border-bottom:1px solid var(--hair);" onclick="scrollToQuery(1)" class="mat-row"><td style="padding:10px 12px 10px 0;color:var(--mute);">licensed daycare options in Ontario</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--pos);font-weight:500;">M</td></tr>
+          <tr style="border-bottom:1px solid var(--hair);" onclick="scrollToQuery(2)" class="mat-row"><td style="padding:10px 12px 10px 0;color:var(--mute);">best way to find childcare in Ontario</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--pos);font-weight:500;">M</td></tr>
+          <tr style="border-bottom:1px solid var(--hair);" onclick="scrollToQuery(3)" class="mat-row"><td style="padding:10px 12px 10px 0;color:var(--mute);">daycare with immediate availability Ontario</td><td style="padding:10px 12px;text-align:center;color:var(--pos);font-weight:500;">M</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td></tr>
+          <tr style="border-bottom:1px solid var(--hair);" onclick="scrollToQuery(4)" class="mat-row"><td style="padding:10px 12px 10px 0;color:var(--mute);">book daycare online without waitlist Ontario</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);font-size:7px;">N/A</td></tr>
+          <tr style="border-bottom:1px solid var(--hair);" onclick="scrollToQuery(5)" class="mat-row"><td style="padding:10px 12px 10px 0;color:var(--mute);">CWELCC daycare spots available Ontario</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--pos);font-weight:500;">M</td></tr>
+          <tr style="border-bottom:1px solid var(--hair);" onclick="scrollToQuery(6)" class="mat-row"><td style="padding:10px 12px 10px 0;color:var(--mute);">how to fill empty daycare spots Ontario</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--pos);font-weight:500;">M</td></tr>
+          <tr onclick="scrollToQuery(7)" class="mat-row"><td style="padding:10px 12px 10px 0;color:var(--mute);">attract more families to my daycare centre</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td><td style="padding:10px 12px;text-align:center;color:var(--faint);">—</td></tr>
+        </tbody>
+      </table>
+      <div style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:8px;letter-spacing:0.06em;">M = mentioned &nbsp;·&nbsp; C = cited &nbsp;·&nbsp; — = not found &nbsp;·&nbsp; N/A = engine skipped &nbsp;·&nbsp; click a row to jump to detail</div>
+    </div>
+
+    <!-- Detailed query blocks — first 3 visible -->
+    <div id="q-visible">
+
+      <div class="q-block" id="q0">
+        <div class="q-text">"find daycare near me Ontario"</div>
+        <div class="q-engine-rows">
+          <div class="q-eng-row"><span class="q-eng-lbl">ChatGPT</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Response listed DaycareRadar.ca — no mention of ChildSpot</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Perplexity</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Directed to Ontario govt child care search tool</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Claude</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Suggested Ministry of Education + Care.com</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Gemini</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Mentioned Wee Watch, general directory advice</span></div>
+        </div>
+      </div>
+
+      <div class="q-block" id="q1">
+        <div class="q-text">"licensed daycare options in Ontario"</div>
+        <div class="q-engine-rows">
+          <div class="q-eng-row"><span class="q-eng-lbl">ChatGPT</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Mentioned KinderPage, CWELCC stats — no ChildSpot</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Perplexity</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Described Ontario licensing types, no brand mentions</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Claude</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">General overview of licensed vs unlicensed care</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Gemini</span><span class="qbadge qb-mentioned">MENTIONED</span>
+            <div>
+              <div class="excerpt-preview">"…<mark>ChildSpot:</mark> This platform allows you to search for licensed daycare with available spots in real-time, filtering by location, age group, and CWELCC status…"</div>
+              <button class="xbtn" onclick="xpand(this)"><span>···</span> see excerpt</button>
+              <div class="excerpt-full" style="font-family:var(--mono);font-size:9px;color:var(--mute);line-height:1.6;"><span style="color:var(--faint);font-style:italic;">Excerpt from Gemini response (ChildSpot appears ~2100 chars in):</span><br><br>"…<mark>ChildSpot:</mark> This platform allows you to search for licensed daycare with available spots in real-time, filtering by location, age group, and CWELCC status.<br><br>Wee Watch: This is a licensed home daycare agency that provides trusted childcare services across Ontario and participates in the CWELCC program…"</div>
+              <button class="xcollapse" onclick="xcollps(this)">↑ collapse</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-block" id="q2">
+        <div class="q-text">"best way to find childcare in Ontario"</div>
+        <div class="q-engine-rows">
+          <div class="q-eng-row"><span class="q-eng-lbl">ChatGPT</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Listed Ontario Ministry of Education, Child Care Locator tool</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Perplexity</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Recommended "One List" waitlist system</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Claude</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Pointed to Ministry licensed child care search only</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Gemini</span><span class="qbadge qb-mentioned">MENTIONED</span>
+            <div>
+              <div class="excerpt-preview">"…<mark>ChildSpot:</mark> This platform allows you to search for real-time availability at licensed Ontario daycares by location, age group, and CWELCC status, potentially bypassing waitlists…"</div>
+              <button class="xbtn" onclick="xpand(this)"><span>···</span> see excerpt</button>
+              <div class="excerpt-full" style="font-family:var(--mono);font-size:9px;color:var(--mute);line-height:1.6;"><span style="color:var(--faint);font-style:italic;">Excerpt from Gemini response (ChildSpot appears ~2850 chars in):</span><br><br>"…platforms that can help you find and apply for licensed child care programs or even search for available spots:<br><br><mark>ChildSpot:</mark> This platform allows you to search for real-time availability at licensed Ontario daycares by location, age group, and CWELCC status, potentially bypassing waitlists.<br><br>Regional Registries: Many municipalities, such as Niagara Region, have their own online registration systems for licensed child care programs…"</div>
+              <button class="xcollapse" onclick="xcollps(this)">↑ collapse</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Hidden: 5 more queries -->
+    <div id="q-hidden" style="display:none;">
+
+      <div class="q-block" id="q3">
+        <div class="q-text">"daycare with immediate availability Ontario"</div>
+        <div class="q-engine-rows">
+          <div class="q-eng-row"><span class="q-eng-lbl">ChatGPT</span><span class="qbadge qb-mentioned">MENTIONED</span>
+            <div>
+              <div class="excerpt-preview">"…<strong>1. <mark>ChildSpot</mark> App</strong> — ChildSpot is an app that allows parents to search for licensed childcare spots with real-time availability…"</div>
+              <button class="xbtn" onclick="xpand(this)"><span>···</span> see excerpt</button>
+              <div class="excerpt-full" style="font-family:var(--mono);font-size:9px;color:var(--mute);line-height:1.6;"><span style="color:var(--faint);font-style:italic;">Excerpt from ChatGPT response (ChildSpot appears first ~220 chars in):</span><br><br>"…resources and services are designed to help parents locate available spots more efficiently:<br><br><strong>1. <mark>ChildSpot</mark> App</strong><br><br>ChildSpot is an app that allows parents to search for licensed childcare spots with real-time availability. It covers various program types, including infant care, toddler programs, preschool, and after-school care. The app aims to eliminate waitlists by providing immediate options. Parents have reported success in finding spots quickly using this platform…"</div>
+              <button class="xcollapse" onclick="xcollps(this)">↑ collapse</button>
+            </div>
+          </div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Perplexity</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Mentioned Care.com, advised calling centres directly</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Claude</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Asked for location clarification, no brand mentions</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Gemini</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Discussed CWELCC demand surge, mentioned Wee Watch</span></div>
+        </div>
+      </div>
+
+      <div class="q-block" id="q4">
+        <div class="q-text">"book daycare online without waitlist Ontario"</div>
+        <div class="q-engine-rows">
+          <div class="q-eng-row"><span class="q-eng-lbl">ChatGPT</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Listed DropIN Child Care App, Care.com — no ChildSpot</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Perplexity</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Said no province-wide no-waitlist system exists</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Claude</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Mentioned DaycareRadar.ca as leading option</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Gemini</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint);font-style:italic;padding-top:3px;">skipped — no response recorded for this run</span></div>
+        </div>
+      </div>
+
+      <div class="q-block" id="q5">
+        <div class="q-text">"CWELCC daycare spots available Ontario"</div>
+        <div class="q-engine-rows">
+          <div class="q-eng-row"><span class="q-eng-lbl">ChatGPT</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Mentioned KinderPage, Daycare Radar for CWELCC info</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Perplexity</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Pointed to Ontario licensed child care search only</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Claude</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Mentioned Daycare Radar, A-Z Child Care listing</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Gemini</span><span class="qbadge qb-mentioned">MENTIONED</span>
+            <div>
+              <div class="excerpt-preview">"…Examples include <mark>ChildSpot</mark> and DaycareRadar. Some regions also have their own online tools…"</div>
+              <button class="xbtn" onclick="xpand(this)"><span>···</span> see excerpt</button>
+              <div class="excerpt-full" style="font-family:var(--mono);font-size:9px;color:var(--mute);line-height:1.6;"><span style="color:var(--faint);font-style:italic;">Excerpt from Gemini response (ChildSpot appears ~640 chars in):</span><br><br>"…Several online platforms can help parents search for licensed daycare centers with real-time availability in Ontario, including those participating in CWELCC. These platforms often allow filtering by location, age group, and CWELCC status. Examples include <mark>ChildSpot</mark> and DaycareRadar. Some regions also have their own online tools, such as OneList Waterloo Region and York Region's Early Years Program Finder…"</div>
+              <button class="xcollapse" onclick="xcollps(this)">↑ collapse</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-block" id="q6">
+        <div class="q-text">"how to fill empty daycare spots Ontario"</div>
+        <div class="q-engine-rows">
+          <div class="q-eng-row"><span class="q-eng-lbl">ChatGPT</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Mentioned Care.com, suggested local partnerships</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Perplexity</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Recommended government waitlist tools only</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Claude</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Marketing and visibility advice, no brand mentions</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Gemini</span><span class="qbadge qb-mentioned">MENTIONED</span>
+            <div>
+              <div class="excerpt-preview">"…Platforms like <mark>ChildSpot</mark> allow licensed operators to directly list and fill short-term vacancies caused by staff absences or attendance fluctuations…"</div>
+              <button class="xbtn" onclick="xpand(this)"><span>···</span> see excerpt</button>
+              <div class="excerpt-full" style="font-family:var(--mono);font-size:9px;color:var(--mute);line-height:1.6;"><span style="color:var(--faint);font-style:italic;">Excerpt from Gemini response (ChildSpot appears ~2830 chars in):</span><br><br>"…Online Platforms for Vacancies: Platforms like <mark>ChildSpot</mark> allow licensed operators to directly list and fill short-term vacancies caused by staff absences or attendance fluctuations, generating revenue from otherwise empty spots…"</div>
+              <button class="xcollapse" onclick="xcollps(this)">↑ collapse</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-block" id="q7">
+        <div class="q-text">"attract more families to my daycare centre"</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--neg);padding:10px 0 4px;letter-spacing:0.06em;">Zero mentions across all 4 engines — complete content gap on operator-side queries.</div>
+        <div class="q-engine-rows">
+          <div class="q-eng-row"><span class="q-eng-lbl">ChatGPT</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Generic marketing advice, no platforms mentioned</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Perplexity</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Website, social media, trust-building advice only</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Claude</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Online presence advice, no brand recommendations</span></div>
+          <div class="q-eng-row"><span class="q-eng-lbl">Gemini</span><span class="qb-none">— not found</span><span style="font-family:var(--mono);font-size:8px;color:var(--faint);margin-top:3px;">Core strengths and quality messaging advice only</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Show more / collapse toggle -->
+    <button id="show-more-btn" onclick="showMoreQueries()" style="width:100%;margin-top:4px;font-family:var(--mono);font-size:9px;letter-spacing:0.14em;padding:14px;border:1px solid var(--hair);background:transparent;color:var(--faint);cursor:pointer;transition:all 0.2s;">
+      SHOW 5 MORE QUERIES ↓
+    </button>
+
+  </div>
+</div>
+
+<!-- ═══════════ PAGE: REPORT VIEW (clean PDF) ═══════════ -->
+<div class="pg" id="pg-view">
+  <div style="background:#080809;min-height:calc(100vh - 78px);">
+    <div style="height:48px;padding:0 24px;border-bottom:1px solid var(--hair);display:flex;align-items:center;justify-content:space-between;background:rgba(14,14,15,0.7);">
+      <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:9px;letter-spacing:0.12em;">
+        <span class="bc-link" onclick="goClient('reports')" style="color:var(--faint);cursor:pointer;">← Reports</span>
+        <span style="color:var(--faint);opacity:0.4;">/</span>
+        <span style="color:var(--mute);">JUN 9–15, 2026</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="goEditor()" style="font-family:var(--mono);font-size:9px;letter-spacing:0.1em;padding:7px 16px;border:1px solid var(--hair);background:transparent;color:var(--faint);cursor:pointer;transition:all 0.2s;">EDIT</button>
+        <button style="font-family:var(--mono);font-size:9px;letter-spacing:0.1em;padding:7px 16px;border:1px solid var(--ghost);background:transparent;color:var(--white);cursor:pointer;">PRINT / PDF →</button>
+      </div>
+    </div>
+    <div style="padding:40px 24px 80px;">
+      <div class="paper">
+        <div class="p-eye">GEO · WEEKLY PERFORMANCE REPORT</div>
+        <div class="p-title">ChildSpot</div>
+        <div class="p-date">Week of Jun 9–15, 2026</div>
+        <div class="p-meta">childspotapp.com · Prepared by Victory Velocity</div>
+        <div class="p-div"></div>
+
+        <div class="p-sec">Executive Summary</div>
+        <div class="p-exec">Mention rate climbed to 68% this week — the highest since onboarding — driven by a breakthrough on Perplexity and strong CWELCC query performance. Citation rate held at 41%. The brand is now appearing in the majority of tracked queries across all four engines.</div>
+
+        <div class="p-sec">AI Visibility</div>
+        <div class="kpi-grid-p">
+          <div class="kpi-cell-p"><div class="kpi-n" style="color:#2d7a52;">68%</div><div class="kpi-l">MENTION RATE</div><div class="kpi-d">↑ +4pp vs last week</div></div>
+          <div class="kpi-cell-p"><div class="kpi-n" style="color:#2d7a52;">41%</div><div class="kpi-l">CITATION RATE</div><div class="kpi-d">↑ +2pp vs last week</div></div>
+        </div>
+
+        <div class="p-sec">Highlights</div>
+        <ul class="checklist-p">
+          <li class="check-row-p"><span>—</span><span>ChatGPT cited childspotapp.com for CWELCC queries for the first time</span></li>
+          <li class="check-row-p"><span>—</span><span>Perplexity mention rate hit 80% — highest single-engine score to date</span></li>
+          <li class="check-row-p"><span>—</span><span>Claude cited the brand on 3 of 8 queries, up from 1 last week</span></li>
+        </ul>
+
+        <div class="p-sec">Work Completed</div>
+        <ul class="checklist-p">
+          <li class="check-row-p"><span class="chk done"></span><span>Published "Best daycare apps in Canada" comparison blog post</span></li>
+          <li class="check-row-p"><span class="chk done"></span><span>Added FAQ schema markup to /features page</span></li>
+          <li class="check-row-p"><span class="chk done"></span><span>Submitted updated sitemap to Google Search Console</span></li>
+        </ul>
+
+        <div class="p-sec">Next Week Priorities</div>
+        <ul class="checklist-p">
+          <li class="check-row-p"><span class="prio-n">01</span><span>Publish /pricing page — brand is invisible on all cost-related queries</span></li>
+          <li class="check-row-p"><span class="prio-n">02</span><span>Write operator-side content targeting "attract families to my daycare" angle</span></li>
+          <li class="check-row-p"><span class="prio-n">03</span><span>Reach out to 3 Ontario childcare associations for directory listings</span></li>
+        </ul>
+
+        <div class="p-sec">Blockers / Risks</div>
+        <ul class="checklist-p">
+          <li class="check-row-p"><span style="color:#b03a3a;">—</span><span>No /pricing page — leaves the brand invisible on cost-related queries (3 queries affected)</span></li>
+          <li class="check-row-p"><span style="color:#b03a3a;">—</span><span>Zero mentions on operator-side queries — content gap for B2B angle</span></li>
+        </ul>
+
+        <div class="p-sec">Google Search Console</div>
+        <div class="gsc-strip">
+          <div class="gsc-cell-p"><div class="gsc-n">12,400</div><div class="gsc-l">IMPRESSIONS</div></div>
+          <div class="gsc-cell-p"><div class="gsc-n">940</div><div class="gsc-l">CLICKS</div></div>
+          <div class="gsc-cell-p"><div class="gsc-n">7.6%</div><div class="gsc-l">AVG CTR</div></div>
+          <div class="gsc-cell-p"><div class="gsc-n">14.2</div><div class="gsc-l">AVG POSITION</div></div>
+        </div>
+
+        <div class="p-footer">
+          <span>Prepared by Victory Velocity · victoryvelocity.ca</span>
+          <span>Week of Jun 9–15, 2026</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ PAGE: REPORT EDITOR ═══════════ -->
+<div class="pg" id="pg-editor">
+  <!-- Editor top bar -->
+  <div class="ed-chrome">
+    <div class="ed-bc">
+      <span class="bc-link" onclick="goClients()">CLIENTS</span>
+      <span class="bc-sep">/</span>
+      <span class="bc-link" onclick="goClient('reports')">CHILDSPOT</span>
+      <span class="bc-sep">/</span>
+      <span class="bc-cur">JUN 9–15, 2026</span>
+    </div>
+    <div class="ed-actions">
+      <button class="ed-btn">SAVE DRAFT</button>
+      <button class="ed-btn pub">PUBLISH REPORT →</button>
+    </div>
+  </div>
+
+  <div class="ed-body">
+    <!-- LEFT: Edit fields -->
+    <div class="ed-sidebar">
+
+      <div class="ed-field">
+        <div class="ed-label">EXECUTIVE SUMMARY</div>
+        <textarea class="ed-textarea" id="exec-input" oninput="syncExec()" rows="5" placeholder="Write a short narrative summary for the client…">Mention rate climbed to 68% this week — the highest since onboarding — driven largely by a breakthrough on Perplexity where the brand now appears in 4 of 5 tracked queries. Citation rate held at 41%, with childspotapp.com/features emerging as the most-cited URL across engines.</textarea>
+      </div>
+
+      <div class="ed-sep"></div>
+
+      <div class="ed-field">
+        <div class="ed-label">HIGHLIGHTS / WINS</div>
+        <div class="list-field" id="highlights-list">
+          <div class="list-item"><input value="ChatGPT cited childspotapp.com for the first time since tracking began"><button class="del-item" onclick="delItem(this)">×</button></div>
+          <div class="list-item"><input value="Perplexity mention rate reached 80% — highest single-engine score to date"><button class="del-item" onclick="delItem(this)">×</button></div>
+        </div>
+        <button class="add-item-btn" onclick="addItem('highlights-list', '')">+ add highlight</button>
+      </div>
+
+      <div class="ed-sep"></div>
+
+      <div class="ed-field">
+        <div class="ed-label">WORK COMPLETED THIS WEEK</div>
+        <div class="list-field" id="work-list">
+          <div class="list-item"><input value="Published 'Best daycare apps in Canada' comparison blog post"><button class="del-item" onclick="delItem(this)">×</button></div>
+          <div class="list-item"><input value="Added FAQ schema markup to /features page"><button class="del-item" onclick="delItem(this)">×</button></div>
+          <div class="list-item"><input value="Submitted updated sitemap to Google Search Console"><button class="del-item" onclick="delItem(this)">×</button></div>
+        </div>
+        <button class="add-item-btn" onclick="addItem('work-list', '')">+ add item</button>
+      </div>
+
+      <div class="ed-sep"></div>
+
+      <div class="ed-field">
+        <div class="ed-label">NEXT WEEK PRIORITIES</div>
+        <div class="list-field" id="prio-list">
+          <div class="list-item"><input value="Publish /pricing page to close 'childcare app cost' query gap"><button class="del-item" onclick="delItem(this)">×</button></div>
+          <div class="list-item"><input value="Draft Claude-targeted FAQ content — lowest-performing engine at 20% citation"><button class="del-item" onclick="delItem(this)">×</button></div>
+        </div>
+        <button class="add-item-btn" onclick="addItem('prio-list', '')">+ add priority</button>
+      </div>
+
+      <div class="ed-sep"></div>
+
+      <div class="ed-field">
+        <div class="ed-label">BLOCKERS / RISKS</div>
+        <div class="list-field" id="blockers-list">
+          <div class="list-item"><input value="No pricing page exists — brand invisible on all cost-related queries"><button class="del-item" onclick="delItem(this)">×</button></div>
+        </div>
+        <button class="add-item-btn" onclick="addItem('blockers-list', '')">+ add blocker</button>
+      </div>
+
+      <div class="ed-sep"></div>
+
+      <div class="ed-field">
+        <div class="ed-label">GOOGLE SEARCH CONSOLE</div>
+        <div class="gsc-grid">
+          <div><input class="gsc-fi" placeholder="Impressions" value="12,400"><div class="gsc-sub">IMPRESSIONS</div></div>
+          <div><input class="gsc-fi" placeholder="Clicks" value="940"><div class="gsc-sub">CLICKS</div></div>
+          <div><input class="gsc-fi" placeholder="CTR" value="7.6%"><div class="gsc-sub">AVG CTR</div></div>
+          <div><input class="gsc-fi" placeholder="Position" value="14.2"><div class="gsc-sub">AVG POSITION</div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: Live paper preview -->
+    <div class="ed-preview">
+      <div class="paper">
+        <div class="p-eye">GEO · WEEKLY PERFORMANCE REPORT</div>
+        <div class="p-title">ChildSpot</div>
+        <div class="p-date">Week of Jun 9–15, 2026</div>
+        <div class="p-meta">childspotapp.com · Prepared by Victory Velocity</div>
+        <div class="p-div"></div>
+
+        <div class="p-sec">Executive Summary</div>
+        <div class="p-exec" id="preview-exec">Mention rate climbed to 68% this week — the highest since onboarding — driven largely by a breakthrough on Perplexity where the brand now appears in 4 of 5 tracked queries. Citation rate held at 41%, with childspotapp.com/features emerging as the most-cited URL across engines.</div>
+
+        <div class="p-sec">AI Visibility</div>
+        <div class="kpi-grid-p">
+          <div class="kpi-cell-p"><div class="kpi-n" style="color:var(--pos-paper);">68%</div><div class="kpi-l">MENTION RATE</div><div class="kpi-d">↑ +4pp vs last week</div></div>
+          <div class="kpi-cell-p"><div class="kpi-n" style="color:var(--pos-paper);">41%</div><div class="kpi-l">CITATION RATE</div><div class="kpi-d">↑ +2pp vs last week</div></div>
+        </div>
+
+        <div class="p-sec">Highlights</div>
+        <ul class="checklist-p" id="preview-highlights">
+          <li class="check-row-p"><span>—</span><span>ChatGPT cited childspotapp.com for the first time since tracking began</span></li>
+          <li class="check-row-p"><span>—</span><span>Perplexity mention rate reached 80% — highest single-engine score to date</span></li>
+        </ul>
+
+        <div class="p-sec">Work Completed</div>
+        <ul class="checklist-p" id="preview-work">
+          <li class="check-row-p"><span class="chk done"></span><span>Published 'Best daycare apps in Canada' comparison blog post</span></li>
+          <li class="check-row-p"><span class="chk done"></span><span>Added FAQ schema markup to /features page</span></li>
+          <li class="check-row-p"><span class="chk done"></span><span>Submitted updated sitemap to Google Search Console</span></li>
+        </ul>
+
+        <div class="p-sec">Next Week Priorities</div>
+        <ul class="checklist-p" id="preview-prios">
+          <li class="check-row-p"><span class="prio-n">01</span><span>Publish /pricing page to close 'childcare app cost' query gap</span></li>
+          <li class="check-row-p"><span class="prio-n">02</span><span>Draft Claude-targeted FAQ content — lowest-performing engine at 20% citation</span></li>
+        </ul>
+
+        <div class="p-sec">Blockers / Risks</div>
+        <ul class="checklist-p" id="preview-blockers">
+          <li class="check-row-p"><span class="blk-dash">—</span><span>No pricing page exists — brand invisible on all cost-related queries</span></li>
+        </ul>
+
+        <div class="p-sec">Google Search Console</div>
+        <div class="gsc-strip">
+          <div class="gsc-cell-p"><div class="gsc-n">12,400</div><div class="gsc-l">IMPRESSIONS</div></div>
+          <div class="gsc-cell-p"><div class="gsc-n">940</div><div class="gsc-l">CLICKS</div></div>
+          <div class="gsc-cell-p"><div class="gsc-n">7.6%</div><div class="gsc-l">AVG CTR</div></div>
+          <div class="gsc-cell-p"><div class="gsc-n">14.2</div><div class="gsc-l">AVG POSITION</div></div>
+        </div>
+
+        <div class="p-footer">
+          <span>Prepared by Victory Velocity · victoryvelocity.ca</span>
+          <span>Week of Jun 9–15, 2026</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Routing ──
+function goView() { showPage('pg-view'); }
+function goRunDetail() { showPage('pg-run-detail'); }
+function promoteFromDetail() {
+  alert('Report created from this run. Go to REPORTS tab to edit and publish.');
+  goClient('reports');
+}
+function showPage(id) {
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('active'));
+  document.getElementById('client-chrome').style.display = 'none';
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function goClients() { showPage('pg-clients'); }
+function goClient(tab) {
+  showPage('pg-' + tab);
+  document.getElementById('client-chrome').style.display = 'block';
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+  const el = document.getElementById('tab-' + tab);
+  if(el) el.classList.add('active');
+}
+function goEditor() {
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('active'));
+  document.getElementById('client-chrome').style.display = 'none';
+  document.getElementById('pg-editor').classList.add('active');
+}
+
+// ── Config tags ──
+function removeTag(x) { x.closest('.tag').remove(); }
+function addTag(prefix) {
+  const input = document.getElementById(prefix + '-input');
+  const val = input.value.trim();
+  if (!val) return;
+  const tag = document.createElement('span');
+  tag.className = 'tag';
+  tag.innerHTML = val + ' <span class="tx" onclick="removeTag(this)">×</span>';
+  document.getElementById(prefix + '-tags').appendChild(tag);
+  input.value = '';
+}
+document.querySelectorAll('.ti').forEach(i => i.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const id = i.id.replace('-input',''); addTag(id); }
+}));
+
+// ── Save config ──
+function saveConfig() {
+  const note = document.getElementById('save-note');
+  note.style.display = 'inline';
+  setTimeout(() => { note.style.display = 'none'; }, 3000);
+}
+
+// ── Tracker run ──
+function triggerRun() {
+  const btn = document.getElementById('run-btn');
+  const bar = document.getElementById('live-bar');
+  btn.textContent = '◌ RUNNING…'; btn.classList.add('running'); bar.classList.add('show');
+  setTimeout(() => {
+    btn.textContent = '▷ RUN NOW'; btn.classList.remove('running'); bar.classList.remove('show');
+    alert('Run complete — results saved. View in Runs history.');
+  }, 4000);
+}
+function promoteRun(btn) {
+  btn.textContent = '✓ REPORTED'; btn.classList.add('done'); btn.onclick = null;
+  // Get the date from the row
+  const row = btn.closest('.rr');
+  const date = row.querySelector('.rd').textContent;
+  const mention = row.querySelectorAll('.rm')[0].textContent;
+  const citation = row.querySelectorAll('.rm')[1].textContent;
+  // Add to reports list
+  const list = document.getElementById('reports-list');
+  const newRow = document.createElement('div');
+  newRow.className = 'rprow';
+  newRow.innerHTML = `
+    <div><div class="rpw">${date}</div><div class="rps" style="color:var(--faint);">Draft</div></div>
+    <div><div class="rpr pos">${mention}</div><div class="rpd"></div></div>
+    <div><div class="rpr pos">${citation}</div><div class="rpd"></div></div>
+    <div><div class="rpc">Just now · from run</div></div>
+    <div class="rpa"><button class="rpb" onclick="goEditor()">EDIT</button><button class="rpb" onclick="goView()">VIEW ↗</button></div>
+  `;
+  list.insertBefore(newRow, list.firstChild);
+}
+
+// ── Editor: exec summary syncs live ──
+function syncExec() {
+  document.getElementById('preview-exec').textContent = document.getElementById('exec-input').value;
+}
+
+// ── Editor: list items ──
+function addItem(listId, val) {
+  const list = document.getElementById(listId);
+  const div = document.createElement('div');
+  div.className = 'list-item';
+  div.innerHTML = '<input value="' + val + '" placeholder="type here…"><button class="del-item" onclick="delItem(this)">×</button>';
+  list.appendChild(div);
+  syncList(listId);
+  div.querySelector('input').addEventListener('input', () => syncList(listId));
+  div.querySelector('input').focus();
+}
+function delItem(btn) {
+  const list = btn.closest('.list-field');
+  btn.closest('.list-item').remove();
+  syncList(list.id);
+}
+function syncList(listId) {
+  const map = {
+    'highlights-list': { preview: 'preview-highlights', tag: 'span', prefix: '—', cls: '' },
+    'work-list':       { preview: 'preview-work',       tag: 'span', prefix: 'chk done', cls: 'chk done' },
+    'prio-list':       { preview: 'preview-prios',      tag: 'prio', prefix: '', cls: '' },
+    'blockers-list':   { preview: 'preview-blockers',   tag: 'blk',  prefix: '', cls: '' },
+  };
+  const cfg = map[listId]; if (!cfg) return;
+  const inputs = [...document.getElementById(listId).querySelectorAll('input')].map(i => i.value).filter(v => v.trim());
+  const preview = document.getElementById(cfg.preview);
+  preview.innerHTML = inputs.map((v, i) => {
+    let icon = '';
+    if (listId === 'work-list') icon = '<span class="chk done"></span>';
+    else if (listId === 'prio-list') icon = '<span class="prio-n">0' + (i+1) + '</span>';
+    else if (listId === 'blockers-list') icon = '<span class="blk-dash">—</span>';
+    else icon = '<span>—</span>';
+    return '<li class="check-row-p">' + icon + '<span>' + v + '</span></li>';
+  }).join('');
+}
+// ── Excerpt expand/collapse ──
+// ── Run detail: show more / collapse queries ──
+function showMoreQueries() {
+  const hidden = document.getElementById('q-hidden');
+  const btn = document.getElementById('show-more-btn');
+  if (hidden.style.display === 'none') {
+    hidden.style.display = 'block';
+    btn.textContent = 'COLLAPSE QUERIES ↑';
+  } else {
+    hidden.style.display = 'none';
+    btn.textContent = 'SHOW 5 MORE QUERIES ↓';
+    document.getElementById('q-visible').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function scrollToQuery(idx) {
+  const hidden = document.getElementById('q-hidden');
+  if (idx >= 3 && hidden.style.display === 'none') {
+    hidden.style.display = 'block';
+    document.getElementById('show-more-btn').textContent = 'COLLAPSE QUERIES ↑';
+  }
+  setTimeout(() => {
+    const el = document.getElementById('q' + idx);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+
+function xpand(btn) {
+  const w = btn.parentElement;
+  w.querySelector('.excerpt-full').classList.add('open');
+  w.querySelector('.xcollapse').classList.add('show');
+  btn.style.display = 'none';
+}
+function xcollps(btn) {
+  const w = btn.parentElement;
+  w.querySelector('.excerpt-full').classList.remove('open');
+  btn.classList.remove('show');
+  w.querySelector('.xbtn').style.display = '';
+}
+
+// Wire existing list inputs
+document.querySelectorAll('.list-field').forEach(lf => {
+  lf.querySelectorAll('input').forEach(i => i.addEventListener('input', () => syncList(lf.id)));
+});
+</script>
+</body>
+</html>

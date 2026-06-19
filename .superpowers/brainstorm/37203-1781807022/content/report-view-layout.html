@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report View Layouts</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0e0e0f; color: #f5f4f1; font-family: 'Segoe UI', system-ui, sans-serif; padding: 32px 24px 80px; }
+
+  h1 { font-family: serif; font-size: 26px; font-weight: 400; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .subtitle { font-size: 13px; color: rgba(245,244,241,0.5); margin-bottom: 40px; line-height: 1.6; max-width: 700px; }
+
+  .layout-option { border: 1px solid rgba(245,244,241,0.13); border-radius: 6px; margin-bottom: 40px; overflow: hidden; cursor: pointer; transition: border-color 0.25s; }
+  .layout-option:hover { border-color: rgba(245,244,241,0.3); }
+  .layout-option.selected { border-color: #f5f4f1; }
+
+  .option-header { padding: 18px 22px; border-bottom: 1px solid rgba(245,244,241,0.08); display: flex; align-items: flex-start; gap: 14px; }
+  .option-letter { width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(245,244,241,0.25); display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; flex: none; margin-top: 2px; transition: all 0.2s; }
+  .layout-option.selected .option-letter { background: #f5f4f1; color: #0e0e0f; border-color: #f5f4f1; }
+  .option-header h3 { font-family: serif; font-size: 17px; font-weight: 400; }
+  .option-header p { font-size: 12px; color: rgba(245,244,241,0.5); margin-top: 4px; line-height: 1.6; }
+
+  .devices { display: grid; grid-template-columns: 1fr 300px; gap: 0; background: #080809; }
+  .device-pane { padding: 18px; border-right: 1px solid rgba(245,244,241,0.05); }
+  .device-pane:last-child { border-right: none; }
+  .device-label { font-family: monospace; font-size: 9px; letter-spacing: 0.18em; color: rgba(245,244,241,0.22); margin-bottom: 12px; }
+  .device-frame { border: 1px solid rgba(245,244,241,0.1); border-radius: 4px; overflow: hidden; background: #0e0e0f; }
+
+  /* Shared nav */
+  .vv-nav { background: rgba(14,14,15,0.96); border-bottom: 1px solid rgba(245,244,241,0.08); padding: 0 20px; height: 42px; display: flex; align-items: center; justify-content: space-between; }
+  .vv-nav .mark { font-family: serif; font-size: 13px; }
+  .vv-nav .links { display: flex; gap: 16px; }
+  .vv-nav .lnk { font-family: monospace; font-size: 9px; letter-spacing: 0.09em; color: rgba(245,244,241,0.38); }
+  .vv-nav .lnk.dim { color: rgba(245,244,241,0.22); }
+
+  /* Report chrome */
+  .report-bar { background: rgba(10,10,11,0.97); border-bottom: 1px solid rgba(245,244,241,0.07); padding: 0 20px; height: 38px; display: flex; align-items: center; justify-content: space-between; }
+  .back-link { font-family: monospace; font-size: 9px; letter-spacing: 0.12em; color: rgba(245,244,241,0.38); }
+  .print-btn { font-family: monospace; font-size: 8px; letter-spacing: 0.12em; border: 1px solid rgba(245,244,241,0.2); padding: 4px 10px; color: rgba(245,244,241,0.7); }
+
+  /* Report document */
+  .report-doc { padding: 24px 32px; max-width: 600px; margin: 0 auto; }
+  .report-doc-sm { padding: 16px; }
+
+  .r-eyebrow { font-family: monospace; font-size: 8px; letter-spacing: 0.16em; color: rgba(245,244,241,0.35); margin-bottom: 10px; }
+  .r-title { font-family: serif; font-size: 48px; font-weight: 300; line-height: 0.96; letter-spacing: -0.015em; margin-bottom: 10px; }
+  .r-title-sm { font-family: serif; font-size: 30px; font-weight: 300; line-height: 1; letter-spacing: -0.015em; margin-bottom: 8px; }
+  .r-date { font-family: serif; font-style: italic; font-size: 16px; color: rgba(245,244,241,0.55); }
+  .r-date-sm { font-family: serif; font-style: italic; font-size: 13px; color: rgba(245,244,241,0.55); }
+
+  .r-divider { height: 1px; background: rgba(245,244,241,0.08); margin: 18px 0; }
+
+  .r-section-label { font-family: monospace; font-size: 8px; letter-spacing: 0.16em; color: rgba(245,244,241,0.32); text-transform: uppercase; padding-bottom: 8px; border-bottom: 1px solid rgba(245,244,241,0.08); margin-bottom: 12px; }
+
+  .r-summary { font-family: serif; font-style: italic; font-size: 14px; line-height: 1.65; color: rgba(245,244,241,0.75); margin-bottom: 18px; }
+  .r-summary-sm { font-family: serif; font-style: italic; font-size: 13px; line-height: 1.6; color: rgba(245,244,241,0.7); }
+
+  .kpi-strip { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .kpi-box { border: 1px solid rgba(245,244,241,0.08); padding: 10px 12px; }
+  .kpi-num { font-family: serif; font-size: 32px; line-height: 1; }
+  .kpi-lbl { font-family: monospace; font-size: 7px; letter-spacing: 0.14em; color: rgba(245,244,241,0.32); margin-top: 4px; }
+
+  .row-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(245,244,241,0.06); font-family: serif; font-size: 12px; color: rgba(245,244,241,0.8); }
+  .row-marker { color: rgba(245,244,241,0.3); flex-shrink: 0; }
+
+  /* TOC sidebar */
+  .toc { padding: 16px; border-right: 1px solid rgba(245,244,241,0.07); min-height: 240px; }
+  .toc-item { font-family: monospace; font-size: 8px; letter-spacing: 0.1em; padding: 6px 0; border-bottom: 1px solid rgba(245,244,241,0.05); color: rgba(245,244,241,0.35); cursor: pointer; }
+  .toc-item.active { color: #f5f4f1; border-left: 1px solid #f5f4f1; padding-left: 8px; margin-left: -1px; }
+
+  /* Prev/next nav */
+  .prev-next { display: flex; justify-content: space-between; padding: 14px 20px; border-top: 1px solid rgba(245,244,241,0.07); background: rgba(10,10,11,0.6); }
+  .pn-link { font-family: monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(245,244,241,0.4); }
+
+  /* Mobile TOC collapse */
+  .toc-pill { display: flex; gap: 6px; padding: 8px 14px; overflow-x: auto; border-bottom: 1px solid rgba(245,244,241,0.07); }
+  .toc-chip { font-family: monospace; font-size: 7px; letter-spacing: 0.1em; white-space: nowrap; padding: 4px 8px; border: 1px solid rgba(245,244,241,0.12); border-radius: 20px; color: rgba(245,244,241,0.4); }
+  .toc-chip.active { color: #f5f4f1; border-color: #f5f4f1; }
+
+  #indicator { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #f5f4f1; color: #0e0e0f; font-family: monospace; font-size: 11px; letter-spacing: 0.1em; padding: 10px 20px; border-radius: 24px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  #indicator.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<h1>Report View — Reading Experience</h1>
+<p class="subtitle">The report has ~9 sections: header, exec summary, KPI grid, competitor table, per-query results, search console, highlights, work completed, priorities. Three ways to frame that long scroll.</p>
+
+<!-- ══ OPTION A ══ -->
+<div class="layout-option" id="opt-a" onclick="pick('a')">
+  <div class="option-header">
+    <div class="option-letter" id="ltr-a">A</div>
+    <div>
+      <h3>Editorial document + sticky report bar (recommended)</h3>
+      <p>Keep the single-column document feel — it reads like a VV editorial piece. Add a slim sticky bar just below the nav: ← Dashboard on the left, "Print / PDF" CTA on the right. Previous/next report links at the bottom. On mobile, padding tightens and the title scales down. No structural change, maximum polish.</p>
+    </div>
+  </div>
+  <div class="devices">
+    <!-- Desktop -->
+    <div class="device-pane">
+      <div class="device-label">DESKTOP</div>
+      <div class="device-frame">
+        <div class="vv-nav">
+          <span class="mark">Victory Velocity</span>
+          <div class="links"><span class="lnk">Dashboard</span><span class="lnk dim">Sign Out</span></div>
+        </div>
+        <!-- Sticky report bar -->
+        <div class="report-bar">
+          <span class="back-link">← Dashboard</span>
+          <div style="font-family:monospace;font-size:9px;letter-spacing:0.08em;color:rgba(245,244,241,0.4);">Week of Jun 9–15, 2026</div>
+          <span class="print-btn">Print / PDF →</span>
+        </div>
+        <!-- Document -->
+        <div class="report-doc">
+          <div class="r-eyebrow">GEO · WEEKLY PERFORMANCE REPORT</div>
+          <div class="r-title">ChildSpot</div>
+          <div class="r-date">Week of Jun 9–15, 2026</div>
+          <div class="r-divider"></div>
+          <div class="r-section-label">Executive Summary</div>
+          <div class="r-summary">Mention rate climbed to 68% this week, the highest since onboarding. ChatGPT now cites the domain in 3 of 5 tracked queries. Competitor Daycare.com lost two citation positions.</div>
+          <div class="r-section-label" style="margin-top:16px;">AI Visibility</div>
+          <div class="kpi-strip">
+            <div class="kpi-box"><div class="kpi-num" style="color:#84d8ab;">68%</div><div class="kpi-lbl">MENTION RATE · ↑ +4PP</div></div>
+            <div class="kpi-box"><div class="kpi-num" style="color:#84d8ab;">41%</div><div class="kpi-lbl">CITATION RATE · ↑ +2PP</div></div>
+          </div>
+          <div class="r-section-label" style="margin-top:4px;">Highlights</div>
+          <div class="row-item"><span class="row-marker">—</span>ChatGPT cited childspot.com in "best daycare apps" query for first time</div>
+          <div class="row-item"><span class="row-marker">—</span>Perplexity mention rate up to 80%, highest of all engines</div>
+          <div style="font-family:monospace;font-size:8px;color:rgba(245,244,241,0.2);margin-top:14px;text-align:center;">· · · report continues · · ·</div>
+        </div>
+        <!-- Prev/Next -->
+        <div class="prev-next">
+          <span class="pn-link">← Jun 2–8, 2026</span>
+          <span class="pn-link" style="color:rgba(245,244,241,0.2);">Most recent →</span>
+        </div>
+      </div>
+    </div>
+    <!-- Mobile -->
+    <div class="device-pane">
+      <div class="device-label">MOBILE</div>
+      <div class="device-frame">
+        <div class="vv-nav" style="padding:0 12px;">
+          <span class="mark" style="font-size:12px;">Victory Velocity</span>
+          <span class="lnk">≡</span>
+        </div>
+        <div class="report-bar" style="padding:0 12px;">
+          <span class="back-link" style="font-size:8px;">← Dashboard</span>
+          <span class="print-btn" style="font-size:7px;padding:3px 8px;">PDF →</span>
+        </div>
+        <div class="report-doc-sm">
+          <div class="r-eyebrow" style="font-size:7px;">GEO · WEEKLY REPORT</div>
+          <div class="r-title-sm">ChildSpot</div>
+          <div class="r-date-sm">Jun 9–15, 2026</div>
+          <div class="r-divider"></div>
+          <div class="r-section-label">Executive Summary</div>
+          <div class="r-summary-sm">Mention rate climbed to 68%, highest since onboarding. ChatGPT now cites the domain in 3 of 5 queries.</div>
+          <div class="kpi-strip" style="margin-top:12px;">
+            <div class="kpi-box"><div class="kpi-num" style="color:#84d8ab;font-size:26px;">68%</div><div class="kpi-lbl">MENTION</div></div>
+            <div class="kpi-box"><div class="kpi-num" style="color:#84d8ab;font-size:26px;">41%</div><div class="kpi-lbl">CITATION</div></div>
+          </div>
+          <div style="font-family:monospace;font-size:7px;color:rgba(245,244,241,0.2);margin-top:10px;text-align:center;">· · · continues · · ·</div>
+        </div>
+        <div class="prev-next" style="padding:10px 12px;">
+          <span class="pn-link" style="font-size:8px;">← Jun 2–8</span>
+          <span class="pn-link" style="font-size:8px;opacity:0.4;">Latest →</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ OPTION B ══ -->
+<div class="layout-option" id="opt-b" onclick="pick('b')">
+  <div class="option-header">
+    <div class="option-letter" id="ltr-b">B</div>
+    <div>
+      <h3>TOC sidebar + scrollable document</h3>
+      <p>Left sidebar shows a sticky table of contents (Executive Summary, KPIs, Competitors, Query Results, Highlights, Work, Priorities). Active section highlights as you scroll. Document scrolls on the right. On mobile, TOC becomes a horizontal pill row you can tap to jump. Good for long reports but adds layout complexity.</p>
+    </div>
+  </div>
+  <div class="devices">
+    <!-- Desktop -->
+    <div class="device-pane">
+      <div class="device-label">DESKTOP</div>
+      <div class="device-frame">
+        <div class="vv-nav">
+          <span class="mark">Victory Velocity</span>
+          <div class="links"><span class="lnk">Dashboard</span><span class="lnk dim">Sign Out</span></div>
+        </div>
+        <div class="report-bar">
+          <span class="back-link">← Dashboard</span>
+          <span class="print-btn">Print / PDF →</span>
+        </div>
+        <div style="display:grid;grid-template-columns:150px 1fr;min-height:260px;">
+          <!-- TOC -->
+          <div class="toc">
+            <div style="font-family:monospace;font-size:7px;letter-spacing:0.16em;color:rgba(245,244,241,0.22);margin-bottom:10px;">IN THIS REPORT</div>
+            <div class="toc-item active">Executive Summary</div>
+            <div class="toc-item">AI Visibility</div>
+            <div class="toc-item">Competitors</div>
+            <div class="toc-item">Query Results</div>
+            <div class="toc-item">Highlights</div>
+            <div class="toc-item">Work Completed</div>
+            <div class="toc-item">Priorities</div>
+          </div>
+          <!-- Doc -->
+          <div style="padding:18px 22px;">
+            <div class="r-eyebrow">GEO · WEEKLY REPORT</div>
+            <div class="r-title" style="font-size:36px;">ChildSpot</div>
+            <div class="r-date" style="font-size:14px;">Jun 9–15, 2026</div>
+            <div class="r-divider"></div>
+            <div class="r-section-label">Executive Summary</div>
+            <div class="r-summary" style="font-size:13px;">Mention rate climbed to 68% this week. ChatGPT now cites the domain in 3 of 5 tracked queries. Competitor Daycare.com lost two citation positions.</div>
+            <div class="kpi-strip">
+              <div class="kpi-box"><div class="kpi-num" style="color:#84d8ab;font-size:26px;">68%</div><div class="kpi-lbl">MENTION</div></div>
+              <div class="kpi-box"><div class="kpi-num" style="color:#84d8ab;font-size:26px;">41%</div><div class="kpi-lbl">CITATION</div></div>
+            </div>
+            <div style="font-family:monospace;font-size:8px;color:rgba(245,244,241,0.2);margin-top:8px;text-align:center;">· · · continues · · ·</div>
+          </div>
+        </div>
+        <div class="prev-next">
+          <span class="pn-link">← Jun 2–8, 2026</span>
+          <span class="pn-link" style="opacity:0.3;">Most recent →</span>
+        </div>
+      </div>
+    </div>
+    <!-- Mobile -->
+    <div class="device-pane">
+      <div class="device-label">MOBILE</div>
+      <div class="device-frame">
+        <div class="vv-nav" style="padding:0 12px;">
+          <span class="mark" style="font-size:12px;">Victory Velocity</span>
+          <span class="lnk">≡</span>
+        </div>
+        <div class="report-bar" style="padding:0 12px;">
+          <span class="back-link" style="font-size:8px;">← Dashboard</span>
+          <span class="print-btn" style="font-size:7px;padding:3px 8px;">PDF →</span>
+        </div>
+        <!-- Horizontal pill TOC on mobile -->
+        <div class="toc-pill">
+          <div class="toc-chip active">Summary</div>
+          <div class="toc-chip">KPIs</div>
+          <div class="toc-chip">Competitors</div>
+          <div class="toc-chip">Queries</div>
+          <div class="toc-chip">Highlights</div>
+          <div class="toc-chip">Work</div>
+          <div class="toc-chip">Priorities</div>
+        </div>
+        <div class="report-doc-sm">
+          <div class="r-title-sm">ChildSpot</div>
+          <div class="r-date-sm">Jun 9–15, 2026</div>
+          <div class="r-divider"></div>
+          <div class="r-summary-sm">Mention rate climbed to 68%, highest since onboarding. ChatGPT now cites the domain in 3 of 5 queries.</div>
+          <div class="kpi-strip" style="margin-top:12px;">
+            <div class="kpi-box"><div class="kpi-num" style="color:#84d8ab;font-size:24px;">68%</div><div class="kpi-lbl">MENTION</div></div>
+            <div class="kpi-box"><div class="kpi-num" style="color:#84d8ab;font-size:24px;">41%</div><div class="kpi-lbl">CITATION</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ OPTION C ══ -->
+<div class="layout-option" id="opt-c" onclick="pick('c')">
+  <div class="option-header">
+    <div class="option-letter" id="ltr-c">C</div>
+    <div>
+      <h3>Full-bleed immersive · sections feel like landing page blocks</h3>
+      <p>Each report section gets full viewport width with generous padding — feels like scrolling the VV landing page rather than reading a document. KPIs are a hero strip. Highlights are a full-width list. More "presentation" than "document". Doesn't print cleanly but looks premium on screen.</p>
+    </div>
+  </div>
+  <div class="devices">
+    <!-- Desktop -->
+    <div class="device-pane">
+      <div class="device-label">DESKTOP</div>
+      <div class="device-frame">
+        <div class="vv-nav">
+          <span class="mark">Victory Velocity</span>
+          <div class="links"><span class="lnk">Dashboard</span><span class="lnk dim">Sign Out</span></div>
+        </div>
+        <!-- Full-bleed hero header -->
+        <div style="padding:28px 28px 20px;border-bottom:1px solid rgba(245,244,241,0.07);">
+          <div class="r-eyebrow">GEO · WEEKLY PERFORMANCE REPORT</div>
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:8px;">
+            <div>
+              <div class="r-title" style="font-size:44px;">ChildSpot</div>
+              <div class="r-date">Week of Jun 9–15, 2026</div>
+            </div>
+            <span class="print-btn" style="margin-bottom:4px;">Print / PDF →</span>
+          </div>
+        </div>
+        <!-- KPI hero strip (full bleed) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid rgba(245,244,241,0.07);">
+          <div style="padding:16px 20px;border-right:1px solid rgba(245,244,241,0.07);">
+            <div class="kpi-lbl" style="margin-bottom:6px;">MENTION RATE</div>
+            <div style="font-family:serif;font-size:40px;color:#84d8ab;line-height:1;">68%</div>
+            <div style="font-family:monospace;font-size:8px;color:rgba(245,244,241,0.3);margin-top:4px;">↑ +4pp vs last week</div>
+          </div>
+          <div style="padding:16px 20px;border-right:1px solid rgba(245,244,241,0.07);">
+            <div class="kpi-lbl" style="margin-bottom:6px;">CITATION RATE</div>
+            <div style="font-family:serif;font-size:40px;color:#84d8ab;line-height:1;">41%</div>
+            <div style="font-family:monospace;font-size:8px;color:rgba(245,244,241,0.3);margin-top:4px;">↑ +2pp vs last week</div>
+          </div>
+          <div style="padding:16px 20px;">
+            <div class="kpi-lbl" style="margin-bottom:6px;">BEST ENGINE</div>
+            <div style="font-family:serif;font-size:28px;line-height:1;margin-top:4px;">Perplexity</div>
+            <div style="font-family:monospace;font-size:8px;color:rgba(245,244,241,0.3);margin-top:6px;">80% mention rate</div>
+          </div>
+        </div>
+        <!-- Summary section -->
+        <div style="padding:18px 28px;border-bottom:1px solid rgba(245,244,241,0.07);">
+          <div class="r-section-label">Executive Summary</div>
+          <div class="r-summary">Mention rate climbed to 68% this week — highest since onboarding. ChatGPT now cites the domain in 3 of 5 tracked queries. Competitor Daycare.com lost two citation positions.</div>
+        </div>
+        <!-- Highlights full-bleed -->
+        <div style="padding:14px 28px;">
+          <div class="r-section-label">Highlights</div>
+          <div class="row-item">
+            <span class="row-marker">—</span>ChatGPT cited childspot.com in "best daycare apps" query for first time
+          </div>
+          <div class="row-item">
+            <span class="row-marker">—</span>Perplexity mention rate 80%, highest of all engines this week
+          </div>
+          <div style="font-family:monospace;font-size:8px;color:rgba(245,244,241,0.18);margin-top:12px;text-align:center;">· · · more sections below · · ·</div>
+        </div>
+        <div class="prev-next">
+          <span class="pn-link">← Jun 2–8, 2026</span>
+          <span class="pn-link" style="opacity:0.3;">Most recent →</span>
+        </div>
+      </div>
+    </div>
+    <!-- Mobile -->
+    <div class="device-pane">
+      <div class="device-label">MOBILE</div>
+      <div class="device-frame">
+        <div class="vv-nav" style="padding:0 12px;">
+          <span class="mark" style="font-size:12px;">Victory Velocity</span>
+          <span class="lnk">≡</span>
+        </div>
+        <div style="padding:14px;border-bottom:1px solid rgba(245,244,241,0.07);">
+          <div class="r-eyebrow" style="font-size:7px;">GEO · WEEKLY REPORT</div>
+          <div class="r-title-sm" style="margin-top:6px;">ChildSpot</div>
+          <div class="r-date-sm">Jun 9–15, 2026</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid rgba(245,244,241,0.07);">
+          <div style="padding:12px;border-right:1px solid rgba(245,244,241,0.07);">
+            <div class="kpi-lbl">MENTION</div>
+            <div style="font-family:serif;font-size:28px;color:#84d8ab;line-height:1;margin-top:4px;">68%</div>
+          </div>
+          <div style="padding:12px;">
+            <div class="kpi-lbl">CITATION</div>
+            <div style="font-family:serif;font-size:28px;color:#84d8ab;line-height:1;margin-top:4px;">41%</div>
+          </div>
+        </div>
+        <div style="padding:12px;">
+          <div class="r-section-label">Executive Summary</div>
+          <div class="r-summary-sm">Mention rate climbed to 68%, highest since onboarding.</div>
+          <div class="row-item" style="margin-top:10px;font-size:11px;">
+            <span class="row-marker">—</span>ChatGPT cited childspot.com for first time
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="indicator">Selected</div>
+<script>
+  let sel = null;
+  function pick(id) {
+    if (sel) { document.getElementById('opt-'+sel).classList.remove('selected'); document.getElementById('ltr-'+sel).style.cssText=''; }
+    sel = id;
+    document.getElementById('opt-'+id).classList.add('selected');
+    const l = document.getElementById('ltr-'+id);
+    l.style.background='#f5f4f1'; l.style.color='#0e0e0f'; l.style.borderColor='#f5f4f1';
+    const ind = document.getElementById('indicator');
+    ind.textContent = 'Selected: Option ' + id.toUpperCase();
+    ind.classList.add('show');
+    setTimeout(() => ind.classList.remove('show'), 2000);
+    if (window.__sp_recordClick) window.__sp_recordClick(id, 'Option '+id.toUpperCase());
+  }
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { weekRangeLabel, formatRate, scoreColor } from "@/lib/utils";
 import type { Report, TrackerRun } from "@/lib/types";
@@ -9,7 +9,7 @@ export default async function ReportsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: reports } = await supabase
     .from("reports")

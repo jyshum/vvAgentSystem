@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Responsive Layouts</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0e0e0f;
+    color: #f5f4f1;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 32px 24px 60px;
+  }
+
+  h1 { font-family: serif; font-size: 28px; font-weight: 400; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .subtitle { font-size: 14px; color: rgba(245,244,241,0.55); margin-bottom: 40px; line-height: 1.5; }
+
+  /* ── Option sections ── */
+  .layout-option {
+    border: 1px solid rgba(245,244,241,0.13);
+    border-radius: 6px;
+    margin-bottom: 40px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.25s;
+  }
+  .layout-option:hover { border-color: rgba(245,244,241,0.35); }
+  .layout-option.selected { border-color: #f5f4f1; }
+
+  .option-header {
+    padding: 18px 22px;
+    border-bottom: 1px solid rgba(245,244,241,0.08);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .option-letter {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid rgba(245,244,241,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-family: monospace; font-size: 12px; letter-spacing: 0.1em; flex: none;
+    transition: all 0.2s;
+  }
+  .layout-option.selected .option-letter {
+    background: #f5f4f1; color: #0e0e0f; border-color: #f5f4f1;
+  }
+  .option-header h3 { font-family: serif; font-size: 18px; font-weight: 400; }
+  .option-header p { font-size: 13px; color: rgba(245,244,241,0.5); margin-top: 3px; line-height: 1.5; }
+
+  /* ── Device frames ── */
+  .devices {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 0;
+    background: #0a0a0b;
+  }
+
+  .device-pane {
+    padding: 20px;
+    border-right: 1px solid rgba(245,244,241,0.06);
+  }
+  .device-pane:last-child { border-right: none; }
+
+  .device-label {
+    font-family: monospace; font-size: 9px; letter-spacing: 0.18em;
+    color: rgba(245,244,241,0.25); margin-bottom: 14px;
+  }
+
+  .device-frame {
+    border: 1px solid rgba(245,244,241,0.12);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #0e0e0f;
+  }
+
+  /* ── VV Nav (shared) ── */
+  .vv-nav {
+    background: rgba(14,14,15,0.94);
+    border-bottom: 1px solid rgba(245,244,241,0.09);
+    padding: 0 24px;
+    height: 44px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .vv-nav .mark { font-family: serif; font-size: 14px; }
+  .vv-nav .nav-links { display: flex; gap: 18px; }
+  .vv-nav .nav-link { font-family: monospace; font-size: 9px; letter-spacing: 0.1em; color: rgba(245,244,241,0.4); }
+  .vv-nav .nav-link.active { color: #f5f4f1; }
+
+  /* ── Dashboard content ── */
+  .dash-body { padding: 20px; }
+  .dash-body-sm { padding: 14px; }
+
+  .brand-name { font-family: serif; font-size: 32px; font-weight: 400; letter-spacing: -0.02em; line-height: 1; }
+  .brand-name-sm { font-family: serif; font-size: 22px; font-weight: 400; letter-spacing: -0.02em; line-height: 1; }
+
+  .score-big { font-family: serif; font-size: 56px; line-height: 1; }
+  .score-big-sm { font-family: serif; font-size: 38px; line-height: 1; }
+  .score-label { font-family: monospace; font-size: 8px; letter-spacing: 0.16em; color: rgba(245,244,241,0.35); margin-top: 4px; }
+  .score-delta { font-family: monospace; font-size: 8px; color: rgba(245,244,241,0.4); margin-top: 3px; }
+
+  .chart-area {
+    background: rgba(245,244,241,0.03);
+    border: 1px solid rgba(245,244,241,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .report-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(245,244,241,0.07);
+  }
+  .report-row:last-child { border-bottom: none; }
+  .report-title { font-family: serif; font-size: 13px; font-style: italic; }
+  .report-title-sm { font-family: serif; font-size: 12px; font-style: italic; }
+  .report-badge {
+    font-family: monospace; font-size: 7px; letter-spacing: 0.1em;
+    border: 1px solid rgba(245,244,241,0.2); padding: 2px 6px; color: #84d8ab;
+  }
+
+  .section-label {
+    font-family: monospace; font-size: 8px; letter-spacing: 0.16em;
+    color: rgba(245,244,241,0.3); margin-bottom: 12px;
+  }
+
+  .divider { height: 1px; background: rgba(245,244,241,0.07); margin: 16px 0; }
+
+  /* ── Layout A: L/R split desktop, stacked mobile ── */
+  .layout-a-desktop {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 0;
+    min-height: 280px;
+  }
+  .layout-a-left {
+    padding: 20px;
+    border-right: 1px solid rgba(245,244,241,0.07);
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .layout-a-right {
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .kpi-pair { display: flex; flex-direction: column; gap: 4px; }
+
+  /* ── Layout B: full-width stacked ── */
+  .kpi-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    border: 1px solid rgba(245,244,241,0.07);
+    border-radius: 2px;
+    margin-bottom: 16px;
+  }
+  .kpi-cell {
+    padding: 12px 14px;
+    border-right: 1px solid rgba(245,244,241,0.07);
+  }
+  .kpi-cell:last-child { border-right: none; }
+  .kpi-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid rgba(245,244,241,0.07);
+    border-radius: 2px;
+    margin-bottom: 14px;
+  }
+
+  /* ── Layout C: sticky left panel ── */
+  .layout-c-desktop {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 0;
+    min-height: 280px;
+  }
+  .layout-c-panel {
+    background: rgba(20,20,22,0.8);
+    border-right: 1px solid rgba(245,244,241,0.07);
+    padding: 16px;
+  }
+  .layout-c-content { padding: 16px; }
+
+  /* ── Selection indicator ── */
+  #indicator {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #f5f4f1; color: #0e0e0f;
+    font-family: monospace; font-size: 11px; letter-spacing: 0.1em;
+    padding: 10px 20px; border-radius: 24px;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  }
+  #indicator.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<h1>Dashboard — Responsive Layout Options</h1>
+<p class="subtitle">Each option shows desktop (left) and phone (right) side by side. Click an option to select it.</p>
+
+<!-- ══════════════════════════════════════════
+     OPTION A: Left score panel + right chart/list
+     ══════════════════════════════════════════ -->
+<div class="layout-option" id="opt-a" onclick="select('a')">
+  <div class="option-header">
+    <div class="option-letter" id="letter-a">A</div>
+    <div>
+      <h3>Left score panel · right chart + reports (recommended)</h3>
+      <p>Desktop: two columns — sticky left shows brand name + big KPI numbers. Right scrolls with chart and report list. On mobile: stacks to single column, scores on top, chart + reports below.</p>
+    </div>
+  </div>
+
+  <div class="devices">
+    <!-- DESKTOP -->
+    <div class="device-pane">
+      <div class="device-label">DESKTOP / LAPTOP</div>
+      <div class="device-frame">
+        <div class="vv-nav">
+          <span class="mark">Victory Velocity</span>
+          <div class="nav-links">
+            <span class="nav-link active">Dashboard</span>
+            <span class="nav-link">ChildSpot</span>
+            <span class="nav-link">Sign Out</span>
+          </div>
+        </div>
+        <div class="layout-a-desktop">
+          <!-- Left panel -->
+          <div class="layout-a-left">
+            <div>
+              <div class="brand-name" style="margin-bottom:20px;">ChildSpot</div>
+              <div class="section-label">THIS WEEK</div>
+              <div class="kpi-pair" style="margin-bottom:16px;">
+                <div class="score-big" style="color:#84d8ab;">68%</div>
+                <div class="score-label">MENTION RATE</div>
+                <div class="score-delta">↑ +4pp vs last week</div>
+              </div>
+              <div class="kpi-pair">
+                <div style="font-family:serif;font-size:34px;color:#84d8ab;line-height:1;">41%</div>
+                <div class="score-label">CITATION RATE</div>
+                <div class="score-delta">↑ +2pp vs last week</div>
+              </div>
+            </div>
+            <div style="font-family:monospace;font-size:9px;color:rgba(245,244,241,0.25);margin-top:16px;">12 reports · since Jan 2026</div>
+          </div>
+          <!-- Right panel -->
+          <div class="layout-a-right">
+            <div>
+              <div class="section-label">8-WEEK TREND</div>
+              <div class="chart-area" style="height:90px;">
+                <svg viewBox="0 0 400 90" style="width:100%;height:100%;" preserveAspectRatio="none">
+                  <polyline points="0,70 50,62 100,54 150,58 200,40 250,32 300,24 350,18 400,12" fill="none" stroke="#84d8ab" stroke-width="1.5" opacity="0.7"/>
+                  <polyline points="0,70 50,62 100,54 150,58 200,40 250,32 300,24 350,18 400,12 400,90 0,90" fill="#84d8ab" fill-opacity="0.07" stroke="none"/>
+                </svg>
+              </div>
+            </div>
+            <div>
+              <div class="section-label">REPORTS</div>
+              <div class="report-row">
+                <span class="report-title">Week of Jun 9–15, 2026</span>
+                <span class="report-badge">PUB</span>
+              </div>
+              <div class="report-row" style="opacity:0.6;">
+                <span class="report-title">Week of Jun 2–8, 2026</span>
+                <span class="report-badge">PUB</span>
+              </div>
+              <div class="report-row" style="opacity:0.4;">
+                <span class="report-title">Week of May 26–Jun 1, 2026</span>
+                <span class="report-badge">PUB</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHONE -->
+    <div class="device-pane">
+      <div class="device-label">MOBILE / PHONE</div>
+      <div class="device-frame">
+        <div class="vv-nav" style="padding:0 14px;">
+          <span class="mark" style="font-size:13px;">Victory Velocity</span>
+          <span class="nav-link" style="font-size:9px;">≡</span>
+        </div>
+        <div class="dash-body-sm">
+          <div class="brand-name-sm" style="margin-bottom:14px;">ChildSpot</div>
+          <!-- Scores stacked -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div>
+              <div class="score-big-sm" style="color:#84d8ab;">68%</div>
+              <div class="score-label">MENTION</div>
+              <div class="score-delta">↑ +4pp</div>
+            </div>
+            <div>
+              <div style="font-family:serif;font-size:26px;color:#84d8ab;line-height:1;">41%</div>
+              <div class="score-label">CITATION</div>
+              <div class="score-delta">↑ +2pp</div>
+            </div>
+          </div>
+          <!-- Chart -->
+          <div class="section-label">8-WEEK TREND</div>
+          <div class="chart-area" style="height:52px;margin-bottom:14px;">
+            <svg viewBox="0 0 280 52" style="width:100%;height:100%;" preserveAspectRatio="none">
+              <polyline points="0,42 35,36 70,30 105,33 140,22 175,18 210,13 245,10 280,7" fill="none" stroke="#84d8ab" stroke-width="1.5" opacity="0.7"/>
+              <polyline points="0,42 35,36 70,30 105,33 140,22 175,18 210,13 245,10 280,7 280,52 0,52" fill="#84d8ab" fill-opacity="0.07" stroke="none"/>
+            </svg>
+          </div>
+          <!-- Reports -->
+          <div class="section-label">REPORTS</div>
+          <div class="report-row">
+            <span class="report-title-sm">Jun 9–15, 2026</span>
+            <span class="report-badge">PUB</span>
+          </div>
+          <div class="report-row" style="opacity:0.55;">
+            <span class="report-title-sm">Jun 2–8, 2026</span>
+            <span class="report-badge">PUB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     OPTION B: Full-width stacked, editorial rhythm
+     ══════════════════════════════════════════ -->
+<div class="layout-option" id="opt-b" onclick="select('b')">
+  <div class="option-header">
+    <div class="option-letter" id="letter-b">B</div>
+    <div>
+      <h3>Full-width stacked · editorial rhythm</h3>
+      <p>Single column always — no split. Brand name headline, then a 3-col KPI row, then full-width chart, then reports. No layout shift between desktop and mobile; just scales. Very close to landing page section rhythm.</p>
+    </div>
+  </div>
+
+  <div class="devices">
+    <!-- DESKTOP -->
+    <div class="device-pane">
+      <div class="device-label">DESKTOP / LAPTOP</div>
+      <div class="device-frame">
+        <div class="vv-nav">
+          <span class="mark">Victory Velocity</span>
+          <div class="nav-links">
+            <span class="nav-link active">Dashboard</span>
+            <span class="nav-link">ChildSpot</span>
+            <span class="nav-link">Sign Out</span>
+          </div>
+        </div>
+        <div class="dash-body">
+          <div class="brand-name" style="margin-bottom:20px;">ChildSpot</div>
+          <!-- 3-col KPI row -->
+          <div class="kpi-row-3">
+            <div class="kpi-cell">
+              <div class="score-label" style="margin-bottom:6px;">MENTION RATE</div>
+              <div style="font-family:serif;font-size:42px;color:#84d8ab;line-height:1;">68%</div>
+              <div class="score-delta">↑ +4pp</div>
+            </div>
+            <div class="kpi-cell">
+              <div class="score-label" style="margin-bottom:6px;">CITATION RATE</div>
+              <div style="font-family:serif;font-size:42px;color:#84d8ab;line-height:1;">41%</div>
+              <div class="score-delta">↑ +2pp</div>
+            </div>
+            <div class="kpi-cell">
+              <div class="score-label" style="margin-bottom:6px;">TOTAL REPORTS</div>
+              <div style="font-family:serif;font-size:42px;line-height:1;opacity:0.5;">12</div>
+              <div class="score-delta" style="opacity:0.4;">since onboarding</div>
+            </div>
+          </div>
+          <!-- Chart -->
+          <div class="section-label">8-WEEK TREND</div>
+          <div class="chart-area" style="height:72px;margin-bottom:18px;">
+            <svg viewBox="0 0 500 72" style="width:100%;height:100%;" preserveAspectRatio="none">
+              <polyline points="0,58 63,50 125,42 188,46 250,30 313,24 375,18 438,14 500,9" fill="none" stroke="#84d8ab" stroke-width="1.5" opacity="0.7"/>
+              <polyline points="0,58 63,50 125,42 188,46 250,30 313,24 375,18 438,14 500,9 500,72 0,72" fill="#84d8ab" fill-opacity="0.07" stroke="none"/>
+            </svg>
+          </div>
+          <!-- Reports -->
+          <div class="section-label">REPORTS</div>
+          <div class="report-row">
+            <span class="report-title">Week of Jun 9–15, 2026</span>
+            <span class="report-badge">PUB</span>
+          </div>
+          <div class="report-row" style="opacity:0.6;">
+            <span class="report-title">Week of Jun 2–8, 2026</span>
+            <span class="report-badge">PUB</span>
+          </div>
+          <div class="report-row" style="opacity:0.4;">
+            <span class="report-title">Week of May 26–Jun 1, 2026</span>
+            <span class="report-badge">PUB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHONE -->
+    <div class="device-pane">
+      <div class="device-label">MOBILE / PHONE</div>
+      <div class="device-frame">
+        <div class="vv-nav" style="padding:0 14px;">
+          <span class="mark" style="font-size:13px;">Victory Velocity</span>
+          <span class="nav-link">≡</span>
+        </div>
+        <div class="dash-body-sm">
+          <div class="brand-name-sm" style="margin-bottom:14px;">ChildSpot</div>
+          <!-- 2-col KPI on mobile (mention + citation), reports count dropped -->
+          <div class="kpi-row-2" style="margin-bottom:12px;">
+            <div class="kpi-cell">
+              <div class="score-label" style="margin-bottom:4px;">MENTION</div>
+              <div style="font-family:serif;font-size:30px;color:#84d8ab;line-height:1;">68%</div>
+              <div class="score-delta">↑ +4pp</div>
+            </div>
+            <div class="kpi-cell">
+              <div class="score-label" style="margin-bottom:4px;">CITATION</div>
+              <div style="font-family:serif;font-size:30px;color:#84d8ab;line-height:1;">41%</div>
+              <div class="score-delta">↑ +2pp</div>
+            </div>
+          </div>
+          <div class="chart-area" style="height:48px;margin-bottom:12px;">
+            <svg viewBox="0 0 280 48" style="width:100%;height:100%;" preserveAspectRatio="none">
+              <polyline points="0,38 35,32 70,26 105,29 140,18 175,13 210,9 245,7 280,4" fill="none" stroke="#84d8ab" stroke-width="1.5" opacity="0.7"/>
+              <polyline points="0,38 35,32 70,26 105,29 140,18 175,13 210,9 245,7 280,4 280,48 0,48" fill="#84d8ab" fill-opacity="0.07" stroke="none"/>
+            </svg>
+          </div>
+          <div class="section-label">REPORTS</div>
+          <div class="report-row">
+            <span class="report-title-sm">Jun 9–15, 2026</span>
+            <span class="report-badge">PUB</span>
+          </div>
+          <div class="report-row" style="opacity:0.55;">
+            <span class="report-title-sm">Jun 2–8, 2026</span>
+            <span class="report-badge">PUB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     OPTION C: Sticky left metrics + scrollable right
+     ══════════════════════════════════════════ -->
+<div class="layout-option" id="opt-c" onclick="select('c')">
+  <div class="option-header">
+    <div class="option-letter" id="letter-c">C</div>
+    <div>
+      <h3>Sticky left metrics panel · scrollable right content</h3>
+      <p>Desktop: narrow left panel stays fixed as you scroll — brand name, scores, last run date. Right side scrolls through the full trend chart and report archive. On mobile: panel collapses to a slim stat strip at the top. Most "app-like" of the three.</p>
+    </div>
+  </div>
+
+  <div class="devices">
+    <!-- DESKTOP -->
+    <div class="device-pane">
+      <div class="device-label">DESKTOP / LAPTOP</div>
+      <div class="device-frame">
+        <div class="vv-nav">
+          <span class="mark">Victory Velocity</span>
+          <div class="nav-links">
+            <span class="nav-link active">Dashboard</span>
+            <span class="nav-link">ChildSpot</span>
+            <span class="nav-link">Sign Out</span>
+          </div>
+        </div>
+        <div class="layout-c-desktop">
+          <!-- Sticky panel -->
+          <div class="layout-c-panel">
+            <div class="brand-name" style="font-size:18px;margin-bottom:20px;line-height:1.2;">Child<br>Spot</div>
+            <div class="section-label">THIS WEEK</div>
+            <div style="margin-bottom:14px;">
+              <div style="font-family:serif;font-size:36px;color:#84d8ab;line-height:1;">68%</div>
+              <div class="score-label">MENTION</div>
+              <div class="score-delta">↑ +4pp</div>
+            </div>
+            <div style="margin-bottom:20px;">
+              <div style="font-family:serif;font-size:24px;color:#84d8ab;line-height:1;">41%</div>
+              <div class="score-label">CITATION</div>
+              <div class="score-delta">↑ +2pp</div>
+            </div>
+            <div class="divider"></div>
+            <div style="font-family:monospace;font-size:8px;color:rgba(245,244,241,0.25);">Last run<br>Jun 12, 2026</div>
+          </div>
+          <!-- Scrollable content -->
+          <div class="layout-c-content">
+            <div class="section-label">8-WEEK TREND</div>
+            <div class="chart-area" style="height:80px;margin-bottom:16px;">
+              <svg viewBox="0 0 300 80" style="width:100%;height:100%;" preserveAspectRatio="none">
+                <polyline points="0,64 38,55 75,46 113,50 150,34 188,26 225,19 263,14 300,9" fill="none" stroke="#84d8ab" stroke-width="1.5" opacity="0.7"/>
+                <polyline points="0,64 38,55 75,46 113,50 150,34 188,26 225,19 263,14 300,9 300,80 0,80" fill="#84d8ab" fill-opacity="0.07" stroke="none"/>
+              </svg>
+            </div>
+            <div class="section-label">REPORTS</div>
+            <div class="report-row">
+              <span class="report-title">Week of Jun 9–15, 2026</span>
+              <span class="report-badge">PUB</span>
+            </div>
+            <div class="report-row" style="opacity:0.6;">
+              <span class="report-title">Week of Jun 2–8, 2026</span>
+              <span class="report-badge">PUB</span>
+            </div>
+            <div class="report-row" style="opacity:0.4;">
+              <span class="report-title">Week of May 26–Jun 1</span>
+              <span class="report-badge">PUB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHONE -->
+    <div class="device-pane">
+      <div class="device-label">MOBILE / PHONE</div>
+      <div class="device-frame">
+        <div class="vv-nav" style="padding:0 14px;">
+          <span class="mark" style="font-size:13px;">Victory Velocity</span>
+          <span class="nav-link">≡</span>
+        </div>
+        <!-- Collapsed stat strip on mobile -->
+        <div style="background:rgba(20,20,22,0.8);border-bottom:1px solid rgba(245,244,241,0.07);padding:10px 14px;display:flex;gap:16px;align-items:center;">
+          <div>
+            <div style="font-family:serif;font-size:22px;color:#84d8ab;line-height:1;">68%</div>
+            <div class="score-label">MENTION</div>
+          </div>
+          <div style="width:1px;background:rgba(245,244,241,0.07);height:32px;"></div>
+          <div>
+            <div style="font-family:serif;font-size:22px;color:#84d8ab;line-height:1;">41%</div>
+            <div class="score-label">CITATION</div>
+          </div>
+          <div style="margin-left:auto;font-family:serif;font-size:16px;font-weight:400;">ChildSpot</div>
+        </div>
+        <div class="dash-body-sm">
+          <div class="section-label">8-WEEK TREND</div>
+          <div class="chart-area" style="height:48px;margin-bottom:12px;">
+            <svg viewBox="0 0 260 48" style="width:100%;height:100%;" preserveAspectRatio="none">
+              <polyline points="0,38 33,31 65,24 98,27 130,17 163,12 195,8 228,6 260,3" fill="none" stroke="#84d8ab" stroke-width="1.5" opacity="0.7"/>
+              <polyline points="0,38 33,31 65,24 98,27 130,17 163,12 195,8 228,6 260,3 260,48 0,48" fill="#84d8ab" fill-opacity="0.07" stroke="none"/>
+            </svg>
+          </div>
+          <div class="section-label">REPORTS</div>
+          <div class="report-row">
+            <span class="report-title-sm">Jun 9–15, 2026</span>
+            <span class="report-badge">PUB</span>
+          </div>
+          <div class="report-row" style="opacity:0.55;">
+            <span class="report-title-sm">Jun 2–8, 2026</span>
+            <span class="report-badge">PUB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="indicator">Selected</div>
+
+<script>
+  let selected = null;
+  function select(id) {
+    if (selected) {
+      document.getElementById('opt-' + selected).classList.remove('selected');
+      document.getElementById('letter-' + selected).style.background = '';
+      document.getElementById('letter-' + selected).style.color = '';
+      document.getElementById('letter-' + selected).style.borderColor = '';
+    }
+    selected = id;
+    document.getElementById('opt-' + id).classList.add('selected');
+    const ltr = document.getElementById('letter-' + id);
+    ltr.style.background = '#f5f4f1';
+    ltr.style.color = '#0e0e0f';
+    ltr.style.borderColor = '#f5f4f1';
+
+    const ind = document.getElementById('indicator');
+    ind.textContent = 'Selected: Option ' + id.toUpperCase();
+    ind.classList.add('show');
+    setTimeout(() => ind.classList.remove('show'), 2000);
+
+    // post to superpowers if available
+    if (window.__sp_recordClick) window.__sp_recordClick(id, 'Option ' + id.toUpperCase());
+  }
+</script>
+
+</body>
+</html>

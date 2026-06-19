@@ -1,10 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ClientRow } from "@/components/admin/ClientRow";
 import { AddClientButton } from "@/components/admin/AddClientButton";
 import type { Client, TrackerRun, Report } from "@/lib/types";
 
 export default async function AdminPage() {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: clients } = await supabase
     .from("clients")

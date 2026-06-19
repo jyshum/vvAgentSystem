@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ReportView } from "@/components/report/ReportView";
@@ -11,7 +11,7 @@ export default async function ReportViewPage({
   params: Promise<{ id: string; reportId: string }>;
 }) {
   const { id, reportId } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const [{ data: report }, { data: client }] = await Promise.all([
     supabase.from("reports").select("*").eq("id", reportId).eq("client_id", id).single(),

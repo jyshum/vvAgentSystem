@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import { RunDetail } from "@/components/admin/RunDetail";
 import type { TrackerRun, TrackerResult, Client } from "@/lib/types";
@@ -9,7 +9,7 @@ export default async function RunDetailPage({
   params: Promise<{ id: string; runId: string }>;
 }) {
   const { id, runId } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const [{ data: run }, { data: results }, { data: client }] = await Promise.all([
     supabase.from("tracker_runs").select("*").eq("id", runId).eq("client_id", id).single(),

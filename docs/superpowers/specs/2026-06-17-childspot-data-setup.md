@@ -57,7 +57,7 @@ Insert into `public.clients`:
 
 ### 3. Run Tracker With Upload
 
-Run `python -m geo_tracker.run --config ../clients/childspot.json --upload` from the `agents/` directory. This will:
+Run `python run.py ../clients/childspot.json --upload` from the `agents/` directory. This will:
 - Query all 8 new queries across 4 engines (ChatGPT, Perplexity, Claude, Gemini)
 - Produce 32 results (8 queries x 4 engines)
 - Auto-upload to Supabase via the `--upload` flag using the `supabase_client_id` from the config

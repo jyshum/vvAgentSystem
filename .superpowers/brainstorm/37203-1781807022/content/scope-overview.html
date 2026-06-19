@@ -1,0 +1,108 @@
+<h2>Dashboard Frontend Overhaul — Full Scope</h2>
+<p class="subtitle">Mapping every screen we'll redesign, admin first then client-facing. Click sections you want to prioritize or flag as lower priority.</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:32px;">
+
+  <!-- ADMIN SIDE -->
+  <div>
+    <div class="label" style="margin-bottom:16px;color:#f5f4f1;letter-spacing:0.18em;">Admin Interface</div>
+
+    <div class="options" data-multiselect>
+
+      <div class="option" data-choice="admin-nav" onclick="toggleSelect(this)">
+        <div class="letter">1</div>
+        <div class="content">
+          <h3>Admin Nav Shell</h3>
+          <p>Shared layout for all admin pages. Fixed top nav matching landing page behavior (blur on scroll, 78px, 56px padding). Needs active link states, possible breadcrumb pattern for deep pages.</p>
+        </div>
+      </div>
+
+      <div class="option" data-choice="admin-clients" onclick="toggleSelect(this)">
+        <div class="letter">2</div>
+        <div class="content">
+          <h3>Clients List <code style="font-size:11px;opacity:0.5">/admin</code></h3>
+          <p>Currently a plain card grid. Needs cleaner hierarchy — page heading treatment, card hover states, stat display that matches VV report aesthetic.</p>
+        </div>
+      </div>
+
+      <div class="option" data-choice="admin-client-detail" onclick="toggleSelect(this)">
+        <div class="letter">3</div>
+        <div class="content">
+          <h3>Client Detail <code style="font-size:11px;opacity:0.5">/admin/clients/[id]</code></h3>
+          <p>Long scroll of cards (config, users, run history, reports). Needs clear sectioning, tab or anchor navigation to jump between sections, inline actions that feel intentional.</p>
+        </div>
+      </div>
+
+      <div class="option" data-choice="admin-report-editor" onclick="toggleSelect(this)">
+        <div class="letter">4</div>
+        <div class="content">
+          <h3>Report Editor <code style="font-size:11px;opacity:0.5">/admin/reports/[id]</code></h3>
+          <p>Edit/publish interface for weekly reports. Needs status badge, publish action, and preview toggle — all matching VV aesthetic.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CLIENT SIDE -->
+  <div>
+    <div class="label" style="margin-bottom:16px;color:#f5f4f1;letter-spacing:0.18em;">Client Interface</div>
+
+    <div class="options" data-multiselect>
+
+      <div class="option" data-choice="client-login" onclick="toggleSelect(this)">
+        <div class="letter">5</div>
+        <div class="content">
+          <h3>Login Page <code style="font-size:11px;opacity:0.5">/login</code></h3>
+          <p>Already close to landing page style. Minor refinements: VV wordmark treatment, magic link form matches .cta button pattern, centered with generous spacing.</p>
+        </div>
+      </div>
+
+      <div class="option" data-choice="client-nav" onclick="toggleSelect(this)">
+        <div class="letter">6</div>
+        <div class="content">
+          <h3>Client Nav Shell</h3>
+          <p>Shared layout for all client pages. Similar to admin shell but shows client name prominently. Scroll-aware blur like landing page nav.</p>
+        </div>
+      </div>
+
+      <div class="option" data-choice="client-dashboard" onclick="toggleSelect(this)">
+        <div class="letter">7</div>
+        <div class="content">
+          <h3>Dashboard Overview <code style="font-size:11px;opacity:0.5">/dashboard</code></h3>
+          <p>Visibility score hero, trend chart, and report list. Needs editorial layout — big number display, spacious section rhythm, report links styled like landing page post cards.</p>
+        </div>
+      </div>
+
+      <div class="option" data-choice="client-report" onclick="toggleSelect(this)">
+        <div class="letter">8</div>
+        <div class="content">
+          <h3>Report View <code style="font-size:11px;opacity:0.5">/dashboard/reports/[id]</code></h3>
+          <p>Full report renderer (KPI grid, competitor table, query results). Already has strong bones — needs typographic polish and print/PDF button matching VV CTA style.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:40px;padding:24px;border:1px solid rgba(245,244,241,0.11);border-radius:4px;">
+  <div class="label" style="margin-bottom:12px;letter-spacing:0.14em;">Shared Design Gaps (apply everywhere)</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px;">
+    <div style="padding:16px;border:1px solid rgba(245,244,241,0.08);border-radius:3px;">
+      <div style="font-size:11px;font-family:monospace;letter-spacing:0.1em;color:rgba(245,244,241,0.45);margin-bottom:6px;">MISSING</div>
+      <div style="font-size:14px;">Cormorant Garamond font not loaded in dashboard (used for display headlines on landing page)</div>
+    </div>
+    <div style="padding:16px;border:1px solid rgba(245,244,241,0.08);border-radius:3px;">
+      <div style="font-size:11px;font-family:monospace;letter-spacing:0.1em;color:rgba(245,244,241,0.45);margin-bottom:6px;">MISSING</div>
+      <div style="font-size:14px;">CTA button hover pattern — ghost border → white fill on hover (landing page .cta style)</div>
+    </div>
+    <div style="padding:16px;border:1px solid rgba(245,244,241,0.08);border-radius:3px;">
+      <div style="font-size:11px;font-family:monospace;letter-spacing:0.1em;color:rgba(245,244,241,0.45);margin-bottom:6px;">MISSING</div>
+      <div style="font-size:14px;">Scroll-aware nav (blur + border appear on scroll, like landing page .nav.scrolled)</div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:32px;font-size:13px;">Select the items above that feel most important or where you have specific opinions. Then let me know in the terminal and we'll start with the admin nav shell.</p>

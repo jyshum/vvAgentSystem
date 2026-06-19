@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import { ConfigForm } from "@/components/admin/ConfigForm";
 import type { Client } from "@/lib/types";
@@ -9,7 +9,7 @@ export default async function ConfigPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: client } = await supabase
     .from("clients")

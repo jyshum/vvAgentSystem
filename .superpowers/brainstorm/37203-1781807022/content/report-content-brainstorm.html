@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Content Brainstorm</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0e0e0f; --ink-2: #19191c; --ink-soft: #141416;
+    --white: #f5f4f1; --mute: rgba(245,244,241,0.55); --faint: rgba(245,244,241,0.32);
+    --hair: rgba(245,244,241,0.09); --ghost: rgba(245,244,241,0.12);
+    --pos: #84d8ab; --neg: #e89aa0; --warn: #e8c87a;
+    --serif: 'Newsreader', serif; --sans: 'Schibsted Grotesk', sans-serif; --mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--ink); color: var(--white); font-family: var(--sans); padding: 36px 32px 80px; -webkit-font-smoothing: antialiased; }
+
+  h1 { font-family: var(--serif); font-size: 30px; font-weight: 400; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .sub { font-size: 13px; color: var(--mute); line-height: 1.6; max-width: 680px; margin-bottom: 36px; }
+
+  /* Legend */
+  .legend { display: flex; gap: 24px; margin-bottom: 32px; flex-wrap: wrap; }
+  .leg { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Section column layout */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+  .col-head { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; color: var(--faint); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--hair); }
+
+  /* Report section card */
+  .sec {
+    border: 1px solid var(--ghost);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .sec:hover { border-color: rgba(245,244,241,0.3); transform: translateX(3px); }
+  .sec.selected { border-color: var(--white); }
+
+  .sec-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--ghost);
+  }
+  .sec-icon { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .sec-title { font-family: var(--serif); font-size: 15px; flex: 1; }
+  .sec-tag {
+    font-family: var(--mono); font-size: 7px; letter-spacing: 0.12em;
+    padding: 3px 7px; border-radius: 20px; flex-shrink: 0;
+  }
+  .tag-ready { background: rgba(132,216,171,0.15); color: var(--pos); border: 1px solid rgba(132,216,171,0.3); }
+  .tag-ui { background: rgba(232,200,122,0.15); color: var(--warn); border: 1px solid rgba(232,200,122,0.3); }
+  .tag-new { background: rgba(232,154,160,0.15); color: var(--neg); border: 1px solid rgba(232,154,160,0.3); }
+
+  .sec-body { padding: 12px 14px; font-size: 12px; color: var(--mute); line-height: 1.65; }
+
+  .sec-preview {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(245,244,241,0.03);
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--faint);
+    line-height: 1.7;
+  }
+
+  /* Summary bar at bottom */
+  .summary-bar {
+    margin-top: 36px;
+    padding: 20px 24px;
+    border: 1px solid var(--ghost);
+    border-radius: 4px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+  }
+  .sum-item { }
+  .sum-count { font-family: var(--serif); font-size: 36px; font-weight: 400; line-height: 1; margin-bottom: 4px; }
+  .sum-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; color: var(--faint); }
+
+  .divider { grid-column: 1 / -1; height: 1px; background: var(--hair); margin: 8px 0; }
+
+  #selection-note {
+    margin-top: 24px; padding: 16px 20px;
+    border: 1px solid var(--ghost); border-radius: 4px;
+    font-size: 13px; color: var(--mute); line-height: 1.6;
+    display: none;
+  }
+  #selection-note.show { display: block; }
+</style>
+</head>
+<body>
+
+<h1>What goes in the weekly report?</h1>
+<p class="sub">Everything the report could contain, mapped by what's ready today vs. what needs new work. Click any section to flag it — we'll use this to decide scope.</p>
+
+<div class="legend">
+  <div class="leg"><div class="dot" style="background:var(--pos);"></div> IN SYSTEM — just needs UI</div>
+  <div class="leg"><div class="dot" style="background:var(--warn);"></div> PARTIAL — data exists, needs new agent logic</div>
+  <div class="leg"><div class="dot" style="background:var(--neg);"></div> NEW — requires new agent or integration</div>
+</div>
+
+<div class="cols">
+
+  <!-- LEFT COL: AI Visibility Data -->
+  <div>
+    <div class="col-head">AI VISIBILITY (from tracker)</div>
+
+    <div class="sec selected" onclick="toggle(this)" data-key="kpi">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--pos);"></div>
+        <div class="sec-title">KPI Summary — Mention & Citation rates</div>
+        <span class="sec-tag tag-ready">READY</span>
+      </div>
+      <div class="sec-body">
+        Aggregate mention rate + citation rate for the week, delta vs. prior week. Already computed by tracker and stored in <code>tracker_runs</code>.
+        <div class="sec-preview">
+          Mention Rate: 68% ↑ +4pp<br>
+          Citation Rate: 41% ↑ +2pp<br>
+          Queries tracked: 5 · Engines: 4
+        </div>
+      </div>
+    </div>
+
+    <div class="sec selected" onclick="toggle(this)" data-key="per-engine">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--pos);"></div>
+        <div class="sec-title">Per-Engine Breakdown</div>
+        <span class="sec-tag tag-ready">READY</span>
+      </div>
+      <div class="sec-body">
+        Mention rate and citation rate split by engine — ChatGPT, Perplexity, Claude, Gemini. Already computed in <code>per_engine</code> scores. Tells the client which AI is their strongest channel.
+        <div class="sec-preview">
+          ChatGPT &nbsp;&nbsp;&nbsp;· mention 60% · citation 40%<br>
+          Perplexity · mention 80% · citation 60%<br>
+          Claude &nbsp;&nbsp;&nbsp;&nbsp;· mention 60% · citation 20%<br>
+          Gemini &nbsp;&nbsp;&nbsp;&nbsp;· mention 80% · citation 40%
+        </div>
+      </div>
+    </div>
+
+    <div class="sec selected" onclick="toggle(this)" data-key="per-query">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--pos);"></div>
+        <div class="sec-title">Per-Query Results Table</div>
+        <span class="sec-tag tag-ready">READY</span>
+      </div>
+      <div class="sec-body">
+        Every tracked query, every engine — did the brand appear? Was it cited? What URL was cited? Already in <code>tracker_results_client</code>. This is the most detailed view of exactly where you're winning and losing.
+        <div class="sec-preview">
+          "best daycare app Canada"<br>
+          &nbsp;&nbsp;ChatGPT &nbsp;&nbsp;→ CITED &nbsp;childspot.com<br>
+          &nbsp;&nbsp;Perplexity → MENTIONED<br>
+          &nbsp;&nbsp;Claude &nbsp;&nbsp;&nbsp;→ not found<br>
+          &nbsp;&nbsp;Gemini &nbsp;&nbsp;&nbsp;→ CITED &nbsp;childspot.com
+        </div>
+      </div>
+    </div>
+
+    <div class="sec selected" onclick="toggle(this)" data-key="competitors">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--pos);"></div>
+        <div class="sec-title">Competitor Share of Voice</div>
+        <span class="sec-tag tag-ready">READY</span>
+      </div>
+      <div class="sec-body">
+        Mention rates for all tracked competitors vs. your brand, across the same queries. Already computed in <code>competitor_scores</code>. Shows clients how they stack up.
+        <div class="sec-preview">
+          ChildSpot &nbsp;&nbsp;&nbsp;68% ████████░░<br>
+          Daycare.com &nbsp;52% ██████░░░░<br>
+          KidGenius &nbsp;&nbsp;&nbsp;44% █████░░░░░<br>
+          Brightwheel &nbsp;36% ████░░░░░░
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" onclick="toggle(this)" data-key="citation-urls">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--pos);"></div>
+        <div class="sec-title">Citation URLs Discovered</div>
+        <span class="sec-tag tag-ready">READY</span>
+      </div>
+      <div class="sec-body">
+        The actual URLs the AI engines are citing for the brand. Already captured in <code>citation_url</code> per result. Tells clients which pages are driving their AI authority — useful for content strategy.
+        <div class="sec-preview">
+          childspot.com/features &nbsp;&nbsp;&nbsp;— 4 citations<br>
+          childspot.com/blog/review — 2 citations<br>
+          childspot.com &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;— 1 citation
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" onclick="toggle(this)" data-key="response-excerpts">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--warn);"></div>
+        <div class="sec-title">AI Response Excerpts</div>
+        <span class="sec-tag tag-ui">PARTIAL</span>
+      </div>
+      <div class="sec-body">
+        The actual sentence(s) where the brand was mentioned, pulled from <code>response_text</code> in the tracker. Needs a short extraction step — find the brand mention context window (~50 words around it). Shows HOW the AI is describing the brand, not just IF.
+        <div class="sec-preview">
+          "…<strong>ChildSpot</strong> is widely regarded as the<br>
+          most parent-friendly daycare management<br>
+          app available in Canada, offering…"<br>
+          <span style="opacity:0.5;">— ChatGPT, "best daycare app Canada"</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" onclick="toggle(this)" data-key="sentiment">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--neg);"></div>
+        <div class="sec-title">AI Sentiment Scoring</div>
+        <span class="sec-tag tag-new">NEW AGENT</span>
+      </div>
+      <div class="sec-body">
+        Run a sentiment pass on each AI response that mentions the brand — is it positive, neutral, or negative framing? Requires a separate LLM call per result to classify and score. High value but adds cost per run.
+        <div class="sec-preview">
+          "best daycare app Canada" · ChatGPT<br>
+          Sentiment: Positive (0.91)<br>
+          Framing: recommended, top-rated<br>
+          <span style="opacity:0.5;">vs. last week: neutral → positive</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT COL: External Data -->
+  <div>
+    <div class="col-head">EXTERNAL DATA SOURCES</div>
+
+    <div class="sec selected" onclick="toggle(this)" data-key="gsc">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--pos);"></div>
+        <div class="sec-title">Google Search Console</div>
+        <span class="sec-tag tag-ready">READY</span>
+      </div>
+      <div class="sec-body">
+        Impressions, clicks, average CTR, and average position. Already a field in the <code>reports</code> table (<code>search_console</code> JSON). Currently filled manually by the admin — could be automated via GSC API later. Shows traditional SEO health alongside AI visibility.
+        <div class="sec-preview">
+          Impressions &nbsp;12,400 ↑ +8%<br>
+          Clicks &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;940 &nbsp;&nbsp;↑ +12%<br>
+          Avg CTR &nbsp;&nbsp;&nbsp;&nbsp;7.6% &nbsp;↑ +0.4pp<br>
+          Avg Position 14.2 &nbsp;↓ -1.1
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" onclick="toggle(this)" data-key="reddit">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--neg);"></div>
+        <div class="sec-title">Reddit / Forum Mentions</div>
+        <span class="sec-tag tag-new">NEW AGENT</span>
+      </div>
+      <div class="sec-body">
+        Pull brand mentions from Reddit, Quora, and parenting forums. GEO performance is heavily influenced by what communities are saying — AI engines read forums and use them as citation sources. Needs a Reddit API agent (already partially architected in the GEO agent system).
+        <div class="sec-preview">
+          r/Parenting &nbsp;&nbsp;&nbsp;— 3 mentions this week<br>
+          r/Daycare &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;— 1 mention<br>
+          BabyCenter forum — 2 mentions<br>
+          <span style="opacity:0.5;">Sentiment: mostly positive</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" onclick="toggle(this)" data-key="content-gaps">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--neg);"></div>
+        <div class="sec-title">Content Gap Analysis</div>
+        <span class="sec-tag tag-new">NEW AGENT</span>
+      </div>
+      <div class="sec-body">
+        For each query where the brand was NOT mentioned, analyze what content the AI cited instead — and what content the brand is missing. Surfaces specific blog topics, FAQ pages, or schema types that would close the gap. High-value for GEO strategy.
+        <div class="sec-preview">
+          Query: "childcare app cost Canada"<br>
+          Brand: not found<br>
+          AI cited: competitor pricing page<br>
+          Gap: <strong>no pricing/cost page exists</strong><br>
+          <span style="opacity:0.5;">Rec: publish /pricing with structured data</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" onclick="toggle(this)" data-key="backlinks">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--neg);"></div>
+        <div class="sec-title">Authority / Backlink Delta</div>
+        <span class="sec-tag tag-new">NEW AGENT</span>
+      </div>
+      <div class="sec-body">
+        New backlinks or authority signals gained this week — press mentions, directory listings, third-party reviews. AI engines weight these for citations. Would require integration with Ahrefs, Moz, or a web crawl agent.
+        <div class="sec-preview">
+          New referring domains: +3<br>
+          Notable: techcrunch.com linked<br>
+          Lost: 1 referring domain<br>
+          <span style="opacity:0.5;">DR change: 42 → 43</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-head" style="margin-top:24px;">MANUALLY WRITTEN (admin fills in)</div>
+
+    <div class="sec selected" onclick="toggle(this)" data-key="exec">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--pos);"></div>
+        <div class="sec-title">Executive Summary</div>
+        <span class="sec-tag tag-ready">READY</span>
+      </div>
+      <div class="sec-body">Admin writes 2–3 sentences framing the week's story. The most human, highest-signal section of the report.</div>
+    </div>
+
+    <div class="sec selected" onclick="toggle(this)" data-key="work">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--pos);"></div>
+        <div class="sec-title">Work Completed + Priorities + Blockers</div>
+        <span class="sec-tag tag-ready">READY</span>
+      </div>
+      <div class="sec-body">What VV did this week, what's next, and any blockers. Core accountability section of the agency deliverable. Already in the editor.</div>
+    </div>
+
+    <div class="sec" onclick="toggle(this)" data-key="ai-exec">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:var(--warn);"></div>
+        <div class="sec-title">AI-drafted Executive Summary</div>
+        <span class="sec-tag tag-ui">PARTIAL</span>
+      </div>
+      <div class="sec-body">
+        Auto-generate a draft executive summary from the tracker data — admin reviews and edits before publishing. Saves time each week. Could use Claude to synthesize the week's KPI changes, competitive moves, and notable queries into a paragraph.
+        <div class="sec-preview">
+          [Generate Draft] → admin edits → saves
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="summary-bar">
+  <div class="sum-item">
+    <div class="sum-count" style="color:var(--pos);" id="count-ready">7</div>
+    <div class="sum-label">IN SYSTEM ALREADY</div>
+  </div>
+  <div class="sum-item">
+    <div class="sum-count" style="color:var(--warn);" id="count-partial">3</div>
+    <div class="sum-label">NEEDS SMALL EXTENSION</div>
+  </div>
+  <div class="sum-item">
+    <div class="sum-count" style="color:var(--neg);" id="count-new">4</div>
+    <div class="sum-label">REQUIRES NEW AGENT</div>
+  </div>
+</div>
+
+<div id="selection-note" class="show" style="margin-top:24px;">
+  <strong style="font-family:var(--mono);font-size:10px;letter-spacing:0.12em;">PRE-SELECTED (recommended MVP)</strong><br><br>
+  The highlighted sections are what I'd include in the first version — all data is already in the system, zero new agents needed. That gets you a rich, data-dense report immediately. The "PARTIAL" and "NEW AGENT" items are V2+ additions once the core is live.
+</div>
+
+<script>
+function toggle(el) {
+  el.classList.toggle('selected');
+}
+</script>
+
+</body>
+</html>

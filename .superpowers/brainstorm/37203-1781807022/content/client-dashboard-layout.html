@@ -1,0 +1,161 @@
+<h2>Client Dashboard — Overview Layout</h2>
+<p class="subtitle">The first thing every client sees. Three ways to arrange the visibility score, trend chart, and report list.</p>
+
+<div class="options" style="margin-top:32px;">
+
+  <!-- OPTION A: Score Hero + Chart + List -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Score hero → trend chart → report list</h3>
+      <p>Big editorial headline number at the top (current week's mention + citation rates side by side), trend sparkline below, then the report list. Feels like a magazine cover — one dominant moment of truth before you scroll.</p>
+
+      <div style="margin-top:16px;border:1px solid rgba(245,244,241,0.13);border-radius:4px;overflow:hidden;background:#0e0e0f;padding:16px;">
+        <!-- Brand name -->
+        <div style="font-family:serif;font-size:28px;margin-bottom:20px;letter-spacing:-0.02em;">ChildSpot</div>
+
+        <!-- Hero score row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding-bottom:20px;border-bottom:1px solid rgba(245,244,241,0.08);margin-bottom:20px;">
+          <div>
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.16em;opacity:0.35;margin-bottom:6px;">MENTION RATE</div>
+            <div style="font-family:serif;font-size:48px;color:#84d8ab;line-height:1;">68%</div>
+            <div style="font-family:monospace;font-size:8px;opacity:0.35;margin-top:4px;">↑ +4pp vs last week</div>
+          </div>
+          <div>
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.16em;opacity:0.35;margin-bottom:6px;">CITATION RATE</div>
+            <div style="font-family:serif;font-size:48px;color:#84d8ab;line-height:1;">41%</div>
+            <div style="font-family:monospace;font-size:8px;opacity:0.35;margin-top:4px;">↑ +2pp vs last week</div>
+          </div>
+          <div>
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.16em;opacity:0.35;margin-bottom:6px;">REPORTS</div>
+            <div style="font-family:serif;font-size:48px;opacity:0.6;line-height:1;">12</div>
+            <div style="font-family:monospace;font-size:8px;opacity:0.35;margin-top:4px;">since onboarding</div>
+          </div>
+        </div>
+
+        <!-- Trend sparkline placeholder -->
+        <div style="margin-bottom:20px;">
+          <div style="font-family:monospace;font-size:8px;letter-spacing:0.14em;opacity:0.35;margin-bottom:10px;">8-WEEK TREND</div>
+          <div style="height:52px;background:rgba(245,244,241,0.03);border-radius:2px;position:relative;overflow:hidden;">
+            <svg viewBox="0 0 300 52" style="width:100%;height:100%;" preserveAspectRatio="none">
+              <polyline points="0,40 40,35 80,30 120,32 160,22 200,18 240,15 300,10" fill="none" stroke="#84d8ab" stroke-width="1.5" opacity="0.6"/>
+              <polyline points="0,40 40,35 80,30 120,32 160,22 200,18 240,15 300,10 300,52 0,52" fill="#84d8ab" fill-opacity="0.06" stroke="none"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Report list -->
+        <div>
+          <div style="font-family:monospace;font-size:8px;letter-spacing:0.14em;opacity:0.35;margin-bottom:10px;">REPORTS</div>
+          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(245,244,241,0.07);">
+            <span style="font-family:serif;font-size:13px;font-style:italic;">Week of Jun 9–15, 2026</span>
+            <span style="font-family:monospace;font-size:7px;letter-spacing:0.1em;border:1px solid rgba(245,244,241,0.2);padding:2px 6px;color:#84d8ab;">PUB</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(245,244,241,0.07);opacity:0.5;">
+            <span style="font-family:serif;font-size:13px;font-style:italic;">Week of Jun 2–8, 2026</span>
+            <span style="font-family:monospace;font-size:7px;letter-spacing:0.1em;border:1px solid rgba(245,244,241,0.15);padding:2px 6px;">PUB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B: Split — score left, chart right, list below -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Split hero (score left, chart right) → list below</h3>
+      <p>Top half splits into two columns: big score on the left, 8-week trend chart on the right. Report list below as a full-width section. More of a "dashboard" feel — data and trend coexist without scrolling.</p>
+
+      <div style="margin-top:16px;border:1px solid rgba(245,244,241,0.13);border-radius:4px;overflow:hidden;background:#0e0e0f;padding:16px;">
+        <div style="font-family:serif;font-size:22px;margin-bottom:16px;letter-spacing:-0.02em;">ChildSpot</div>
+
+        <!-- Split row -->
+        <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid rgba(245,244,241,0.08);">
+          <!-- Left: scores -->
+          <div>
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.14em;opacity:0.35;margin-bottom:8px;">THIS WEEK</div>
+            <div style="margin-bottom:12px;">
+              <div style="font-family:serif;font-size:40px;color:#84d8ab;line-height:1;">68%</div>
+              <div style="font-family:monospace;font-size:8px;opacity:0.35;margin-top:2px;">MENTION</div>
+            </div>
+            <div>
+              <div style="font-family:serif;font-size:28px;color:#84d8ab;line-height:1;opacity:0.7;">41%</div>
+              <div style="font-family:monospace;font-size:8px;opacity:0.35;margin-top:2px;">CITATION</div>
+            </div>
+          </div>
+          <!-- Right: chart -->
+          <div>
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.14em;opacity:0.35;margin-bottom:8px;">8-WEEK TREND</div>
+            <div style="height:80px;background:rgba(245,244,241,0.03);border-radius:2px;position:relative;overflow:hidden;">
+              <svg viewBox="0 0 280 80" style="width:100%;height:100%;" preserveAspectRatio="none">
+                <polyline points="0,60 40,52 80,44 120,48 160,32 200,26 240,20 280,14" fill="none" stroke="#84d8ab" stroke-width="1.5" opacity="0.7"/>
+                <polyline points="0,60 40,52 80,44 120,48 160,32 200,26 240,20 280,14 280,80 0,80" fill="#84d8ab" fill-opacity="0.07" stroke="none"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Report list -->
+        <div style="font-family:monospace;font-size:8px;letter-spacing:0.14em;opacity:0.35;margin-bottom:10px;">REPORTS</div>
+        <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(245,244,241,0.07);">
+          <span style="font-family:serif;font-size:13px;font-style:italic;">Week of Jun 9–15, 2026</span>
+          <span style="font-family:monospace;font-size:7px;letter-spacing:0.1em;border:1px solid rgba(245,244,241,0.2);padding:2px 6px;color:#84d8ab;">PUB</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:9px 0;opacity:0.5;">
+          <span style="font-family:serif;font-size:13px;font-style:italic;">Week of Jun 2–8, 2026</span>
+          <span style="font-family:monospace;font-size:7px;letter-spacing:0.1em;border:1px solid rgba(245,244,241,0.15);padding:2px 6px;">PUB</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION C: Score only, list as primary -->
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Minimal score strip → reports as the star</h3>
+      <p>A single slim stat strip at the top (mention rate + citation rate in small type, no chart), then the report list takes over as the main content. Best if clients primarily come to the dashboard to read reports, not track numbers week-to-week.</p>
+
+      <div style="margin-top:16px;border:1px solid rgba(245,244,241,0.13);border-radius:4px;overflow:hidden;background:#0e0e0f;padding:16px;">
+        <div style="font-family:serif;font-size:22px;margin-bottom:14px;letter-spacing:-0.02em;">ChildSpot</div>
+
+        <!-- Slim stat strip -->
+        <div style="display:flex;gap:24px;padding:10px 14px;background:rgba(245,244,241,0.03);border:1px solid rgba(245,244,241,0.08);border-radius:2px;margin-bottom:20px;">
+          <div>
+            <div style="font-family:monospace;font-size:7px;letter-spacing:0.14em;opacity:0.35;">MENTION</div>
+            <div style="font-family:serif;font-size:22px;color:#84d8ab;">68%</div>
+          </div>
+          <div style="width:1px;background:rgba(245,244,241,0.08);"></div>
+          <div>
+            <div style="font-family:monospace;font-size:7px;letter-spacing:0.14em;opacity:0.35;">CITATION</div>
+            <div style="font-family:serif;font-size:22px;color:#84d8ab;">41%</div>
+          </div>
+          <div style="width:1px;background:rgba(245,244,241,0.08);"></div>
+          <div>
+            <div style="font-family:monospace;font-size:7px;letter-spacing:0.14em;opacity:0.35;">LAST RUN</div>
+            <div style="font-family:serif;font-size:22px;opacity:0.6;">Jun 12</div>
+          </div>
+        </div>
+
+        <!-- Reports as main content -->
+        <div style="font-family:monospace;font-size:8px;letter-spacing:0.14em;opacity:0.35;margin-bottom:12px;">REPORTS</div>
+        <div style="padding:12px 0;border-bottom:1px solid rgba(245,244,241,0.08);">
+          <div style="font-family:serif;font-size:16px;font-style:italic;margin-bottom:3px;">Week of Jun 9–15, 2026</div>
+          <div style="font-family:monospace;font-size:8px;opacity:0.35;">Mention 68% · Citation 41% · 3 engines</div>
+        </div>
+        <div style="padding:12px 0;border-bottom:1px solid rgba(245,244,241,0.08);opacity:0.55;">
+          <div style="font-family:serif;font-size:16px;font-style:italic;margin-bottom:3px;">Week of Jun 2–8, 2026</div>
+          <div style="font-family:monospace;font-size:8px;opacity:0.35;">Mention 64% · Citation 39% · 3 engines</div>
+        </div>
+        <div style="padding:12px 0;opacity:0.35;">
+          <div style="font-family:serif;font-size:16px;font-style:italic;margin-bottom:3px;">Week of May 26–Jun 1, 2026</div>
+          <div style="font-family:monospace;font-size:8px;opacity:0.35;">Mention 60% · Citation 37% · 3 engines</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:28px;font-size:13px;">I recommend <strong>A</strong> — the big score moment lands hardest and sets the tone for the whole relationship with the client. The trend chart below rewards scrolling. Click your pick.</p>

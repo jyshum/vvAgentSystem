@@ -1,0 +1,113 @@
+<h2>Admin Navigation Structure</h2>
+<p class="subtitle">The admin has 3 levels of depth: Clients list → Client detail → Report editor. Which structure handles this best?</p>
+
+<div class="options" style="margin-top:32px;">
+
+  <!-- OPTION A -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Top nav + in-page tabs on detail pages</h3>
+      <p>Keep the flat top nav (Clients · Sign Out). On the Client detail page, add a sticky tab row beneath the heading to jump between Config, Users, Runs, and Reports. Closest to landing page simplicity.</p>
+
+      <div style="margin-top:20px;border:1px solid rgba(245,244,241,0.13);border-radius:4px;overflow:hidden;font-size:12px;">
+        <!-- Nav -->
+        <div style="background:rgba(14,14,15,0.9);padding:12px 20px;border-bottom:1px solid rgba(245,244,241,0.11);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-family:serif;font-size:14px;">Victory Velocity <span style="font-family:monospace;font-size:9px;border:1px solid rgba(245,244,241,0.2);padding:2px 5px;margin-left:6px;opacity:0.6;">ADMIN</span></span>
+          <div style="display:flex;gap:20px;font-family:sans-serif;font-size:11px;">
+            <span style="color:#f5f4f1;border-bottom:1px solid #f5f4f1;padding-bottom:2px;">Clients</span>
+            <span style="opacity:0.4;">Sign Out</span>
+          </div>
+        </div>
+        <!-- Page -->
+        <div style="background:#0e0e0f;padding:20px;">
+          <div style="opacity:0.4;font-family:monospace;font-size:10px;margin-bottom:8px;">← Clients</div>
+          <div style="font-family:serif;font-size:22px;margin-bottom:4px;">ChildSpot</div>
+          <div style="opacity:0.3;font-family:monospace;font-size:9px;margin-bottom:16px;">childspot.com</div>
+          <!-- Tabs -->
+          <div style="display:flex;gap:0;border-bottom:1px solid rgba(245,244,241,0.11);margin-bottom:16px;">
+            <div style="font-family:monospace;font-size:9px;letter-spacing:0.12em;padding:8px 16px;border-bottom:1px solid #f5f4f1;color:#f5f4f1;">CONFIG</div>
+            <div style="font-family:monospace;font-size:9px;letter-spacing:0.12em;padding:8px 16px;opacity:0.35;">USERS</div>
+            <div style="font-family:monospace;font-size:9px;letter-spacing:0.12em;padding:8px 16px;opacity:0.35;">RUNS</div>
+            <div style="font-family:monospace;font-size:9px;letter-spacing:0.12em;padding:8px 16px;opacity:0.35;">REPORTS</div>
+          </div>
+          <div style="height:48px;background:rgba(245,244,241,0.04);border-radius:3px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Top nav + left sidebar</h3>
+      <p>Top nav holds the brand mark and Sign Out. A persistent left sidebar shows Clients list with the active client highlighted. Detail sections (Config, Users, Runs, Reports) are sub-items in the sidebar. More like a traditional admin panel.</p>
+
+      <div style="margin-top:20px;border:1px solid rgba(245,244,241,0.13);border-radius:4px;overflow:hidden;font-size:12px;">
+        <!-- Nav -->
+        <div style="background:rgba(14,14,15,0.9);padding:12px 20px;border-bottom:1px solid rgba(245,244,241,0.11);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-family:serif;font-size:14px;">Victory Velocity <span style="font-family:monospace;font-size:9px;border:1px solid rgba(245,244,241,0.2);padding:2px 5px;margin-left:6px;opacity:0.6;">ADMIN</span></span>
+          <span style="font-family:sans-serif;font-size:11px;opacity:0.4;">Sign Out</span>
+        </div>
+        <!-- Body -->
+        <div style="display:grid;grid-template-columns:140px 1fr;background:#0e0e0f;">
+          <!-- Sidebar -->
+          <div style="border-right:1px solid rgba(245,244,241,0.08);padding:16px 0;min-height:120px;">
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.16em;opacity:0.35;padding:0 14px 8px;">CLIENTS</div>
+            <div style="font-family:serif;font-size:12px;padding:6px 14px;background:rgba(245,244,241,0.06);border-left:2px solid #f5f4f1;color:#f5f4f1;">ChildSpot</div>
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.1em;padding:5px 20px;opacity:0.35;">— Config</div>
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.1em;padding:5px 20px;opacity:0.35;">— Users</div>
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.1em;padding:5px 20px;opacity:0.35;">— Runs</div>
+            <div style="font-family:monospace;font-size:8px;letter-spacing:0.1em;padding:5px 20px;opacity:0.35;">— Reports</div>
+            <div style="font-family:serif;font-size:12px;padding:6px 14px;opacity:0.4;">Acme Corp</div>
+          </div>
+          <!-- Content -->
+          <div style="padding:16px;">
+            <div style="font-family:serif;font-size:18px;margin-bottom:4px;">ChildSpot</div>
+            <div style="height:48px;background:rgba(245,244,241,0.04);border-radius:3px;margin-top:12px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION C -->
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Top nav + breadcrumb trail (recommended)</h3>
+      <p>Nav matches the landing page exactly (Clients link active-highlighted, Sign Out). Below the nav, a slim breadcrumb line shows depth: <em>Clients / ChildSpot / Reports</em>. Within client detail, sections scroll naturally with a floating anchor bar that sticks at the top. Most editorial, zero clutter at the top level.</p>
+
+      <div style="margin-top:20px;border:1px solid rgba(245,244,241,0.13);border-radius:4px;overflow:hidden;font-size:12px;">
+        <!-- Nav -->
+        <div style="background:rgba(14,14,15,0.9);padding:12px 20px;border-bottom:1px solid rgba(245,244,241,0.11);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-family:serif;font-size:14px;">Victory Velocity <span style="font-family:monospace;font-size:9px;border:1px solid rgba(245,244,241,0.2);padding:2px 5px;margin-left:6px;opacity:0.6;">ADMIN</span></span>
+          <div style="display:flex;gap:20px;font-family:sans-serif;font-size:11px;">
+            <span style="color:#f5f4f1;">Clients</span>
+            <span style="opacity:0.4;">Sign Out</span>
+          </div>
+        </div>
+        <!-- Breadcrumb -->
+        <div style="background:#0e0e0f;padding:8px 20px;border-bottom:1px solid rgba(245,244,241,0.06);font-family:monospace;font-size:9px;letter-spacing:0.12em;opacity:0.45;">
+          CLIENTS &nbsp;/&nbsp; CHILDSPOT &nbsp;/&nbsp; <span style="color:#f5f4f1;opacity:1;">REPORTS</span>
+        </div>
+        <!-- Sticky anchor row -->
+        <div style="background:rgba(14,14,15,0.96);padding:0 20px;border-bottom:1px solid rgba(245,244,241,0.08);display:flex;gap:0;">
+          <div style="font-family:monospace;font-size:8px;letter-spacing:0.12em;padding:8px 14px;opacity:0.35;">CONFIG</div>
+          <div style="font-family:monospace;font-size:8px;letter-spacing:0.12em;padding:8px 14px;opacity:0.35;">USERS</div>
+          <div style="font-family:monospace;font-size:8px;letter-spacing:0.12em;padding:8px 14px;opacity:0.35;">RUNS</div>
+          <div style="font-family:monospace;font-size:8px;letter-spacing:0.12em;padding:8px 14px;border-bottom:1px solid #f5f4f1;color:#f5f4f1;">REPORTS</div>
+        </div>
+        <!-- Page -->
+        <div style="background:#0e0e0f;padding:16px 20px;">
+          <div style="font-family:serif;font-size:22px;margin-bottom:12px;">ChildSpot</div>
+          <div style="height:48px;background:rgba(245,244,241,0.04);border-radius:3px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:28px;font-size:13px;">I recommend <strong>C</strong> — it stays closest to the landing page's editorial feel while solving the depth problem. Click your choice and let me know in the terminal.</p>

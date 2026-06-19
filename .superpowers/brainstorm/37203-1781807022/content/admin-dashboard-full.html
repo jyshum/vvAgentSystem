@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VV Admin — Clients</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0e0e0f;
+    --white: #f5f4f1;
+    --mute: rgba(245,244,241,0.5);
+    --faint: rgba(245,244,241,0.3);
+    --ghost: rgba(245,244,241,0.15);
+    --hair: rgba(245,244,241,0.08);
+    --pos: #84d8ab;
+    --neg: #e89aa0;
+    --serif: 'Newsreader', Georgia, serif;
+    --sans: 'Schibsted Grotesk', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --display: 'Cormorant Garamond', serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--ink);
+    color: var(--white);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* ── Nav ── */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: 78px;
+    padding: 0 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid transparent;
+    transition: background 0.3s, border-color 0.3s, backdrop-filter 0.3s;
+  }
+  nav.scrolled {
+    background: rgba(14,14,15,0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-color: var(--hair);
+  }
+  .nav-logo {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: var(--white);
+  }
+  .nav-logo span { font-style: italic; color: var(--mute); }
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+  .nav-link {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--mute);
+    text-decoration: none;
+    transition: color 0.2s;
+    cursor: pointer;
+  }
+  .nav-link:hover, .nav-link.active { color: var(--white); }
+  .nav-signout {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--faint);
+    cursor: pointer;
+    transition: color 0.2s;
+    background: transparent;
+    border: none;
+  }
+  .nav-signout:hover { color: var(--white); }
+
+  /* ── Page shell ── */
+  .page {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 56px 56px 100px;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 44px;
+  }
+  .page-title {
+    font-family: var(--display);
+    font-size: 52px;
+    font-weight: 300;
+    line-height: 0.96;
+    letter-spacing: -0.01em;
+  }
+  .page-sub {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 16px;
+    color: var(--mute);
+    margin-top: 8px;
+  }
+  .add-client-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    padding: 11px 22px;
+    border: 1px solid var(--ghost);
+    background: transparent;
+    color: var(--white);
+    cursor: pointer;
+    transition: background 0.25s, border-color 0.25s, color 0.25s;
+  }
+  .add-client-btn:hover {
+    background: var(--white);
+    border-color: var(--white);
+    color: var(--ink);
+  }
+
+  /* ── Table header ── */
+  .table-head {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1.2fr 1fr;
+    gap: 16px;
+    padding: 0 16px 12px;
+    border-bottom: 1px solid var(--hair);
+    margin-bottom: 4px;
+  }
+  .col-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.18em;
+    color: var(--faint);
+  }
+
+  /* ── Client rows ── */
+  .client-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1.2fr 1fr;
+    gap: 16px;
+    align-items: center;
+    padding: 20px 16px;
+    border-bottom: 1px solid var(--hair);
+    cursor: pointer;
+    transition: padding-left 0.2s cubic-bezier(.2,.8,.2,1), background 0.2s;
+  }
+  .client-row:hover {
+    padding-left: 28px;
+    background: rgba(245,244,241,0.02);
+  }
+  .client-row:last-child { border-bottom: none; }
+
+  .client-name {
+    font-family: var(--serif);
+    font-size: 18px;
+    color: var(--white);
+    line-height: 1.2;
+  }
+  .client-domain {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+    margin-top: 3px;
+  }
+
+  .metric-val {
+    font-family: var(--display);
+    font-weight: 300;
+    font-size: 26px;
+    line-height: 1;
+  }
+  .metric-delta {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--faint);
+    margin-top: 4px;
+  }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
+
+  .last-run {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--mute);
+    line-height: 1.5;
+  }
+  .last-run-sub {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--faint);
+    margin-top: 3px;
+  }
+
+  .report-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+    border: 1px solid rgba(245,244,241,0.12);
+    padding: 7px 13px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .client-row:hover .report-link {
+    color: var(--white);
+    border-color: var(--ghost);
+  }
+  .no-report {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--faint);
+    opacity: 0.4;
+  }
+
+  /* ── Stats strip ── */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--hair);
+    border: 1px solid var(--hair);
+    margin-bottom: 44px;
+  }
+  .stat-cell {
+    background: var(--ink);
+    padding: 18px 22px;
+  }
+  .stat-num {
+    font-family: var(--display);
+    font-weight: 300;
+    font-size: 38px;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    color: var(--faint);
+  }
+
+  /* ── Run status pill ── */
+  .run-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 2px;
+    margin-top: 5px;
+  }
+  .pill-ok { background: rgba(132,216,171,0.1); color: var(--pos); border: 1px solid rgba(132,216,171,0.2); }
+  .pill-stale { background: rgba(232,154,160,0.08); color: var(--neg); border: 1px solid rgba(232,154,160,0.18); }
+  .pill-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <div class="nav-logo">Victory<span>Velocity</span></div>
+  <div class="nav-right">
+    <span class="nav-link active">CLIENTS</span>
+    <button class="nav-signout">SIGN OUT</button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Page header -->
+  <div class="page-header">
+    <div>
+      <div class="page-title">Clients</div>
+      <div class="page-sub">6 active accounts</div>
+    </div>
+    <button class="add-client-btn">+ ADD CLIENT</button>
+  </div>
+
+  <!-- Agency stats strip -->
+  <div class="stats-strip">
+    <div class="stat-cell">
+      <div class="stat-num">6</div>
+      <div class="stat-label">ACTIVE CLIENTS</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num" style="color:var(--pos);">71%</div>
+      <div class="stat-label">AVG MENTION RATE</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num" style="color:var(--pos);">44%</div>
+      <div class="stat-label">AVG CITATION RATE</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">12</div>
+      <div class="stat-label">REPORTS THIS MONTH</div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-head">
+    <div class="col-label">CLIENT</div>
+    <div class="col-label">MENTION</div>
+    <div class="col-label">CITATION</div>
+    <div class="col-label">LAST RUN</div>
+    <div class="col-label">REPORT</div>
+  </div>
+
+  <!-- Row 1 -->
+  <div class="client-row">
+    <div>
+      <div class="client-name">ChildSpot</div>
+      <div class="client-domain">childspot.com</div>
+    </div>
+    <div>
+      <div class="metric-val pos">68%</div>
+      <div class="metric-delta">↑ +4pp</div>
+    </div>
+    <div>
+      <div class="metric-val pos">41%</div>
+      <div class="metric-delta">↑ +2pp</div>
+    </div>
+    <div>
+      <div class="last-run">Jun 15, 2026</div>
+      <div class="run-pill pill-ok"><span class="pill-dot"></span>CURRENT</div>
+    </div>
+    <div>
+      <div class="report-link">VIEW ↗</div>
+    </div>
+  </div>
+
+  <!-- Row 2 -->
+  <div class="client-row">
+    <div>
+      <div class="client-name">Northfield Law</div>
+      <div class="client-domain">northfieldlaw.ca</div>
+    </div>
+    <div>
+      <div class="metric-val pos">82%</div>
+      <div class="metric-delta">↑ +7pp</div>
+    </div>
+    <div>
+      <div class="metric-val pos">55%</div>
+      <div class="metric-delta">↑ +3pp</div>
+    </div>
+    <div>
+      <div class="last-run">Jun 14, 2026</div>
+      <div class="run-pill pill-ok"><span class="pill-dot"></span>CURRENT</div>
+    </div>
+    <div>
+      <div class="report-link">VIEW ↗</div>
+    </div>
+  </div>
+
+  <!-- Row 3 -->
+  <div class="client-row">
+    <div>
+      <div class="client-name">Helio Studio</div>
+      <div class="client-domain">heliostudio.co</div>
+    </div>
+    <div>
+      <div class="metric-val" style="color:var(--mute);">44%</div>
+      <div class="metric-delta" style="color:var(--neg);">↓ −3pp</div>
+    </div>
+    <div>
+      <div class="metric-val" style="color:var(--mute);">28%</div>
+      <div class="metric-delta" style="color:var(--neg);">↓ −1pp</div>
+    </div>
+    <div>
+      <div class="last-run">Jun 13, 2026</div>
+      <div class="run-pill pill-ok"><span class="pill-dot"></span>CURRENT</div>
+    </div>
+    <div>
+      <div class="report-link">VIEW ↗</div>
+    </div>
+  </div>
+
+  <!-- Row 4 -->
+  <div class="client-row">
+    <div>
+      <div class="client-name">Maple Integrations</div>
+      <div class="client-domain">mapleintegrations.com</div>
+    </div>
+    <div>
+      <div class="metric-val pos">76%</div>
+      <div class="metric-delta">↑ +2pp</div>
+    </div>
+    <div>
+      <div class="metric-val pos">49%</div>
+      <div class="metric-delta">— no change</div>
+    </div>
+    <div>
+      <div class="last-run">Jun 15, 2026</div>
+      <div class="run-pill pill-ok"><span class="pill-dot"></span>CURRENT</div>
+    </div>
+    <div>
+      <div class="report-link">VIEW ↗</div>
+    </div>
+  </div>
+
+  <!-- Row 5 — stale -->
+  <div class="client-row">
+    <div>
+      <div class="client-name">Verdana Health</div>
+      <div class="client-domain">verdanahealth.com</div>
+    </div>
+    <div>
+      <div class="metric-val" style="color:var(--faint);">—</div>
+      <div class="metric-delta">no data</div>
+    </div>
+    <div>
+      <div class="metric-val" style="color:var(--faint);">—</div>
+      <div class="metric-delta">no data</div>
+    </div>
+    <div>
+      <div class="last-run" style="color:var(--faint);">Jun 1, 2026</div>
+      <div class="run-pill pill-stale"><span class="pill-dot"></span>STALE</div>
+    </div>
+    <div>
+      <div class="report-link">VIEW ↗</div>
+    </div>
+  </div>
+
+  <!-- Row 6 — no report yet -->
+  <div class="client-row">
+    <div>
+      <div class="client-name">Quorum Analytics</div>
+      <div class="client-domain">quorumanalytics.io</div>
+    </div>
+    <div>
+      <div class="metric-val pos">91%</div>
+      <div class="metric-delta">↑ +11pp</div>
+    </div>
+    <div>
+      <div class="metric-val pos">63%</div>
+      <div class="metric-delta">↑ +5pp</div>
+    </div>
+    <div>
+      <div class="last-run">Jun 15, 2026</div>
+      <div class="run-pill pill-ok"><span class="pill-dot"></span>CURRENT</div>
+    </div>
+    <div>
+      <div class="no-report">no report yet</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 10);
+  });
+</script>
+
+</body>
+</html>

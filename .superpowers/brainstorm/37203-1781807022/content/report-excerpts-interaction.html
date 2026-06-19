@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Response Excerpts — Interaction Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,300;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0e0e0f;
+    --paper: #f1ede4;
+    --paper-ink: #17150f;
+    --p-mute: rgba(23,21,15,0.55);
+    --p-faint: rgba(23,21,15,0.35);
+    --p-ghost: rgba(23,21,15,0.12);
+    --p-hair: rgba(23,21,15,0.09);
+    --pos-paper: #2d7a52;
+    --neg-paper: #b03a3a;
+    --serif: 'Newsreader', serif;
+    --sans: 'Schibsted Grotesk', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --display: 'Cormorant Garamond', serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0b;
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    padding: 40px 24px 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .page-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: rgba(245,244,241,0.25);
+    margin-bottom: 20px;
+    align-self: flex-start;
+    max-width: 700px;
+    width: 100%;
+  }
+
+  /* Paper document */
+  .paper {
+    background: var(--paper);
+    color: var(--paper-ink);
+    width: 100%;
+    max-width: 700px;
+    padding: 56px 64px;
+    font-family: var(--display);
+    box-shadow: 0 12px 60px rgba(0,0,0,0.5);
+  }
+
+  .rp-eyebrow {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    color: var(--p-mute);
+    margin-bottom: 14px;
+  }
+  .rp-title {
+    font-family: var(--display);
+    font-size: 64px;
+    font-weight: 300;
+    line-height: 0.96;
+    letter-spacing: -0.015em;
+    margin-bottom: 12px;
+  }
+  .rp-date {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 18px;
+    color: var(--p-mute);
+  }
+  .rp-divider { height: 1px; background: var(--p-hair); margin: 28px 0; }
+
+  .rp-section {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    color: var(--p-mute);
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--p-hair);
+    margin-bottom: 20px;
+    margin-top: 36px;
+    text-transform: uppercase;
+  }
+
+  /* ── Query result rows ── */
+  .query-block {
+    border-bottom: 1px solid var(--p-hair);
+    padding: 18px 0;
+  }
+  .query-block:last-child { border-bottom: none; }
+
+  .query-text {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 16px;
+    color: var(--paper-ink);
+    margin-bottom: 14px;
+    line-height: 1.4;
+  }
+
+  /* Engine result rows */
+  .engine-rows { display: flex; flex-direction: column; gap: 10px; }
+
+  .engine-row {
+    display: grid;
+    grid-template-columns: 88px 72px 1fr;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .engine-name {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--p-faint);
+    padding-top: 2px;
+  }
+
+  .result-badge {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    padding: 3px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+    align-self: flex-start;
+    margin-top: 1px;
+  }
+  .badge-cited { background: rgba(45,122,82,0.12); color: var(--pos-paper); border: 1px solid rgba(45,122,82,0.25); }
+  .badge-mentioned { background: rgba(23,21,15,0.06); color: var(--p-mute); border: 1px solid var(--p-ghost); }
+  .badge-none { color: var(--p-faint); border: 1px solid transparent; font-size: 8px; opacity: 0.5; }
+
+  /* Excerpt area */
+  .excerpt-wrap { flex: 1; }
+
+  .excerpt-preview {
+    font-family: var(--serif);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--p-mute);
+    font-style: italic;
+  }
+
+  .excerpt-preview mark {
+    background: transparent;
+    color: var(--paper-ink);
+    font-weight: 400;
+    font-style: normal;
+    border-bottom: 1px solid rgba(23,21,15,0.3);
+    padding-bottom: 1px;
+  }
+
+  .expand-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 5px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--p-faint);
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+    transition: color 0.2s;
+  }
+  .expand-btn:hover { color: var(--paper-ink); }
+  .expand-btn .dots { letter-spacing: 0.2em; }
+
+  /* Full excerpt (hidden by default) */
+  .excerpt-full {
+    display: none;
+    margin-top: 10px;
+    padding: 14px 16px;
+    background: rgba(23,21,15,0.04);
+    border-left: 2px solid rgba(23,21,15,0.15);
+    font-family: var(--serif);
+    font-size: 13px;
+    line-height: 1.75;
+    color: rgba(23,21,15,0.72);
+    font-style: italic;
+  }
+  .excerpt-full mark {
+    background: rgba(45,122,82,0.12);
+    color: var(--pos-paper);
+    font-style: normal;
+    padding: 0 2px;
+    border-radius: 1px;
+  }
+  .excerpt-full.open {
+    display: block;
+    animation: revealExcerpt 0.22s cubic-bezier(.2,.7,.2,1);
+  }
+  @keyframes revealExcerpt {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .collapse-btn {
+    display: none;
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--p-faint);
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+    transition: color 0.2s;
+  }
+  .collapse-btn:hover { color: var(--paper-ink); }
+  .collapse-btn.show { display: inline-block; }
+
+  /* URL chip */
+  .url-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: var(--pos-paper);
+    opacity: 0.7;
+  }
+
+  /* No result row */
+  .no-result {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--p-faint);
+    opacity: 0.5;
+    padding-top: 2px;
+  }
+
+  /* KPI strip at top for context */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--p-hair);
+    border: 1px solid var(--p-hair);
+    margin-bottom: 0;
+  }
+  .kpi-cell { background: var(--paper); padding: 14px 18px; }
+  .kpi-num { font-family: var(--display); font-weight: 300; font-size: 44px; line-height: 1; margin-bottom: 5px; }
+  .kpi-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: 0.14em; color: var(--p-faint); }
+  .kpi-delta { font-family: var(--mono); font-size: 8px; color: var(--p-faint); margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<div class="page-label">REPORT VIEW — AI RESPONSE EXCERPTS INTERACTION · Click ··· to expand any excerpt</div>
+
+<div class="paper">
+
+  <div class="rp-eyebrow">GEO &middot; WEEKLY PERFORMANCE REPORT</div>
+  <div class="rp-title">ChildSpot</div>
+  <div class="rp-date">Week of Jun 9–15, 2026</div>
+  <div class="rp-divider"></div>
+
+  <!-- KPI section for context -->
+  <div class="rp-section">AI Visibility</div>
+  <div class="kpi-strip">
+    <div class="kpi-cell">
+      <div class="kpi-num" style="color:var(--pos-paper);">68%</div>
+      <div class="kpi-lbl">MENTION RATE</div>
+      <div class="kpi-delta">↑ +4pp vs last week</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-num" style="color:var(--pos-paper);">41%</div>
+      <div class="kpi-lbl">CITATION RATE</div>
+      <div class="kpi-delta">↑ +2pp vs last week</div>
+    </div>
+  </div>
+
+  <!-- Query Results with Excerpts -->
+  <div class="rp-section">Query Results &amp; AI Excerpts</div>
+
+  <!-- Query 1 -->
+  <div class="query-block">
+    <div class="query-text">"best daycare app Canada"</div>
+    <div class="engine-rows">
+
+      <div class="engine-row">
+        <span class="engine-name">ChatGPT</span>
+        <span class="result-badge badge-cited">CITED</span>
+        <div class="excerpt-wrap">
+          <div class="excerpt-preview">
+            "…the most parent-friendly option is <mark>ChildSpot</mark>, which offers real-time…"
+          </div>
+          <button class="expand-btn" onclick="expand(this)">
+            <span class="dots">···</span> read full response
+          </button>
+          <div class="excerpt-full">
+            "When it comes to daycare management in Canada, the most parent-friendly option is <mark>ChildSpot</mark>, which offers real-time check-in notifications, bilingual support, and seamless integration with provincial subsidy programs. Parents consistently rate it above alternatives for its clean interface and responsive customer support."
+          </div>
+          <button class="collapse-btn" onclick="collapse(this)">↑ collapse</button>
+          <div class="url-chip">↗ childspot.com/features</div>
+        </div>
+      </div>
+
+      <div class="engine-row">
+        <span class="engine-name">Perplexity</span>
+        <span class="result-badge badge-cited">CITED</span>
+        <div class="excerpt-wrap">
+          <div class="excerpt-preview">
+            "…<mark>ChildSpot</mark> is frequently recommended by Canadian childcare providers for its…"
+          </div>
+          <button class="expand-btn" onclick="expand(this)">
+            <span class="dots">···</span> read full response
+          </button>
+          <div class="excerpt-full">
+            "<mark>ChildSpot</mark> is frequently recommended by Canadian childcare providers for its compliance with provincial reporting requirements and its parent communication tools. Several daycare associations in Ontario and BC list it as a preferred platform. [Source: childspot.com]"
+          </div>
+          <button class="collapse-btn" onclick="collapse(this)">↑ collapse</button>
+          <div class="url-chip">↗ childspot.com</div>
+        </div>
+      </div>
+
+      <div class="engine-row">
+        <span class="engine-name">Claude</span>
+        <span class="result-badge badge-none">—</span>
+        <div class="no-result">not mentioned in this response</div>
+      </div>
+
+      <div class="engine-row">
+        <span class="engine-name">Gemini</span>
+        <span class="result-badge badge-mentioned">MENTIONED</span>
+        <div class="excerpt-wrap">
+          <div class="excerpt-preview">
+            "…options include <mark>ChildSpot</mark>, HiMama, and Brightwheel, each offering…"
+          </div>
+          <button class="expand-btn" onclick="expand(this)">
+            <span class="dots">···</span> read full response
+          </button>
+          <div class="excerpt-full">
+            "Popular daycare management apps available in Canada include <mark>ChildSpot</mark>, HiMama, and Brightwheel, each offering digital attendance tracking and parent communication features. Pricing varies from free tiers to $150/month depending on centre size."
+          </div>
+          <button class="collapse-btn" onclick="collapse(this)">↑ collapse</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Query 2 -->
+  <div class="query-block">
+    <div class="query-text">"childcare management software with parent app"</div>
+    <div class="engine-rows">
+
+      <div class="engine-row">
+        <span class="engine-name">ChatGPT</span>
+        <span class="result-badge badge-mentioned">MENTIONED</span>
+        <div class="excerpt-wrap">
+          <div class="excerpt-preview">
+            "…<mark>ChildSpot</mark> and HiMama both offer dedicated parent-facing mobile apps with…"
+          </div>
+          <button class="expand-btn" onclick="expand(this)">
+            <span class="dots">···</span> read full response
+          </button>
+          <div class="excerpt-full">
+            "For centres prioritizing parent engagement, <mark>ChildSpot</mark> and HiMama both offer dedicated parent-facing mobile apps with real-time photo sharing, daily reports, and billing integration. ChildSpot is noted for its particularly clean UX and strong onboarding support."
+          </div>
+          <button class="collapse-btn" onclick="collapse(this)">↑ collapse</button>
+        </div>
+      </div>
+
+      <div class="engine-row">
+        <span class="engine-name">Perplexity</span>
+        <span class="result-badge badge-none">—</span>
+        <div class="no-result">not mentioned in this response</div>
+      </div>
+
+      <div class="engine-row">
+        <span class="engine-name">Claude</span>
+        <span class="result-badge badge-cited">CITED</span>
+        <div class="excerpt-wrap">
+          <div class="excerpt-preview">
+            "…<mark>ChildSpot</mark> stands out for its bilingual parent app and provincial subsidy…"
+          </div>
+          <button class="expand-btn" onclick="expand(this)">
+            <span class="dots">···</span> read full response
+          </button>
+          <div class="excerpt-full">
+            "Among Canadian-specific options, <mark>ChildSpot</mark> stands out for its bilingual parent app and provincial subsidy tracking, which is a significant differentiator in markets like Quebec and Ontario where subsidy programs are complex. [childspot.com/features]"
+          </div>
+          <button class="collapse-btn" onclick="collapse(this)">↑ collapse</button>
+          <div class="url-chip">↗ childspot.com/features</div>
+        </div>
+      </div>
+
+      <div class="engine-row">
+        <span class="engine-name">Gemini</span>
+        <span class="result-badge badge-none">—</span>
+        <div class="no-result">not mentioned in this response</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Query 3 — no mentions -->
+  <div class="query-block">
+    <div class="query-text">"childcare app cost Canada"</div>
+    <div class="engine-rows">
+      <div class="engine-row">
+        <span class="engine-name">ChatGPT</span>
+        <span class="result-badge badge-none">—</span>
+        <div class="no-result">not mentioned in this response</div>
+      </div>
+      <div class="engine-row">
+        <span class="engine-name">Perplexity</span>
+        <span class="result-badge badge-none">—</span>
+        <div class="no-result">not mentioned in this response</div>
+      </div>
+      <div class="engine-row">
+        <span class="engine-name">Claude</span>
+        <span class="result-badge badge-none">—</span>
+        <div class="no-result">not mentioned in this response</div>
+      </div>
+      <div class="engine-row">
+        <span class="engine-name">Gemini</span>
+        <span class="result-badge badge-none">—</span>
+        <div class="no-result">not mentioned in this response</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function expand(btn) {
+    const wrap = btn.closest('.excerpt-wrap');
+    wrap.querySelector('.excerpt-full').classList.add('open');
+    wrap.querySelector('.collapse-btn').classList.add('show');
+    btn.style.display = 'none';
+  }
+  function collapse(btn) {
+    const wrap = btn.closest('.excerpt-wrap');
+    wrap.querySelector('.excerpt-full').classList.remove('open');
+    btn.classList.remove('show');
+    wrap.querySelector('.expand-btn').style.display = '';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<h2>How the breadcrumb + anchor bar work</h2>
+<p class="subtitle">Two distinct strips — one for navigation up the hierarchy, one for jumping within a page.</p>
+
+<div style="margin-top:32px;display:flex;flex-direction:column;gap:32px;">
+
+  <!-- STRIP 1: BREADCRUMB -->
+  <div>
+    <div class="label" style="margin-bottom:14px;letter-spacing:0.16em;">Strip 1 — Breadcrumb (back-navigation)</div>
+    <div style="border:1px solid rgba(245,244,241,0.13);border-radius:4px;overflow:hidden;">
+      <div style="background:rgba(14,14,15,0.9);padding:12px 20px;border-bottom:1px solid rgba(245,244,241,0.11);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-family:serif;font-size:14px;">Victory Velocity <span style="font-family:monospace;font-size:9px;border:1px solid rgba(245,244,241,0.2);padding:2px 5px;margin-left:6px;opacity:0.6;">ADMIN</span></span>
+        <div style="display:flex;gap:20px;font-family:sans-serif;font-size:11px;">
+          <span style="color:#f5f4f1;">Clients</span>
+          <span style="opacity:0.4;">Sign Out</span>
+        </div>
+      </div>
+      <!-- Breadcrumb strip -->
+      <div style="background:#0e0e0f;padding:10px 20px;border-bottom:1px solid rgba(245,244,241,0.08);font-family:monospace;font-size:9px;letter-spacing:0.12em;display:flex;align-items:center;gap:8px;">
+        <a style="color:rgba(245,244,241,0.45);text-decoration:underline;text-underline-offset:3px;cursor:pointer;" title="→ /admin">CLIENTS</a>
+        <span style="opacity:0.2;">/</span>
+        <a style="color:rgba(245,244,241,0.45);text-decoration:underline;text-underline-offset:3px;cursor:pointer;" title="→ /admin/clients/id">CHILDSPOT</a>
+        <span style="opacity:0.2;">/</span>
+        <span style="color:#f5f4f1;">REPORTS</span>
+        <span style="margin-left:4px;opacity:0.25;font-size:8px;">(current page — not a link)</span>
+      </div>
+      <div style="background:#0e0e0f;padding:16px 20px;">
+        <div style="font-size:11px;opacity:0.4;font-family:monospace;">CLIENTS and CHILDSPOT are clickable links. REPORTS is just a label — it tells you where you are.</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;font-size:13px;opacity:0.65;line-height:1.6;">
+      <strong>Clickable items:</strong> CLIENTS → takes you back to <code>/admin</code>. &nbsp; CHILDSPOT → takes you back to <code>/admin/clients/[id]</code>.<br>
+      <strong>Current item:</strong> The last crumb (REPORTS) is just a label — not a link. It shows where you are.
+    </div>
+  </div>
+
+  <!-- STRIP 2: ANCHOR BAR -->
+  <div>
+    <div class="label" style="margin-bottom:14px;letter-spacing:0.16em;">Strip 2 — Anchor bar (in-page jump, client detail only)</div>
+    <div style="border:1px solid rgba(245,244,241,0.13);border-radius:4px;overflow:hidden;">
+      <div style="background:rgba(14,14,15,0.9);padding:12px 20px;border-bottom:1px solid rgba(245,244,241,0.11);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-family:serif;font-size:14px;">Victory Velocity <span style="font-family:monospace;font-size:9px;border:1px solid rgba(245,244,241,0.2);padding:2px 5px;margin-left:6px;opacity:0.6;">ADMIN</span></span>
+        <div style="display:flex;gap:20px;font-family:sans-serif;font-size:11px;">
+          <span style="color:#f5f4f1;">Clients</span>
+          <span style="opacity:0.4;">Sign Out</span>
+        </div>
+      </div>
+      <!-- Breadcrumb -->
+      <div style="background:#0e0e0f;padding:10px 20px;border-bottom:1px solid rgba(245,244,241,0.08);font-family:monospace;font-size:9px;letter-spacing:0.12em;display:flex;align-items:center;gap:8px;">
+        <a style="color:rgba(245,244,241,0.45);text-decoration:underline;text-underline-offset:3px;" >CLIENTS</a>
+        <span style="opacity:0.2;">/</span>
+        <span style="color:#f5f4f1;">CHILDSPOT</span>
+      </div>
+      <!-- Anchor bar — only appears on client detail -->
+      <div style="background:rgba(10,10,11,0.97);padding:0 20px;border-bottom:1px solid rgba(245,244,241,0.08);display:flex;gap:0;">
+        <div style="font-family:monospace;font-size:8px;letter-spacing:0.12em;padding:9px 14px;opacity:0.35;cursor:pointer;">CONFIG</div>
+        <div style="font-family:monospace;font-size:8px;letter-spacing:0.12em;padding:9px 14px;opacity:0.35;cursor:pointer;">USERS</div>
+        <div style="font-family:monospace;font-size:8px;letter-spacing:0.12em;padding:9px 14px;border-bottom:1px solid #f5f4f1;color:#f5f4f1;cursor:pointer;">RUNS</div>
+        <div style="font-family:monospace;font-size:8px;letter-spacing:0.12em;padding:9px 14px;opacity:0.35;cursor:pointer;">REPORTS</div>
+      </div>
+      <div style="background:#0e0e0f;padding:16px 20px;">
+        <div style="font-size:11px;opacity:0.4;font-family:monospace;">All four items are clickable — they scroll you to that section on the same page. RUNS is highlighted because it's in view.</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;font-size:13px;opacity:0.65;line-height:1.6;">
+      <strong>All four clickable:</strong> CONFIG, USERS, RUNS, REPORTS are anchor links — clicking one smooth-scrolls you to that section below.<br>
+      <strong>Active highlight:</strong> Whichever section is currently in the viewport gets the white underline. Updates as you scroll.<br>
+      <strong>Only on client detail:</strong> This bar only appears on <code>/admin/clients/[id]</code> — not on the clients list or report editor.
+    </div>
+  </div>
+
+  <!-- WHERE EACH STRIP APPEARS -->
+  <div style="padding:20px;border:1px solid rgba(245,244,241,0.08);border-radius:4px;">
+    <div class="label" style="margin-bottom:14px;letter-spacing:0.14em;">Where each strip appears</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:12px;">
+      <div style="padding:14px;border:1px solid rgba(245,244,241,0.07);border-radius:3px;">
+        <div style="font-family:monospace;font-size:9px;letter-spacing:0.12em;opacity:0.4;margin-bottom:8px;">/admin</div>
+        <div>No breadcrumb<br><span style="opacity:0.4">Top level</span></div>
+        <div style="margin-top:6px;">No anchor bar</div>
+      </div>
+      <div style="padding:14px;border:1px solid rgba(245,244,241,0.07);border-radius:3px;">
+        <div style="font-family:monospace;font-size:9px;letter-spacing:0.12em;opacity:0.4;margin-bottom:8px;">/admin/clients/[id]</div>
+        <div>Breadcrumb: <strong>CLIENTS /</strong> ChildSpot</div>
+        <div style="margin-top:6px;">Anchor bar: CONFIG · USERS · RUNS · REPORTS</div>
+      </div>
+      <div style="padding:14px;border:1px solid rgba(245,244,241,0.07);border-radius:3px;">
+        <div style="font-family:monospace;font-size:9px;letter-spacing:0.12em;opacity:0.4;margin-bottom:8px;">/admin/reports/[id]</div>
+        <div>Breadcrumb: <strong>CLIENTS /</strong> ChildSpot / <strong>REPORTS</strong></div>
+        <div style="margin-top:6px;">No anchor bar</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:28px;font-size:13px;">Does this make sense? Let me know in the terminal and we'll move to the next question — the admin clients list layout.</p>

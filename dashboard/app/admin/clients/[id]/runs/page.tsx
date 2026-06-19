@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { TriggerRunButton } from "@/components/admin/TriggerRunButton";
 import { scoreColor, formatRate } from "@/lib/utils";
@@ -10,7 +10,7 @@ export default async function RunsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const [{ data: clientData }, { data: runs }, { data: reports }] = await Promise.all([
     supabase.from("clients").select("name, target_queries").eq("id", id).single(),

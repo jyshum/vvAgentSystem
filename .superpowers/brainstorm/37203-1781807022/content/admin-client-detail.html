@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VV Admin — ChildSpot</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0e0e0f;
+    --white: #f5f4f1;
+    --mute: rgba(245,244,241,0.5);
+    --faint: rgba(245,244,241,0.3);
+    --ghost: rgba(245,244,241,0.15);
+    --hair: rgba(245,244,241,0.08);
+    --pos: #84d8ab;
+    --neg: #e89aa0;
+    --serif: 'Newsreader', Georgia, serif;
+    --sans: 'Schibsted Grotesk', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --display: 'Cormorant Garamond', serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--ink);
+    color: var(--white);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* ── Top nav ── */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    height: 78px;
+    padding: 0 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(14,14,15,0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--hair);
+  }
+  .nav-logo { font-family: var(--display); font-size: 22px; font-weight: 400; color: var(--white); }
+  .nav-logo em { font-style: italic; color: var(--mute); }
+  .nav-right { display: flex; align-items: center; gap: 32px; }
+  .nav-link { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; color: var(--mute); cursor: pointer; transition: color 0.2s; }
+  .nav-link:hover, .nav-link.active { color: var(--white); }
+  .nav-signout { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--faint); cursor: pointer; background: transparent; border: none; color: var(--faint); transition: color 0.2s; }
+  .nav-signout:hover { color: var(--white); }
+
+  /* ── Breadcrumb ── */
+  .breadcrumb {
+    padding: 16px 56px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    border-bottom: 1px solid var(--hair);
+  }
+  .bc-link { color: var(--faint); cursor: pointer; transition: color 0.2s; }
+  .bc-link:hover { color: var(--white); }
+  .bc-sep { color: var(--faint); opacity: 0.4; }
+  .bc-current { color: var(--mute); }
+
+  /* ── Page header ── */
+  .page-header {
+    padding: 40px 56px 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .client-title { font-family: var(--display); font-size: 52px; font-weight: 300; line-height: 0.95; }
+  .client-domain { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--faint); margin-top: 8px; }
+  .header-meta { text-align: right; }
+  .run-btn {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    padding: 11px 22px; border: 1px solid var(--ghost); background: transparent;
+    color: var(--white); cursor: pointer; transition: all 0.25s; display: block; margin-bottom: 10px;
+  }
+  .run-btn:hover { background: var(--white); border-color: var(--white); color: var(--ink); }
+  .last-run-note { font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; color: var(--faint); }
+
+  /* ── Anchor bar ── */
+  .anchor-bar {
+    position: sticky;
+    top: 78px;
+    z-index: 100;
+    padding: 0 56px;
+    background: rgba(14,14,15,0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--hair);
+    display: flex;
+    gap: 0;
+    margin-top: 32px;
+  }
+  .anchor-tab {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    padding: 14px 20px;
+    color: var(--faint);
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+    margin-bottom: -1px;
+  }
+  .anchor-tab:hover { color: var(--mute); }
+  .anchor-tab.active { color: var(--white); border-bottom-color: var(--white); }
+
+  /* ── Page body ── */
+  .page-body { padding: 0 56px 100px; max-width: 960px; }
+
+  /* ── Section ── */
+  .section { padding: 48px 0 0; }
+  .section-label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em;
+    color: var(--faint); padding-bottom: 14px; border-bottom: 1px solid var(--hair);
+    margin-bottom: 28px;
+  }
+
+  /* ── CONFIG ── */
+  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .field-group { display: flex; flex-direction: column; gap: 6px; }
+  .field-label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.14em; color: var(--faint); }
+  .field-val {
+    font-family: var(--serif); font-size: 15px; color: var(--white);
+    background: rgba(245,244,241,0.04); border: 1px solid var(--hair);
+    padding: 10px 14px; line-height: 1.4;
+  }
+  .field-val.mono { font-family: var(--mono); font-size: 12px; }
+  .field-val.multiline { min-height: 80px; font-size: 13px; }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+  .tag {
+    font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em;
+    padding: 4px 9px; border: 1px solid var(--ghost); color: var(--mute);
+  }
+  .config-full { grid-column: 1 / -1; }
+  .save-btn {
+    margin-top: 24px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    padding: 11px 22px; border: 1px solid var(--ghost); background: transparent;
+    color: var(--white); cursor: pointer; transition: all 0.25s;
+  }
+  .save-btn:hover { background: var(--white); border-color: var(--white); color: var(--ink); }
+
+  /* ── USERS ── */
+  .users-table { width: 100%; }
+  .users-head { display: grid; grid-template-columns: 2fr 1.5fr 1fr 80px; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--hair); margin-bottom: 4px; }
+  .users-row { display: grid; grid-template-columns: 2fr 1.5fr 1fr 80px; gap: 16px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--hair); transition: background 0.2s, padding-left 0.2s cubic-bezier(.2,.8,.2,1); cursor: default; }
+  .users-row:hover { padding-left: 10px; background: rgba(245,244,241,0.02); }
+  .user-name { font-family: var(--serif); font-size: 16px; }
+  .user-email { font-family: var(--mono); font-size: 9px; color: var(--faint); margin-top: 2px; }
+  .user-role { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--mute); }
+  .user-joined { font-family: var(--mono); font-size: 9px; color: var(--faint); }
+  .remove-btn { font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; color: var(--faint); border: 1px solid var(--hair); padding: 5px 10px; cursor: pointer; background: transparent; transition: all 0.2s; }
+  .remove-btn:hover { color: var(--neg); border-color: rgba(232,154,160,0.3); }
+  .invite-row { display: flex; gap: 10px; margin-top: 20px; }
+  .invite-input {
+    flex: 1; font-family: var(--mono); font-size: 12px; letter-spacing: 0.05em;
+    background: rgba(245,244,241,0.04); border: 1px solid var(--hair);
+    color: var(--white); padding: 10px 14px;
+  }
+  .invite-input::placeholder { color: var(--faint); }
+  .invite-btn { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; padding: 10px 20px; border: 1px solid var(--ghost); background: transparent; color: var(--white); cursor: pointer; transition: all 0.25s; white-space: nowrap; }
+  .invite-btn:hover { background: var(--white); border-color: var(--white); color: var(--ink); }
+
+  /* ── RUNS ── */
+  .runs-list { display: flex; flex-direction: column; gap: 0; }
+  .run-row { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 90px; gap: 16px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--hair); transition: padding-left 0.2s cubic-bezier(.2,.8,.2,1), background 0.2s; cursor: default; }
+  .run-row:hover { padding-left: 10px; background: rgba(245,244,241,0.02); }
+  .run-date { font-family: var(--serif); font-size: 15px; }
+  .run-date-sub { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 2px; }
+  .run-metric { font-family: var(--display); font-weight: 300; font-size: 22px; line-height: 1; }
+  .run-metric-sub { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 3px; }
+  .run-status { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; padding: 3px 8px; border-radius: 2px; }
+  .status-ok { background: rgba(132,216,171,0.1); color: var(--pos); border: 1px solid rgba(132,216,171,0.2); }
+  .status-err { background: rgba(232,154,160,0.08); color: var(--neg); border: 1px solid rgba(232,154,160,0.18); }
+  .status-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+  .run-queries { font-family: var(--mono); font-size: 10px; color: var(--mute); }
+
+  /* ── REPORTS ── */
+  .reports-list { display: flex; flex-direction: column; gap: 0; }
+  .report-row { display: grid; grid-template-columns: 1.5fr 1fr 1fr 110px; gap: 16px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--hair); transition: padding-left 0.2s cubic-bezier(.2,.8,.2,1), background 0.2s; cursor: pointer; }
+  .report-row:hover { padding-left: 10px; background: rgba(245,244,241,0.02); }
+  .report-week { font-family: var(--serif); font-size: 16px; }
+  .report-week-sub { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 2px; }
+  .report-rate { font-family: var(--display); font-weight: 300; font-size: 22px; line-height: 1; }
+  .report-rate-sub { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 3px; }
+  .report-pub { font-family: var(--mono); font-size: 9px; color: var(--mute); }
+  .report-actions { display: flex; gap: 6px; }
+  .rpt-btn { font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em; padding: 6px 10px; border: 1px solid var(--hair); background: transparent; color: var(--faint); cursor: pointer; transition: all 0.2s; }
+  .rpt-btn:hover { color: var(--white); border-color: var(--ghost); }
+  .new-report-btn { margin-top: 24px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; padding: 11px 22px; border: 1px solid var(--ghost); background: transparent; color: var(--white); cursor: pointer; transition: all 0.25s; }
+  .new-report-btn:hover { background: var(--white); border-color: var(--white); color: var(--ink); }
+</style>
+</head>
+<body>
+
+<!-- Top nav -->
+<nav>
+  <div class="nav-logo">Victory<em>Velocity</em></div>
+  <div class="nav-right">
+    <span class="nav-link active">CLIENTS</span>
+    <button class="nav-signout">SIGN OUT</button>
+  </div>
+</nav>
+
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+  <span class="bc-link">CLIENTS</span>
+  <span class="bc-sep">/</span>
+  <span class="bc-current">CHILDSPOT</span>
+</div>
+
+<!-- Page header -->
+<div class="page-header">
+  <div>
+    <div class="client-title">ChildSpot</div>
+    <div class="client-domain">childspot.com</div>
+  </div>
+  <div class="header-meta">
+    <button class="run-btn">▷ RUN TRACKER NOW</button>
+    <div class="last-run-note">Last run: Jun 15, 2026 · 20 queries</div>
+  </div>
+</div>
+
+<!-- Anchor bar -->
+<div class="anchor-bar" id="anchor-bar">
+  <div class="anchor-tab active" onclick="scrollTo('config', this)">CONFIG</div>
+  <div class="anchor-tab" onclick="scrollTo('users', this)">USERS</div>
+  <div class="anchor-tab" onclick="scrollTo('runs', this)">RUNS</div>
+  <div class="anchor-tab" onclick="scrollTo('reports', this)">REPORTS</div>
+</div>
+
+<div class="page-body">
+
+  <!-- CONFIG -->
+  <div class="section" id="config">
+    <div class="section-label">CONFIG</div>
+    <div class="config-grid">
+      <div class="field-group">
+        <div class="field-label">CLIENT NAME</div>
+        <div class="field-val">ChildSpot</div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">DOMAIN</div>
+        <div class="field-val mono">childspot.com</div>
+      </div>
+      <div class="field-group config-full">
+        <div class="field-label">TRACKED QUERIES</div>
+        <div class="tag-list">
+          <span class="tag">best daycare app canada</span>
+          <span class="tag">childcare management software with parent app</span>
+          <span class="tag">daycare software for small childcare centres</span>
+          <span class="tag">how to get parents to use childcare app</span>
+          <span class="tag">childcare app cost canada</span>
+          <span class="tag">ontario subsidy childcare tracking</span>
+          <span class="tag">bilingual daycare app</span>
+          <span class="tag">childcare centre billing software</span>
+        </div>
+      </div>
+      <div class="field-group config-full">
+        <div class="field-label">COMPETITORS</div>
+        <div class="tag-list">
+          <span class="tag">daycare.com</span>
+          <span class="tag">himama.com</span>
+          <span class="tag">kidgenius.ca</span>
+          <span class="tag">getbrightwheel.com</span>
+        </div>
+      </div>
+      <div class="field-group config-full">
+        <div class="field-label">BRAND ALIASES (for mention detection)</div>
+        <div class="tag-list">
+          <span class="tag">ChildSpot</span>
+          <span class="tag">child spot</span>
+          <span class="tag">childspot.com</span>
+        </div>
+      </div>
+      <div class="field-group config-full">
+        <div class="field-label">NOTES (internal)</div>
+        <div class="field-val multiline">Client is focused on growing citation rate on Perplexity and Claude. Pricing page gap identified Jun 2026 — content deliverable in progress.</div>
+      </div>
+    </div>
+    <button class="save-btn">SAVE CHANGES</button>
+  </div>
+
+  <!-- USERS -->
+  <div class="section" id="users">
+    <div class="section-label">USERS</div>
+    <div class="users-table">
+      <div class="users-head">
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">NAME</div>
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">EMAIL</div>
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">ROLE</div>
+        <div></div>
+      </div>
+      <div class="users-row">
+        <div>
+          <div class="user-name">Sarah Okafor</div>
+        </div>
+        <div><div class="user-email">sarah@childspot.com</div></div>
+        <div><div class="user-role">ADMIN</div></div>
+        <div><button class="remove-btn">REMOVE</button></div>
+      </div>
+      <div class="users-row">
+        <div>
+          <div class="user-name">Marcus Tran</div>
+        </div>
+        <div><div class="user-email">marcus@childspot.com</div></div>
+        <div><div class="user-role">VIEWER</div></div>
+        <div><button class="remove-btn">REMOVE</button></div>
+      </div>
+    </div>
+    <div class="invite-row">
+      <input class="invite-input" type="text" placeholder="email@client.com">
+      <button class="invite-btn">+ INVITE USER</button>
+    </div>
+  </div>
+
+  <!-- RUNS -->
+  <div class="section" id="runs">
+    <div class="section-label">RUN HISTORY</div>
+    <div class="runs-list">
+      <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 90px;gap:16px;padding-bottom:10px;border-bottom:1px solid var(--hair);margin-bottom:4px;">
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">DATE</div>
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">MENTION</div>
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">CITATION</div>
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">QUERIES</div>
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">STATUS</div>
+      </div>
+      <div class="run-row">
+        <div><div class="run-date">Jun 15, 2026</div><div class="run-date-sub">11:02 AM</div></div>
+        <div><div class="run-metric pos">68%</div><div class="run-metric-sub">↑ +4pp</div></div>
+        <div><div class="run-metric pos">41%</div><div class="run-metric-sub">↑ +2pp</div></div>
+        <div><div class="run-queries">20 / 20</div></div>
+        <div><span class="run-status status-ok"><span class="status-dot"></span>OK</span></div>
+      </div>
+      <div class="run-row">
+        <div><div class="run-date">Jun 8, 2026</div><div class="run-date-sub">10:55 AM</div></div>
+        <div><div class="run-metric pos">64%</div><div class="run-metric-sub">↑ +2pp</div></div>
+        <div><div class="run-metric pos">39%</div><div class="run-metric-sub">— no change</div></div>
+        <div><div class="run-queries">20 / 20</div></div>
+        <div><span class="run-status status-ok"><span class="status-dot"></span>OK</span></div>
+      </div>
+      <div class="run-row">
+        <div><div class="run-date">Jun 1, 2026</div><div class="run-date-sub">11:14 AM</div></div>
+        <div><div class="run-metric" style="color:var(--mute);">62%</div><div class="run-metric-sub">↑ +1pp</div></div>
+        <div><div class="run-metric" style="color:var(--mute);">39%</div><div class="run-metric-sub">↑ +3pp</div></div>
+        <div><div class="run-queries">19 / 20</div></div>
+        <div><span class="run-status status-ok"><span class="status-dot"></span>OK</span></div>
+      </div>
+      <div class="run-row">
+        <div><div class="run-date">May 25, 2026</div><div class="run-date-sub">10:41 AM</div></div>
+        <div><div class="run-metric" style="color:var(--mute);">61%</div><div class="run-metric-sub">↓ −2pp</div></div>
+        <div><div class="run-metric" style="color:var(--mute);">36%</div><div class="run-metric-sub">↓ −2pp</div></div>
+        <div><div class="run-queries">20 / 20</div></div>
+        <div><span class="run-status status-ok"><span class="status-dot"></span>OK</span></div>
+      </div>
+      <div class="run-row">
+        <div><div class="run-date">May 18, 2026</div><div class="run-date-sub">9:08 AM</div></div>
+        <div><div class="run-metric" style="color:var(--faint);">—</div></div>
+        <div><div class="run-metric" style="color:var(--faint);">—</div></div>
+        <div><div class="run-queries" style="color:var(--faint);">8 / 20</div></div>
+        <div><span class="run-status status-err"><span class="status-dot"></span>ERROR</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="section" id="reports">
+    <div class="section-label">REPORTS</div>
+    <div class="reports-list">
+      <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 110px;gap:16px;padding-bottom:10px;border-bottom:1px solid var(--hair);margin-bottom:4px;">
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">WEEK</div>
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">MENTION</div>
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">CITATION</div>
+        <div style="font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--faint);">ACTIONS</div>
+      </div>
+      <div class="report-row">
+        <div><div class="report-week">Jun 9–15, 2026</div><div class="report-week-sub">Published · Sent to client</div></div>
+        <div><div class="report-rate pos">68%</div><div class="report-rate-sub">↑ +4pp</div></div>
+        <div><div class="report-rate pos">41%</div><div class="report-rate-sub">↑ +2pp</div></div>
+        <div class="report-actions"><button class="rpt-btn">EDIT</button><button class="rpt-btn">VIEW ↗</button></div>
+      </div>
+      <div class="report-row">
+        <div><div class="report-week">Jun 2–8, 2026</div><div class="report-week-sub">Published · Sent to client</div></div>
+        <div><div class="report-rate" style="color:var(--mute);">64%</div><div class="report-rate-sub">↑ +2pp</div></div>
+        <div><div class="report-rate" style="color:var(--mute);">39%</div><div class="report-rate-sub">—</div></div>
+        <div class="report-actions"><button class="rpt-btn">EDIT</button><button class="rpt-btn">VIEW ↗</button></div>
+      </div>
+      <div class="report-row">
+        <div><div class="report-week">May 26 – Jun 1, 2026</div><div class="report-week-sub">Published · Sent to client</div></div>
+        <div><div class="report-rate" style="color:var(--mute);">62%</div><div class="report-rate-sub">↑ +1pp</div></div>
+        <div><div class="report-rate" style="color:var(--mute);">39%</div><div class="report-rate-sub">↑ +3pp</div></div>
+        <div class="report-actions"><button class="rpt-btn">EDIT</button><button class="rpt-btn">VIEW ↗</button></div>
+      </div>
+      <div class="report-row">
+        <div><div class="report-week">May 19–25, 2026</div><div class="report-week-sub">Draft</div></div>
+        <div><div class="report-rate" style="color:var(--faint);">61%</div><div class="report-rate-sub">↓ −2pp</div></div>
+        <div><div class="report-rate" style="color:var(--faint);">36%</div><div class="report-rate-sub">↓ −2pp</div></div>
+        <div class="report-actions"><button class="rpt-btn">EDIT</button><button class="rpt-btn">VIEW ↗</button></div>
+      </div>
+    </div>
+    <button class="new-report-btn">+ NEW REPORT</button>
+  </div>
+
+</div>
+
+<script>
+  // Anchor bar scroll highlight
+  const sections = ['config','users','runs','reports'];
+  const tabs = document.querySelectorAll('.anchor-tab');
+
+  function scrollTo(id, el) {
+    document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    tabs.forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  window.addEventListener('scroll', () => {
+    const offset = 160;
+    let current = sections[0];
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.getBoundingClientRect().top < offset) current = id;
+    });
+    tabs.forEach((t, i) => {
+      t.classList.toggle('active', sections[i] === current);
+    });
+  });
+</script>
+
+</body>
+</html>
