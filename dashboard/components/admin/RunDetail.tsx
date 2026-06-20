@@ -68,9 +68,12 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
   });
 
   const compCounts: Record<string, number> = {};
+  const brandNormalized = (client.brand_name || client.name).toLowerCase().replace(/\s+/g, "");
   results.forEach((r) => {
     r.competitor_mentions.forEach((c) => {
-      compCounts[c] = (compCounts[c] || 0) + 1;
+      if (c.toLowerCase().replace(/\s+/g, "") !== brandNormalized) {
+        compCounts[c] = (compCounts[c] || 0) + 1;
+      }
     });
   });
   const competitors = Object.entries(compCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
@@ -326,7 +329,7 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
                       <td colSpan={5} style={{ padding: "0 0 12px 0", background: "rgba(245,244,241,0.02)" }}>
                         <div className="flex flex-col gap-0 pt-1">
                           {qResults.map((r) => (
-                            <ExpandedEngineRow key={r.id} result={r} />
+                            <ExpandedEngineRow key={r.id} result={r} brandName={client.brand_name || client.name} />
                           ))}
                         </div>
                       </td>
@@ -345,8 +348,69 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
   );
 }
 
-function ExpandedEngineRow({ result }: { result: TrackerResult }) {
-  const PREVIEW_LEN = 340;
+function SpotlightText({
+  text,
+  brandName,
+  open,
+  onToggle,
+}: {
+  text: string;
+  brandName: string;
+  open: boolean;
+  onToggle: (e: React.MouseEvent) => void;
+}) {
+  const brandLower = brandName.toLowerCase();
+  const allLines = text.split(/\n/).filter((l) => l.trim().length > 0);
+
+  // Preview: accumulate lines until ~340 chars
+  const previewLines: string[] = [];
+  let chars = 0;
+  for (const line of allLines) {
+    previewLines.push(line);
+    chars += line.length;
+    if (chars >= 340) break;
+  }
+
+  const displayLines = open ? allLines : previewLines;
+  const hasMore = previewLines.length < allLines.length;
+
+  return (
+    <div>
+      <div className="flex flex-col gap-[3px]">
+        {displayLines.map((line, i) => {
+          const isMatch = line.toLowerCase().includes(brandLower);
+          return (
+            <div
+              key={i}
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 10,
+                lineHeight: "1.65",
+                color: isMatch ? "var(--mute)" : "rgba(245,244,241,0.16)",
+                borderLeft: `2px solid ${isMatch ? "rgba(132,216,171,0.5)" : "transparent"}`,
+                paddingLeft: 8,
+                wordBreak: "break-word",
+              }}
+            >
+              {line}
+            </div>
+          );
+        })}
+      </div>
+      {hasMore && (
+        <button
+          onClick={onToggle}
+          className="font-mono text-[8px] tracking-[0.1em] uppercase mt-2 transition-colors hover:text-white"
+          style={{ color: "var(--faint)" }}
+        >
+          {open ? "collapse" : "read full"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ExpandedEngineRow({ result, brandName }: { result: TrackerResult; brandName: string }) {
   const [open, setOpen] = useState(false);
   const hasText = result.response_text && result.response_text.length > 0;
   const showable = (result.brand_mentioned || result.brand_cited) && hasText;
@@ -378,26 +442,12 @@ function ExpandedEngineRow({ result }: { result: TrackerResult }) {
           )}
         </div>
         {showable && (
-          <div>
-            <p
-              className="font-mono text-[10px] leading-relaxed whitespace-pre-wrap break-words"
-              style={{ color: "var(--mute)" }}
-            >
-              {open
-                ? result.response_text
-                : result.response_text.slice(0, PREVIEW_LEN) +
-                  (result.response_text.length > PREVIEW_LEN ? "..." : "")}
-            </p>
-            {result.response_text.length > PREVIEW_LEN && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-                className="font-mono text-[8px] tracking-[0.1em] uppercase mt-1.5 transition-colors hover:text-white"
-                style={{ color: "var(--faint)" }}
-              >
-                {open ? "collapse" : "read full"}
-              </button>
-            )}
-          </div>
+          <SpotlightText
+            text={result.response_text}
+            brandName={brandName}
+            open={open}
+            onToggle={(e) => { e.stopPropagation(); setOpen(!open); }}
+          />
         )}
       </div>
     </div>

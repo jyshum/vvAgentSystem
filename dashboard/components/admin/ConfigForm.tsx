@@ -6,6 +6,7 @@ import { TagInput } from "./TagInput";
 import type { Client } from "@/lib/types";
 
 export function ConfigForm({ client }: { client: Client }) {
+  const [clientName, setClientName] = useState(client.name || "");
   const [brandName, setBrandName] = useState(client.brand_name || "");
   const [domain, setDomain] = useState(client.website_domain || "");
   const [variations, setVariations] = useState<string[]>(client.brand_variations || []);
@@ -20,6 +21,7 @@ export function ConfigForm({ client }: { client: Client }) {
     setSaveError(null);
     const supabase = createClient();
     const { error } = await supabase.from("clients").update({
+      name: clientName,
       brand_name: brandName,
       website_domain: domain,
       brand_variations: variations,
@@ -43,6 +45,19 @@ export function ConfigForm({ client }: { client: Client }) {
 
   return (
     <div style={{ maxWidth: 640 }}>
+      <div className="mb-6">
+        <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
+          Client Name
+        </div>
+        <input
+          className="w-full font-mono text-[13px] py-2 outline-none transition-all"
+          style={fieldBorderStyle}
+          value={clientName}
+          onChange={(e) => setClientName(e.target.value)}
+          placeholder="Internal identifier"
+        />
+      </div>
+
       <div className="mb-6">
         <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
           Brand Name

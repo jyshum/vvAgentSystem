@@ -26,7 +26,6 @@ export default async function ClientLayout({
   const tabs = [
     { label: "CONFIG", href: `/admin/clients/${id}/config` },
     { label: "RUNS", href: `/admin/clients/${id}/runs` },
-    { label: "REPORTS", href: `/admin/clients/${id}/reports` },
   ];
 
   return (

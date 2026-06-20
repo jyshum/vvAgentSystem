@@ -32,10 +32,10 @@ export function ClientRow({ client, latestRun, previousRun, latestReport }: Clie
       }}
       onClick={() => router.push(`/admin/clients/${client.id}/runs`)}
     >
-      {/* Client name + domain */}
+      {/* Brand name + domain */}
       <div className="group-hover:pl-3 transition-all duration-[200ms]" style={{ transitionTimingFunction: "cubic-bezier(.2,.8,.2,1)" }}>
         <div className="font-serif text-[18px]" style={{ color: "var(--white)" }}>
-          {client.name}
+          {client.brand_name || client.name}
         </div>
         <div className="font-mono text-[9px] tracking-[0.08em] mt-0.5" style={{ color: "var(--faint)" }}>
           {client.website_domain}
