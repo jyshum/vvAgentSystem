@@ -4,28 +4,64 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import type { TrackerResultClient } from "@/lib/types";
 
-const ENGINES = ["ChatGPT", "Perplexity", "Claude", "Gemini"];
-const DEFAULT_SHOWN = 3;
+// DB stores engine names lowercase; display labels keyed by lowercase
+const ENGINE_DISPLAY: Record<string, string> = {
+  chatgpt: "ChatGPT",
+  perplexity: "Perplexity",
+  claude: "Claude",
+  gemini: "Gemini",
+};
+const ENGINE_ORDER = ["chatgpt", "perplexity", "claude", "gemini"];
 
 interface QueryResultsTableProps {
   results: TrackerResultClient[];
+  brandName: string;
+  brandVariations: string[];
 }
 
-export function QueryResultsTable({ results }: QueryResultsTableProps) {
-  // Group results by query
+// Build all lowercase search terms from brand name + variations
+function buildBrandTerms(brandName: string, brandVariations: string[]): string[] {
+  return [brandName, ...brandVariations]
+    .filter(Boolean)
+    .map((t) => t.toLowerCase());
+}
+
+// Match line against brand terms — exact substring OR space-stripped
+function lineMatchesBrand(line: string, brandTerms: string[]): boolean {
+  const lineLower = line.toLowerCase();
+  const lineNorm = lineLower.replace(/\s+/g, "");
+  return brandTerms.some((term) => {
+    if (lineLower.includes(term)) return true;
+    const termNorm = term.replace(/\s+/g, "");
+    return termNorm.length > 2 && lineNorm.includes(termNorm);
+  });
+}
+
+// Extract only the lines/sentences that contain the brand mention
+function extractMentionLines(text: string, brandTerms: string[]): string[] {
+  return text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && lineMatchesBrand(l, brandTerms));
+}
+
+export function QueryResultsTable({ results, brandName, brandVariations }: QueryResultsTableProps) {
+  const brandTerms = buildBrandTerms(brandName, brandVariations);
+
+  // Group by query
   const queryMap = new Map<string, TrackerResultClient[]>();
   for (const r of results) {
     const existing = queryMap.get(r.query) ?? [];
     existing.push(r);
     queryMap.set(r.query, existing);
   }
-  const queries = Array.from(queryMap.entries());
-  const totalQueries = queries.length;
 
-  const [showAll, setShowAll] = useState(false);
-  const visibleQueries = showAll ? queries : queries.slice(0, DEFAULT_SHOWN);
+  // Only show queries where at least one engine mentioned or cited the brand
+  const mentionQueries = Array.from(queryMap.entries()).filter(([, engineResults]) =>
+    engineResults.some((r) => r.brand_mentioned || r.brand_cited)
+  );
 
-  if (queries.length === 0) return null;
+  if (mentionQueries.length === 0) return null;
 
   return (
     <div className="mt-[50px]">
@@ -36,39 +72,20 @@ export function QueryResultsTable({ results }: QueryResultsTableProps) {
           borderBottom: "1px solid var(--p-hair)",
         }}
       >
-        GEO Query Results
+        Where Your Brand Was Mentioned
       </h2>
 
       <div className="flex flex-col gap-0">
-        {visibleQueries.map(([query, engineResults], idx) => (
+        {mentionQueries.map(([query, engineResults], idx) => (
           <QueryBlock
             key={query}
             query={query}
             engineResults={engineResults}
-            isLast={idx === visibleQueries.length - 1 && (showAll || totalQueries <= DEFAULT_SHOWN)}
+            brandTerms={brandTerms}
+            isLast={idx === mentionQueries.length - 1}
           />
         ))}
       </div>
-
-      {!showAll && totalQueries > DEFAULT_SHOWN && (
-        <button
-          onClick={() => setShowAll(true)}
-          className="mt-4 font-mono text-[10px] tracking-[0.12em] uppercase px-4 py-2.5 w-full text-center transition-colors"
-          style={{
-            color: "var(--p-mute)",
-            border: "1px solid var(--p-hair)",
-            background: "transparent",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--p-ghost)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-          }}
-        >
-          Show all {totalQueries} queries
-        </button>
-      )}
     </div>
   );
 }
@@ -76,32 +93,39 @@ export function QueryResultsTable({ results }: QueryResultsTableProps) {
 function QueryBlock({
   query,
   engineResults,
+  brandTerms,
   isLast,
 }: {
   query: string;
   engineResults: TrackerResultClient[];
+  brandTerms: string[];
   isLast: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Build engine map for consistent ordering
+  // Keyed by lowercase engine name to match DB values
   const byEngine = new Map<string, TrackerResultClient>();
   for (const r of engineResults) {
-    byEngine.set(r.engine, r);
+    byEngine.set(r.engine.toLowerCase(), r);
   }
 
-  // Citation URL for this query (any engine)
+  // Only show engines that mentioned/cited — "Not Found" rows add no value
+  const mentionEngines = ENGINE_ORDER.filter((eng) => {
+    const r = byEngine.get(eng);
+    return r && (r.brand_mentioned || r.brand_cited);
+  });
+
   const citationUrl = engineResults.find((r) => r.citation_url)?.citation_url;
 
   return (
     <div
       style={{
         borderBottom: isLast ? "none" : "1px solid var(--p-hair)",
-        paddingBottom: "20px",
-        marginBottom: "20px",
+        paddingBottom: "24px",
+        marginBottom: "24px",
       }}
     >
-      {/* Query header */}
+      {/* Query */}
       <div className="flex items-start justify-between gap-4 mb-3">
         <div
           className="font-serif italic font-light text-[18px] leading-snug flex-1"
@@ -109,41 +133,37 @@ function QueryBlock({
         >
           {query}
         </div>
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="font-mono text-[8px] tracking-[0.14em] uppercase flex-shrink-0 mt-1 transition-opacity"
-          style={{ color: "var(--p-faint)" }}
-        >
-          {expanded ? "Collapse" : "Excerpts"}
-        </button>
+        {mentionEngines.some((eng) => {
+          const r = byEngine.get(eng);
+          return r?.response_text;
+        }) && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="font-mono text-[8px] tracking-[0.14em] uppercase flex-shrink-0 mt-1 transition-opacity hover:opacity-60"
+            style={{ color: "var(--p-faint)" }}
+          >
+            {expanded ? "Hide" : "Show context"}
+          </button>
+        )}
       </div>
 
-      {/* Per-engine rows */}
+      {/* Engine rows — only mention-positive */}
       <div className="flex flex-col gap-0">
-        {ENGINES.map((engine) => {
-          const result = byEngine.get(engine);
-          if (!result) {
-            return (
-              <EngineRow
-                key={engine}
-                engine={engine}
-                result={null}
-                expanded={false}
-              />
-            );
-          }
+        {mentionEngines.map((eng) => {
+          const result = byEngine.get(eng)!;
           return (
             <EngineRow
-              key={engine}
-              engine={engine}
+              key={eng}
+              engine={ENGINE_DISPLAY[eng] ?? eng}
               result={result}
+              brandTerms={brandTerms}
               expanded={expanded}
             />
           );
         })}
       </div>
 
-      {/* Citation URL chip */}
+      {/* Citation chip */}
       {citationUrl && (
         <div className="mt-3">
           <a
@@ -168,32 +188,24 @@ function QueryBlock({
 function EngineRow({
   engine,
   result,
+  brandTerms,
   expanded,
 }: {
   engine: string;
-  result: TrackerResultClient | null;
+  result: TrackerResultClient;
+  brandTerms: string[];
   expanded: boolean;
 }) {
-  const variant = result
-    ? result.brand_cited
-      ? "cited-paper"
-      : result.brand_mentioned
-        ? "mentioned-paper"
-        : "not-found-paper"
-    : "not-found-paper";
+  const variant = result.brand_cited
+    ? "cited-paper"
+    : result.brand_mentioned
+      ? "mentioned-paper"
+      : "not-found-paper";
 
-  const label = result
-    ? result.brand_cited
-      ? "Cited"
-      : result.brand_mentioned
-        ? "Mentioned"
-        : "Not Found"
-    : "No data";
+  const label = result.brand_cited ? "Cited" : "Mentioned";
 
-  const excerpt = result?.response_text;
-  const truncatedExcerpt = excerpt && excerpt.length > 280
-    ? excerpt.slice(0, 280).trimEnd() + "..."
-    : excerpt;
+  const mentionLines =
+    result.response_text ? extractMentionLines(result.response_text, brandTerms) : [];
 
   return (
     <div>
@@ -212,16 +224,22 @@ function EngineRow({
         </div>
       </div>
 
-      {expanded && excerpt && (
-        <div
-          className="py-3 font-serif text-[13px] leading-relaxed"
-          style={{
-            color: "var(--p-mute)",
-            borderBottom: "1px solid var(--p-ghost)",
-            paddingLeft: "0",
-          }}
-        >
-          {truncatedExcerpt}
+      {expanded && mentionLines.length > 0 && (
+        <div className="pt-2 pb-3 flex flex-col gap-[5px]" style={{ borderBottom: "1px solid var(--p-ghost)" }}>
+          {mentionLines.map((line, i) => (
+            <div
+              key={i}
+              className="font-serif text-[13px] leading-relaxed"
+              style={{
+                color: "var(--paper-ink)",
+                borderLeft: "2px solid var(--pos-paper-border)",
+                paddingLeft: 10,
+                opacity: 0.85,
+              }}
+            >
+              {line}
+            </div>
+          ))}
         </div>
       )}
     </div>

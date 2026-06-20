@@ -143,7 +143,7 @@ export function ReportView({
       {run && <CompetitorTable run={run} brandName={brandName} />}
 
       {/* Query Results (includes citation URLs inline) */}
-      {results.length > 0 && <QueryResultsTable results={results} />}
+      {results.length > 0 && <QueryResultsTable results={results} brandName={brandName} brandVariations={[]} />}
 
       {/* Highlights */}
       {report.highlights.filter((h) => h.text.trim()).length > 0 && (
