@@ -14,6 +14,16 @@
   --ghost: rgba(245, 244, 241, 0.13);
   --hair: rgba(245, 244, 241, 0.11);
 
+  /* ── Paper-mode tokens (for cream report doc) ── */
+  --p-mute: rgba(23, 21, 15, 0.55);
+  --p-faint: rgba(23, 21, 15, 0.35);
+  --p-ghost: rgba(23, 21, 15, 0.12);
+  --p-hair: rgba(23, 21, 15, 0.09);
+  --pos-paper: #2d7a52;
+  --neg-paper: #b03a3a;
+  --pos-paper-soft: rgba(45, 122, 82, 0.12);
+  --pos-paper-border: rgba(45, 122, 82, 0.22);
+
   /* ── Accent/Status: VV Report Generator (styles.css) ── */
   --pos: #84d8ab;
   --neg: #e89aa0;
@@ -64,7 +74,7 @@ body {
   body {
     height: auto;
     overflow: visible;
-    background: var(--ink) !important;
+    background: transparent !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }

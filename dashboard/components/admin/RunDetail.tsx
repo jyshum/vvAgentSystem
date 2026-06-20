@@ -20,7 +20,6 @@ const ENGINE_LABELS: Record<string, string> = {
   gemini: "GEMINI",
 };
 
-// Badge shown on each result row
 function StatusBadge({ mentioned, cited }: { mentioned: boolean; cited: boolean }) {
   if (cited) return (
     <span
@@ -33,74 +32,33 @@ function StatusBadge({ mentioned, cited }: { mentioned: boolean; cited: boolean 
   if (mentioned) return (
     <span
       className="font-mono text-[8px] tracking-[0.1em] py-0.5 px-2 shrink-0"
-      style={{ color: "var(--mute)", border: "1px solid var(--ghost)" }}
+      style={{ color: "var(--pos)", border: "1px solid rgba(132,216,171,0.2)", background: "rgba(132,216,171,0.05)" }}
     >
       MENTIONED
     </span>
   );
   return (
-    <span className="font-mono text-[8px] shrink-0" style={{ color: "var(--faint)" }}>— not found</span>
+    <span className="font-mono text-[8px] shrink-0" style={{ color: "var(--faint)" }}>not found</span>
   );
 }
 
-// Expandable result row for one engine within a query
-function ResultRow({ result }: { result: TrackerResult }) {
-  const [open, setOpen] = useState(false);
-  const PREVIEW_LEN = 320;
-  const hasText = result.response_text && result.response_text.length > 0;
-  const showable = (result.brand_mentioned || result.brand_cited) && hasText;
-
+function SectionDivider({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex gap-4 py-3 border-b last:border-b-0" style={{ borderColor: "var(--hair)" }}>
-      <span className="font-mono text-[9px] tracking-[0.1em] w-24 shrink-0 pt-0.5" style={{ color: "var(--mute)" }}>
-        {ENGINE_LABELS[result.engine] ?? result.engine.toUpperCase()}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-3 mb-1.5 flex-wrap">
-          <StatusBadge mentioned={result.brand_mentioned} cited={result.brand_cited} />
-          {result.citation_url && (
-            <span className="font-mono text-[8px] tracking-[0.06em] truncate max-w-[260px]" style={{ color: "var(--pos)" }}>
-              ↗ {result.citation_url}
-            </span>
-          )}
-        </div>
-        {showable && (
-          <div>
-            <p className="font-mono text-[10px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--mute)" }}>
-              {open
-                ? result.response_text
-                : result.response_text.slice(0, PREVIEW_LEN) + (result.response_text.length > PREVIEW_LEN ? "…" : "")}
-            </p>
-            {result.response_text.length > PREVIEW_LEN && (
-              <button
-                onClick={() => setOpen(!open)}
-                className="font-mono text-[8px] tracking-[0.1em] uppercase mt-1.5 transition-colors hover:text-white"
-                style={{ color: "var(--faint)" }}
-              >
-                {open ? "↑ collapse" : "··· read full"}
-              </button>
-            )}
-          </div>
-        )}
-        {result.competitor_mentions.length > 0 && (
-          <p className="font-mono text-[8px] mt-1.5 opacity-50" style={{ color: "var(--faint)" }}>
-            competitors: {result.competitor_mentions.join(", ")}
-          </p>
-        )}
-      </div>
+    <div
+      className="font-mono text-[10px] tracking-[0.18em] uppercase pb-3 mb-5 border-b font-medium"
+      style={{ color: "var(--white)", borderColor: "var(--hair)", marginTop: 44 }}
+    >
+      {children}
     </div>
   );
 }
 
 export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
-  const [showAll, setShowAll] = useState(false);
-  const INITIAL_VISIBLE = 3;
+  const [expandedQuery, setExpandedQuery] = useState<string | null>(null);
 
-  // Group results by query, preserve order
   const queries = Array.from(new Set(results.map((r) => r.query)));
   const byQuery = (q: string) => results.filter((r) => r.query === q);
 
-  // Per-engine breakdown computed from results
   const engineStats = ENGINES.map((eng) => {
     const engineResults = results.filter((r) => r.engine === eng);
     const cited = engineResults.filter((r) => r.brand_cited).length;
@@ -109,17 +67,33 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
     return { engine: eng, cited, mentioned, notFound: total - cited - mentioned, total };
   });
 
-  // Competitor SoV from results
+  // All forms the brand might appear in responses (brand_name, name, variations)
+  const brandTerms: string[] = [
+    client.brand_name,
+    client.name,
+    ...(client.brand_variations || []),
+  ].filter(Boolean).map((t) => t.toLowerCase());
+
+  // Match by exact string OR by stripping spaces from both sides (handles "budgetyourmd" ↔ "Budget Your MD")
+  const isClientBrand = (name: string): boolean => {
+    const nameLower = name.toLowerCase();
+    const nameNorm = nameLower.replace(/\s+/g, "");
+    return brandTerms.some(
+      (term) => nameLower === term || nameNorm === term.replace(/\s+/g, "")
+    );
+  };
+
   const compCounts: Record<string, number> = {};
   results.forEach((r) => {
     r.competitor_mentions.forEach((c) => {
-      compCounts[c] = (compCounts[c] || 0) + 1;
+      if (!isClientBrand(c)) {
+        compCounts[c] = (compCounts[c] || 0) + 1;
+      }
     });
   });
   const competitors = Object.entries(compCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const maxCompMentions = competitors[0]?.[1] ?? 1;
 
-  // Citation URLs
   const citationsByUrl: Record<string, string[]> = {};
   results
     .filter((r) => r.brand_cited && r.citation_url)
@@ -128,9 +102,6 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
       if (!citationsByUrl[url]) citationsByUrl[url] = [];
       citationsByUrl[url].push(ENGINE_LABELS[r.engine] ?? r.engine);
     });
-
-  const visibleQueries = showAll ? queries : queries.slice(0, INITIAL_VISIBLE);
-  const hiddenCount = queries.length - INITIAL_VISIBLE;
 
   return (
     <div style={{ maxWidth: 960 }}>
@@ -157,7 +128,7 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
           className="font-mono text-[9px] tracking-[0.14em] uppercase py-3 px-5 transition-all duration-200 hover:bg-white hover:text-[var(--ink)]"
           style={{ color: "var(--white)", border: "1px solid var(--ghost)" }}
         >
-          → MAKE REPORT
+          MAKE REPORT
         </Link>
       </div>
 
@@ -166,229 +137,345 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
         {(() => {
           const citedCount = results.filter((r) => r.brand_cited).length;
           const topComp = Object.entries(compCounts).sort((a, b) => b[1] - a[1])[0];
-          const topCompRate = topComp ? Math.round((topComp[1] / results.length) * 100) + "%" : "—";
-          const topCompLabel = topComp ? `${topComp[0]} · ${topComp[1]} mention${topComp[1] !== 1 ? "s" : ""}` : "no competitors detected";
+          const topCompRate = topComp ? Math.round((topComp[1] / results.length) * 100) + "%" : "-";
+          const topCompLabel = topComp ? `${topComp[0]}` : "none detected";
           const mentionedCount = results.filter((r) => r.brand_mentioned || r.brand_cited).length;
           return [
-            { n: formatRate(run.aggregate_mention_rate), l: "MENTION RATE", d: `${mentionedCount} of ${results.length} responses`, color: scoreColor(run.aggregate_mention_rate) },
-            { n: formatRate(run.aggregate_citation_rate), l: "CITATION RATE", d: citedCount > 0 ? `${citedCount} URL${citedCount !== 1 ? "s" : ""} cited this run` : "no URLs cited this run", color: scoreColor(run.aggregate_citation_rate) },
-            { n: topCompRate, l: "TOP COMPETITOR", d: topCompLabel, color: "var(--mute)" },
-            { n: String(citedCount), l: "CITATIONS FOUND", d: citedCount > 0 ? `across ${results.filter(r=>r.brand_cited).map(r=>r.engine).filter((v,i,a)=>a.indexOf(v)===i).length} engine${results.filter(r=>r.brand_cited).map(r=>r.engine).filter((v,i,a)=>a.indexOf(v)===i).length!==1?"s":""}` : "—", color: "var(--faint)" },
+            { n: formatRate(run.aggregate_mention_rate), l: "Mention Rate", d: `${mentionedCount} of ${results.length}`, color: scoreColor(run.aggregate_mention_rate) },
+            { n: formatRate(run.aggregate_citation_rate), l: "Citation Rate", d: `${citedCount} URL${citedCount !== 1 ? "s" : ""} cited`, color: scoreColor(run.aggregate_citation_rate) },
+            { n: topCompRate, l: "Top Competitor Rate", d: topCompLabel, color: "var(--mute)" },
+            { n: String(citedCount), l: "Citations Found", d: `across ${results.filter(r=>r.brand_cited).map(r=>r.engine).filter((v,i,a)=>a.indexOf(v)===i).length} engine${results.filter(r=>r.brand_cited).map(r=>r.engine).filter((v,i,a)=>a.indexOf(v)===i).length!==1?"s":""}`, color: "var(--faint)" },
           ];
         })().map(({ n, l, d, color }) => (
-          <div key={l} className="py-4 px-5" style={{ background: "var(--ink)" }}>
-            <div className="font-display text-[36px] font-light leading-none mb-1.5" style={{ color }}>{n}</div>
-            <div className="font-mono text-[8px] tracking-[0.14em] mb-1" style={{ color: "var(--faint)" }}>{l}</div>
+          <div key={l} className="py-5 px-5" style={{ background: "var(--ink)" }}>
+            <div className="font-display text-[44px] font-light leading-none mb-2" style={{ color }}>{n}</div>
+            <div className="font-mono text-[9px] tracking-[0.1em] mb-0.5" style={{ color: "var(--mute)" }}>{l}</div>
             <div className="font-mono text-[8px]" style={{ color: "var(--faint)" }}>{d}</div>
           </div>
         ))}
       </div>
 
       {/* Per-engine breakdown */}
-      <div className="font-mono text-[9px] tracking-[0.18em] uppercase pb-3 mb-5 border-b" style={{ color: "var(--faint)", borderColor: "var(--hair)", marginTop: 40 }}>
-        PER-ENGINE BREAKDOWN <span style={{ fontSize: 8, letterSpacing: "0.06em", opacity: 0.7, marginLeft: 10 }}>{results.length / 4 >= 1 ? Math.round(results.length / ENGINES.length) : "?"} queries each</span>
-      </div>
-      <div className="grid grid-cols-4 gap-3 mb-10">
+      <SectionDivider>
+        Per-Engine Breakdown{" "}
+        <span style={{ fontSize: 8, letterSpacing: "0.06em", opacity: 0.5, fontWeight: 400, marginLeft: 10 }}>
+          {Math.round(results.length / ENGINES.length)} queries each
+        </span>
+      </SectionDivider>
+      <div className="grid grid-cols-4 gap-3 mb-2">
         {engineStats.map(({ engine, cited, mentioned, notFound, total }) => {
           const citedPct = total > 0 ? (cited / total) * 100 : 0;
           const mentionedPct = total > 0 ? (mentioned / total) * 100 : 0;
-          const notFoundPct = total > 0 ? (notFound / total) * 100 : 0;
           return (
             <div key={engine} className="p-4 border" style={{ borderColor: "var(--hair)" }}>
-              <div className="font-mono text-[9px] tracking-[0.14em] mb-3" style={{ color: "var(--mute)" }}>
+              <div className="font-mono text-[10px] tracking-[0.12em] mb-3 font-medium" style={{ color: "var(--white)" }}>
                 {ENGINE_LABELS[engine]}
               </div>
-              {/* Stacked bar */}
               <div className="flex h-1 mb-3 overflow-hidden" style={{ background: "var(--hair)" }}>
                 <div style={{ width: `${citedPct}%`, background: "var(--pos)" }} />
                 <div style={{ width: `${mentionedPct}%`, background: "rgba(132,216,171,0.35)" }} />
-                <div style={{ width: `${notFoundPct}%`, background: "transparent" }} />
               </div>
               <div className="flex flex-col gap-1.5">
                 {[
                   { label: "CITED", val: cited, color: "var(--pos)" },
-                  { label: "MENTIONED", val: mentioned, color: "var(--mute)" },
+                  { label: "MENTIONED", val: mentioned, color: "rgba(132,216,171,0.7)" },
                   { label: "NOT FOUND", val: notFound, color: "var(--faint)" },
                 ].map(({ label, val, color }) => (
                   <div key={label} className="flex justify-between items-center">
-                    <span className="font-mono text-[7px] tracking-[0.08em]" style={{ color }}>● {label}</span>
-                    <span className="font-mono text-[9px]" style={{ color: val > 0 ? "var(--white)" : "var(--faint)" }}>
-                      {val}<span style={{ opacity: 0.4 }}>/{total}</span>
+                    <span className="font-mono text-[7px] tracking-[0.08em]" style={{ color }}>
+                      {label}
+                    </span>
+                    <span className="font-mono text-[11px] font-medium" style={{ color: val > 0 ? "var(--white)" : "var(--faint)" }}>
+                      {val}
+                      <span style={{ opacity: 0.35, fontSize: 8 }}>/{total}</span>
                     </span>
                   </div>
                 ))}
               </div>
-              {total < results.length / ENGINES.length && total > 0 && (
-                <div className="font-mono text-[7px] mt-2" style={{ color: "var(--faint)", opacity: 0.5 }}>
-                  skipped {Math.round(results.length / ENGINES.length) - total} quer
-                  {Math.round(results.length / ENGINES.length) - total === 1 ? "y" : "ies"}
-                </div>
-              )}
             </div>
           );
         })}
       </div>
 
       {/* Competitor SoV */}
-      <div className="mb-10">
-        <div className="font-mono text-[9px] tracking-[0.18em] uppercase pb-3 mb-5 border-b" style={{ color: "var(--faint)", borderColor: "var(--hair)", marginTop: 40 }}>
-          COMPETITOR SHARE OF VOICE
-        </div>
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b" style={{ borderColor: "var(--hair)" }}>
-              {["BRAND", "APPEARANCES", "RATE"].map((h) => (
-                <th
-                  key={h}
-                  className="font-mono text-[8px] tracking-[0.12em] uppercase pb-2.5 text-left font-normal"
-                  style={{ color: "var(--faint)" }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {/* Brand row - always shown */}
-            <tr className="border-b" style={{ borderColor: "var(--hair)" }}>
-              <td className="py-3 font-serif text-sm" style={{ color: "var(--pos)" }}>{client.brand_name}</td>
-              <td className="py-3 pr-8">
-                <div
-                  className="h-0.5"
-                  style={{ width: `${run.aggregate_mention_rate * 200}px`, maxWidth: 200, background: "var(--pos)" }}
-                />
-              </td>
-              <td className="py-3 font-mono text-[10px]" style={{ color: "var(--pos)" }}>
-                {formatRate(run.aggregate_mention_rate)}
-              </td>
-            </tr>
-            {/* Competitor rows - only when there are competitors */}
-            {competitors.map(([name, count]) => (
-              <tr key={name} className="border-b" style={{ borderColor: "var(--hair)" }}>
-                <td className="py-3 font-serif text-sm" style={{ color: "var(--mute)" }}>{name}</td>
-                <td className="py-3 pr-8">
-                  <div
-                    className="h-0.5"
-                    style={{
-                      width: `${(count / maxCompMentions) * 200 * 0.7}px`,
-                      maxWidth: 200,
-                      background: "var(--ghost)",
-                    }}
-                  />
-                </td>
-                <td className="py-3 font-mono text-[10px]" style={{ color: "var(--faint)" }}>
-                  {Math.round((count / results.length) * 100)}%
-                </td>
-              </tr>
+      <SectionDivider>Competitor Share of Voice</SectionDivider>
+      <table className="w-full border-collapse mb-2">
+        <thead>
+          <tr className="border-b" style={{ borderColor: "var(--hair)" }}>
+            {["Brand", "Rate"].map((h) => (
+              <th
+                key={h}
+                className="font-mono text-[9px] tracking-[0.1em] uppercase pb-2.5 text-left font-normal"
+                style={{ color: "var(--faint)" }}
+              >
+                {h}
+              </th>
             ))}
-            {/* Empty state when no competitors */}
-            {competitors.length === 0 && (
-              <tr>
-                <td colSpan={3} className="py-4 font-mono text-[9px]" style={{ color: "var(--faint)" }}>
-                  No competitor mentions detected this run.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-b" style={{ borderColor: "var(--hair)" }}>
+            <td className="py-2.5 font-serif text-sm" style={{ color: "var(--pos)" }}>
+              {client.brand_name}
+              <span className="font-mono text-[7px] tracking-[0.08em] ml-2 opacity-60">YOUR BRAND</span>
+            </td>
+            <td className="py-2.5 font-mono text-[13px] font-medium" style={{ color: "var(--pos)" }}>
+              {formatRate(run.aggregate_mention_rate)}
+            </td>
+          </tr>
+          {competitors.map(([name, count]) => (
+            <tr key={name} className="border-b" style={{ borderColor: "var(--hair)" }}>
+              <td className="py-2.5 font-serif text-sm" style={{ color: "var(--mute)" }}>{name}</td>
+              <td className="py-2.5 font-mono text-[13px]" style={{ color: "var(--faint)" }}>
+                {Math.round((count / results.length) * 100)}%
+              </td>
+            </tr>
+          ))}
+          {competitors.length === 0 && (
+            <tr>
+              <td colSpan={2} className="py-4 font-mono text-[9px]" style={{ color: "var(--faint)" }}>
+                No competitor mentions detected this run.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
 
       {/* Citation URLs */}
-      <div className="mb-10">
-        <div className="font-mono text-[9px] tracking-[0.18em] uppercase pb-3 mb-5 border-b" style={{ color: "var(--faint)", borderColor: "var(--hair)", marginTop: 40 }}>
-          CITATION URLS DISCOVERED
-        </div>
-        {Object.keys(citationsByUrl).length === 0 ? (
-          <p className="font-mono text-[9px]" style={{ color: "var(--faint)" }}>No URLs cited this run.</p>
-        ) : (
-          Object.entries(citationsByUrl).map(([url, engines]) => (
+      <SectionDivider>Citation URLs</SectionDivider>
+      {Object.keys(citationsByUrl).length === 0 ? (
+        <p className="font-mono text-[9px]" style={{ color: "var(--faint)" }}>No URLs cited this run.</p>
+      ) : (
+        <div className="flex flex-col gap-0">
+          {Object.entries(citationsByUrl).map(([url, engines]) => (
             <div
               key={url}
-              className="flex items-center gap-4 py-3 border-b flex-wrap"
+              className="flex items-baseline gap-6 py-3 border-b"
               style={{ borderColor: "var(--hair)" }}
             >
-              <span className="font-mono text-[10px] tracking-[0.04em] break-all" style={{ color: "var(--white)" }}>
+              <a
+                href={url.startsWith("http") ? url : `https://${url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-[10px] tracking-[0.04em] hover:opacity-70 transition-opacity flex-1 min-w-0 break-all"
+                style={{ color: "var(--white)" }}
+              >
                 {url}
-              </span>
-              <span className="font-mono text-[8px]" style={{ color: "var(--faint)" }}>
+              </a>
+              <span className="font-mono text-[8px] shrink-0" style={{ color: "var(--faint)" }}>
                 {engines.join(" · ")}
               </span>
-              <span className="font-mono text-[8px] ml-auto" style={{ color: "var(--faint)" }}>
-                {engines.length} citation{engines.length !== 1 ? "s" : ""}
-              </span>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* Query results */}
-      <div className="font-mono text-[9px] tracking-[0.18em] mb-4 pb-3 border-b flex items-center justify-between" style={{ color: "var(--faint)", borderColor: "var(--hair)", marginTop: 40 }}>
-        <span>QUERY RESULTS <span style={{ opacity: 0.45, fontSize: 9, marginLeft: 8 }}>{queries.length} quer{queries.length !== 1 ? "ies" : "y"} · {results.length} responses</span></span>
-      </div>
-
-      {/* Overview matrix */}
-      <div className="overflow-x-auto mb-7">
+      {/* Query matrix — clickable rows expand to show excerpts */}
+      <SectionDivider>
+        Query Results{" "}
+        <span style={{ fontSize: 8, letterSpacing: "0.06em", opacity: 0.5, fontWeight: 400, marginLeft: 8 }}>
+          {queries.length} {queries.length !== 1 ? "queries" : "query"} · click any row to expand
+        </span>
+      </SectionDivider>
+      <div className="overflow-x-auto">
         <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--mono)", fontSize: 9 }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", padding: "8px 12px 8px 0", color: "var(--faint)", fontWeight: 400, borderBottom: "1px solid var(--hair)" }}>QUERY</th>
-              {["GPT", "PERP", "CLAUDE", "GEMINI"].map(e => (
-                <th key={e} style={{ padding: "8px 12px", color: "var(--faint)", fontWeight: 400, borderBottom: "1px solid var(--hair)", textAlign: "center" }}>{e}</th>
+              <th style={{ textAlign: "left", padding: "8px 12px 8px 0", color: "var(--faint)", fontWeight: 400, borderBottom: "1px solid var(--hair)" }}>
+                QUERY
+              </th>
+              {["GPT", "PERP", "CLAUDE", "GEMINI"].map((e) => (
+                <th key={e} style={{ padding: "8px 12px", color: "var(--faint)", fontWeight: 400, borderBottom: "1px solid var(--hair)", textAlign: "center" }}>
+                  {e}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {queries.map((query) => {
               const qResults = byQuery(query);
+              const isExpanded = expandedQuery === query;
               const cellFor = (eng: string) => {
-                const r = qResults.find(r => r.engine === eng);
-                if (!r) return <td key={eng} style={{ padding: "10px 12px", textAlign: "center", color: "var(--faint)", fontSize: 7 }}>N/A</td>;
-                if (r.brand_cited) return <td key={eng} style={{ padding: "10px 12px", textAlign: "center", color: "var(--pos)", fontWeight: 500 }}>C</td>;
-                if (r.brand_mentioned) return <td key={eng} style={{ padding: "10px 12px", textAlign: "center", color: "var(--pos)", fontWeight: 500 }}>M</td>;
-                return <td key={eng} style={{ padding: "10px 12px", textAlign: "center", color: "var(--faint)" }}>—</td>;
+                const r = qResults.find((r) => r.engine === eng);
+                if (!r) return (
+                  <td key={eng} style={{ padding: "11px 12px", textAlign: "center", color: "var(--faint)", fontSize: 7 }}>
+                    N/A
+                  </td>
+                );
+                if (r.brand_cited) return (
+                  <td key={eng} style={{ padding: "11px 12px", textAlign: "center", color: "var(--pos)", fontWeight: 600, fontSize: 10 }}>
+                    C
+                  </td>
+                );
+                if (r.brand_mentioned) return (
+                  <td key={eng} style={{ padding: "11px 12px", textAlign: "center", color: "rgba(132,216,171,0.8)", fontWeight: 500 }}>
+                    M
+                  </td>
+                );
+                return (
+                  <td key={eng} style={{ padding: "11px 12px", textAlign: "center", color: "var(--faint)" }}>
+                    -
+                  </td>
+                );
               };
+
               return (
-                <tr key={query} style={{ borderBottom: "1px solid var(--hair)", cursor: "pointer" }}
-                  className="hover:bg-[rgba(245,244,241,0.03)] transition-colors">
-                  <td style={{ padding: "10px 12px 10px 0", color: "var(--mute)" }}>{query}</td>
-                  {["chatgpt", "perplexity", "claude", "gemini"].map(eng => cellFor(eng))}
-                </tr>
+                <>
+                  <tr
+                    key={query}
+                    onClick={() => setExpandedQuery(isExpanded ? null : query)}
+                    style={{
+                      borderBottom: "1px solid var(--hair)",
+                      cursor: "pointer",
+                      background: isExpanded ? "rgba(245,244,241,0.03)" : "transparent",
+                    }}
+                    className="hover:bg-[rgba(245,244,241,0.025)] transition-colors"
+                  >
+                    <td style={{ padding: "11px 12px 11px 0", color: isExpanded ? "var(--white)" : "var(--mute)" }}>
+                      {query}
+                      {isExpanded && (
+                        <span style={{ color: "var(--faint)", marginLeft: 6, fontSize: 8 }}>↑ collapse</span>
+                      )}
+                    </td>
+                    {["chatgpt", "perplexity", "claude", "gemini"].map((eng) => cellFor(eng))}
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${query}-expanded`} style={{ borderBottom: "1px solid var(--hair)" }}>
+                      <td colSpan={5} style={{ padding: "0 0 12px 0", background: "rgba(245,244,241,0.02)" }}>
+                        <div className="flex flex-col gap-0 pt-1">
+                          {qResults.map((r) => (
+                            <ExpandedEngineRow key={r.id} result={r} brandTerms={brandTerms} />
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               );
             })}
           </tbody>
         </table>
         <div className="font-mono mt-2" style={{ fontSize: 8, color: "var(--faint)", letterSpacing: "0.06em" }}>
-          M = mentioned &nbsp;·&nbsp; C = cited &nbsp;·&nbsp; — = not found &nbsp;·&nbsp; N/A = engine skipped
+          M = mentioned &nbsp;·&nbsp; C = cited &nbsp;·&nbsp; - = not found &nbsp;·&nbsp; N/A = skipped
         </div>
       </div>
+    </div>
+  );
+}
 
-      {visibleQueries.map((query) => (
-        <div key={query} className="mb-6 pb-6 border-b" style={{ borderColor: "var(--hair)" }}>
-          <div className="font-serif italic text-[15px] mb-3" style={{ color: "var(--mute)" }}>
-            &ldquo;{query}&rdquo;
-          </div>
-          {byQuery(query).every((r) => !r.brand_mentioned) && (
-            <div className="font-mono text-[8px] tracking-[0.08em] mb-2" style={{ color: "var(--neg)" }}>
-              Zero mentions across all engines
+function lineMatchesBrand(line: string, brandTerms: string[]): boolean {
+  const lineLower = line.toLowerCase();
+  const lineNorm = lineLower.replace(/\s+/g, "");
+  return brandTerms.some((term) => {
+    // Exact substring: catches "Budget Your MD" when term is "budget your md"
+    if (lineLower.includes(term)) return true;
+    // Space-stripped: catches "Budget Your MD" when term is "budgetyourmd"
+    const termNorm = term.replace(/\s+/g, "");
+    return termNorm.length > 2 && lineNorm.includes(termNorm);
+  });
+}
+
+function SpotlightText({
+  text,
+  brandTerms,
+  open,
+  onToggle,
+}: {
+  text: string;
+  brandTerms: string[];
+  open: boolean;
+  onToggle: (e: React.MouseEvent) => void;
+}) {
+  const allLines = text.split(/\n/).filter((l) => l.trim().length > 0);
+
+  // Preview: accumulate lines until ~340 chars
+  const previewLines: string[] = [];
+  let chars = 0;
+  for (const line of allLines) {
+    previewLines.push(line);
+    chars += line.length;
+    if (chars >= 340) break;
+  }
+
+  const displayLines = open ? allLines : previewLines;
+  const hasMore = previewLines.length < allLines.length;
+
+  return (
+    <div>
+      <div className="flex flex-col gap-[3px]">
+        {displayLines.map((line, i) => {
+          const isMatch = lineMatchesBrand(line, brandTerms);
+          return (
+            <div
+              key={i}
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 10,
+                lineHeight: "1.65",
+                color: isMatch ? "var(--mute)" : "rgba(245,244,241,0.16)",
+                borderLeft: `2px solid ${isMatch ? "rgba(132,216,171,0.5)" : "transparent"}`,
+                paddingLeft: 8,
+                wordBreak: "break-word",
+              }}
+            >
+              {line}
             </div>
-          )}
-          {byQuery(query).map((result) => (
-            <ResultRow key={result.id} result={result} />
-          ))}
-        </div>
-      ))}
-
-      {queries.length > INITIAL_VISIBLE && (
+          );
+        })}
+      </div>
+      {hasMore && (
         <button
-          onClick={() => setShowAll(!showAll)}
-          className="w-full font-mono text-[9px] tracking-[0.14em] uppercase py-4 transition-all duration-200 hover:text-white"
-          style={{ color: "var(--faint)", border: "1px solid var(--hair)" }}
+          onClick={onToggle}
+          className="font-mono text-[8px] tracking-[0.1em] uppercase mt-2 transition-colors hover:text-white"
+          style={{ color: "var(--faint)" }}
         >
-          {showAll
-            ? "COLLAPSE QUERIES ↑"
-            : `SHOW ${hiddenCount} MORE QUER${hiddenCount === 1 ? "Y" : "IES"} ↓`}
+          {open ? "collapse" : "read full"}
         </button>
       )}
+    </div>
+  );
+}
+
+function ExpandedEngineRow({ result, brandTerms }: { result: TrackerResult; brandTerms: string[] }) {
+  const [open, setOpen] = useState(false);
+  const hasText = result.response_text && result.response_text.length > 0;
+  const showable = (result.brand_mentioned || result.brand_cited) && hasText;
+
+  return (
+    <div
+      className="flex gap-4 py-2.5 border-b"
+      style={{ borderColor: "var(--hair)", paddingLeft: 0 }}
+    >
+      <span
+        className="font-mono text-[8px] tracking-[0.1em] w-24 shrink-0 pt-0.5"
+        style={{ color: "var(--mute)" }}
+      >
+        {ENGINE_LABELS[result.engine] ?? result.engine.toUpperCase()}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+          <StatusBadge mentioned={result.brand_mentioned} cited={result.brand_cited} />
+          {result.citation_url && (
+            <a
+              href={result.citation_url.startsWith("http") ? result.citation_url : `https://${result.citation_url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-[8px] tracking-[0.06em] truncate max-w-[260px] hover:opacity-70 transition-opacity"
+              style={{ color: "var(--pos)" }}
+            >
+              {result.citation_url}
+            </a>
+          )}
+        </div>
+        {showable && (
+          <SpotlightText
+            text={result.response_text}
+            brandTerms={brandTerms}
+            open={open}
+            onToggle={(e) => { e.stopPropagation(); setOpen(!open); }}
+          />
+        )}
+      </div>
     </div>
   );
 }

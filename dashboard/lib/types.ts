@@ -54,6 +54,7 @@ export interface TrackerResultClient {
   brand_cited: boolean;
   citation_url: string | null;
   competitor_mentions: string[];
+  response_text?: string;
   queried_at: string;
 }
 

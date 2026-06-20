@@ -38,7 +38,7 @@ export function ReportView({
     >
       <polyline
         points="1,4.5 3.5,7 8,1.5"
-        stroke="var(--ink)"
+        stroke="var(--paper-ink)"
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -46,13 +46,28 @@ export function ReportView({
     </svg>
   );
 
+  const sectionHead = (title: string) => (
+    <h2
+      className="font-mono text-xs font-normal tracking-[0.14em] uppercase pb-[11px] mb-6"
+      style={{
+        color: "var(--p-mute)",
+        borderBottom: "1px solid var(--p-hair)",
+      }}
+    >
+      {title}
+    </h2>
+  );
+
   return (
     <div
-      className="max-w-[860px] mx-auto py-[70px] px-[76px]"
       style={{
-        background: "var(--ink-2)",
-        color: "var(--white)",
+        maxWidth: "760px",
+        margin: "0 auto",
+        padding: "72px 80px 80px",
+        background: "var(--paper)",
+        color: "var(--paper-ink)",
         fontFamily: "var(--display)",
+        boxShadow: "0 16px 80px rgba(0,0,0,0.6)",
       }}
     >
       <ReportHeader
@@ -61,38 +76,33 @@ export function ReportView({
         domain={domain}
       />
 
+      {/* Executive Summary */}
       {report.exec_summary && (
         <div className="mt-[50px]">
-          <h2
-            className="font-mono text-xs font-normal tracking-[0.14em] uppercase pb-[11px] border-b border-[var(--hair)] mb-6"
-            style={{ color: "var(--mute)" }}
-          >
-            Executive Summary
-          </h2>
+          {sectionHead("Executive Summary")}
           <p
             className="font-display font-light text-[22px] leading-[1.5] italic"
-            style={{ color: "rgba(245,244,241,0.82)" }}
+            style={{ color: "rgba(23,21,15,0.82)" }}
           >
             {report.exec_summary}
           </p>
         </div>
       )}
 
+      {/* AI Visibility + Per-Engine */}
       {run && <KPIGrid run={run} previousRuns={previousRuns} />}
 
-      {run && <CompetitorTable run={run} brandName={brandName} />}
-
-      {results.length > 0 && <QueryResultsTable results={results} />}
-
+      {/* Google Search Console — moved up, tighter spacing after KPIGrid */}
       {report.search_console && (
-        <div className="mt-[50px]">
-          <h2
-            className="font-mono text-xs font-normal tracking-[0.14em] uppercase pb-[11px] border-b border-[var(--hair)] mb-6"
-            style={{ color: "var(--mute)" }}
+        <div className="mt-[32px]">
+          {sectionHead("Search Performance (GSC)")}
+          <div
+            className="grid grid-cols-4 gap-px"
+            style={{
+              background: "var(--p-hair)",
+              border: "1px solid var(--p-hair)",
+            }}
           >
-            Search Performance
-          </h2>
-          <div className="grid grid-cols-4 gap-px bg-[var(--hair)] border border-[var(--hair)]">
             {(
               [
                 ["Impressions", report.search_console.impressions, 0, ""],
@@ -104,21 +114,24 @@ export function ReportView({
               <div
                 key={label}
                 className="p-5 flex flex-col"
-                style={{ background: "var(--ink-2)" }}
+                style={{ background: "var(--paper)" }}
               >
                 <div
                   className="font-mono text-[11px] tracking-[0.12em] uppercase mb-3"
-                  style={{ color: "var(--mute)" }}
+                  style={{ color: "var(--p-mute)" }}
                 >
                   {label}
                 </div>
                 <div
-                  className="font-display font-light text-[40px] leading-none"
-                  style={{ color: "var(--white)" }}
+                  className="font-display font-light text-[36px] leading-none"
+                  style={{ color: "var(--paper-ink)" }}
                 >
                   {data?.week != null
-                    ? `${data.week.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp })}${suffix}`
-                    : "—"}
+                    ? `${data.week.toLocaleString("en-US", {
+                        minimumFractionDigits: dp,
+                        maximumFractionDigits: dp,
+                      })}${suffix}`
+                    : "-"}
                 </div>
               </div>
             ))}
@@ -126,24 +139,29 @@ export function ReportView({
         </div>
       )}
 
+      {/* Competitor Table */}
+      {run && <CompetitorTable run={run} brandName={brandName} />}
+
+      {/* Query Results (includes citation URLs inline) */}
+      {results.length > 0 && <QueryResultsTable results={results} brandName={brandName} brandVariations={[]} />}
+
+      {/* Highlights */}
       {report.highlights.filter((h) => h.text.trim()).length > 0 && (
         <div className="mt-[50px]">
-          <h2
-            className="font-mono text-xs font-normal tracking-[0.14em] uppercase pb-[11px] border-b border-[var(--hair)] mb-6"
-            style={{ color: "var(--mute)" }}
-          >
-            Highlights / Wins
-          </h2>
+          {sectionHead("Highlights / Wins")}
           <ul className="list-none">
             {report.highlights
               .filter((h) => h.text.trim())
               .map((h, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-3.5 py-3 border-b border-[var(--hair)] font-display text-base leading-snug"
-                  style={{ color: "var(--white)" }}
+                  className="flex items-start gap-3.5 py-3 font-display text-base leading-snug"
+                  style={{
+                    color: "var(--paper-ink)",
+                    borderBottom: "1px solid var(--p-hair)",
+                  }}
                 >
-                  <span style={{ color: "var(--accent)" }}>&mdash;</span>
+                  <span style={{ color: "var(--pos-paper)" }}>-</span>
                   <span>{h.text}</span>
                 </li>
               ))}
@@ -151,30 +169,29 @@ export function ReportView({
         </div>
       )}
 
+      {/* Work Completed */}
       {report.work_completed.filter((w) => w.text.trim()).length > 0 && (
         <div className="mt-[50px]">
-          <h2
-            className="font-mono text-xs font-normal tracking-[0.14em] uppercase pb-[11px] border-b border-[var(--hair)] mb-6"
-            style={{ color: "var(--mute)" }}
-          >
-            Work Completed This Week
-          </h2>
+          {sectionHead("Work Completed This Week")}
           <ul className="list-none">
             {report.work_completed
               .filter((w) => w.text.trim())
               .map((w, i) => (
                 <li
                   key={i}
-                  className={`flex items-start gap-3.5 py-3 border-b border-[var(--hair)] font-display text-base leading-snug ${w.done ? "opacity-60" : ""}`}
-                  style={{ color: "var(--white)" }}
+                  className={`flex items-start gap-3.5 py-3 font-display text-base leading-snug ${w.done ? "opacity-60" : ""}`}
+                  style={{
+                    color: "var(--paper-ink)",
+                    borderBottom: "1px solid var(--p-hair)",
+                  }}
                 >
                   <span
                     className="w-[15px] h-[15px] min-w-[15px] mt-0.5 flex items-center justify-center shrink-0"
                     style={{
                       border: w.done
                         ? "none"
-                        : "1px solid rgba(245,244,241,0.42)",
-                      background: w.done ? "var(--white)" : "transparent",
+                        : "1px solid var(--p-ghost)",
+                      background: w.done ? "var(--paper-ink)" : "transparent",
                     }}
                   >
                     {w.done && checkSvg}
@@ -186,26 +203,25 @@ export function ReportView({
         </div>
       )}
 
+      {/* Priorities */}
       {report.priorities.filter((p) => p.text.trim()).length > 0 && (
         <div className="mt-[50px]">
-          <h2
-            className="font-mono text-xs font-normal tracking-[0.14em] uppercase pb-[11px] border-b border-[var(--hair)] mb-6"
-            style={{ color: "var(--mute)" }}
-          >
-            Next Week Priorities
-          </h2>
+          {sectionHead("Next Week Priorities")}
           <ul className="list-none">
             {report.priorities
               .filter((p) => p.text.trim())
               .map((p, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-3.5 py-3 border-b border-[var(--hair)] font-display text-base leading-snug"
-                  style={{ color: "var(--white)" }}
+                  className="flex items-start gap-3.5 py-3 font-display text-base leading-snug"
+                  style={{
+                    color: "var(--paper-ink)",
+                    borderBottom: "1px solid var(--p-hair)",
+                  }}
                 >
                   <span
                     className="font-mono text-[9px] tracking-[0.1em] shrink-0 min-w-[20px] pt-1"
-                    style={{ color: "var(--accent)" }}
+                    style={{ color: "var(--p-faint)" }}
                   >
                     {String(i + 1).padStart(2, "0")}
                   </span>
@@ -216,24 +232,23 @@ export function ReportView({
         </div>
       )}
 
+      {/* Blockers */}
       {report.blockers.filter((b) => b.text.trim()).length > 0 && (
         <div className="mt-[50px]">
-          <h2
-            className="font-mono text-xs font-normal tracking-[0.14em] uppercase pb-[11px] border-b border-[var(--hair)] mb-6"
-            style={{ color: "var(--mute)" }}
-          >
-            Blockers / Risks
-          </h2>
+          {sectionHead("Blockers / Risks")}
           <ul className="list-none">
             {report.blockers
               .filter((b) => b.text.trim())
               .map((b, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-3.5 py-3 border-b border-[var(--hair)] font-display text-base leading-snug"
-                  style={{ color: "var(--white)" }}
+                  className="flex items-start gap-3.5 py-3 font-display text-base leading-snug"
+                  style={{
+                    color: "var(--paper-ink)",
+                    borderBottom: "1px solid var(--p-hair)",
+                  }}
                 >
-                  <span style={{ color: "var(--neg)" }}>&mdash;</span>
+                  <span style={{ color: "var(--neg-paper)" }}>-</span>
                   <span>{b.text}</span>
                 </li>
               ))}
@@ -241,17 +256,13 @@ export function ReportView({
         </div>
       )}
 
+      {/* Notes */}
       {report.notes && (
         <div className="mt-[50px]">
-          <h2
-            className="font-mono text-xs font-normal tracking-[0.14em] uppercase pb-[11px] border-b border-[var(--hair)] mb-6"
-            style={{ color: "var(--mute)" }}
-          >
-            Notes &amp; Observations
-          </h2>
+          {sectionHead("Notes & Observations")}
           <p
             className="font-display italic font-light text-base leading-[1.7]"
-            style={{ color: "var(--mute)" }}
+            style={{ color: "var(--p-mute)" }}
           >
             {report.notes}
           </p>
@@ -259,8 +270,11 @@ export function ReportView({
       )}
 
       <footer
-        className="mt-16 pt-4 border-t border-[var(--hair)] flex justify-between gap-3 flex-wrap font-mono text-[9px] tracking-[0.14em] uppercase"
-        style={{ color: "var(--faint)" }}
+        className="mt-16 pt-4 flex justify-between gap-3 flex-wrap font-mono text-[9px] tracking-[0.14em] uppercase"
+        style={{
+          color: "var(--p-faint)",
+          borderTop: "1px solid var(--p-hair)",
+        }}
       >
         <span>
           Prepared by Victory Velocity &middot;{" "}

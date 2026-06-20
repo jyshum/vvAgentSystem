@@ -1,4 +1,10 @@
-export function scoreColor(rate: number): string {
+export function scoreColor(rate: number, paper?: boolean): string {
+  if (paper) {
+    if (rate === 0) return "var(--neg-paper)";
+    if (rate < 0.25) return "#c45c00";
+    if (rate < 0.5) return "#8a6a00";
+    return "var(--pos-paper)";
+  }
   if (rate === 0) return "var(--neg)";
   if (rate < 0.25) return "#fd7e14";
   if (rate < 0.5) return "#ffc107";

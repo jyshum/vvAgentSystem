@@ -1,1 +1,1 @@
-worker: cd agents && python run.py --client-id $CLIENT_ID
+worker: cd agents && python run.py --client-id $CLIENT_ID --upload

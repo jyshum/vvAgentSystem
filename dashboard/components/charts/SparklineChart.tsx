@@ -3,6 +3,7 @@ interface SparklineChartProps {
   direction?: "up" | "down" | "flat" | "none";
   width?: number;
   height?: number;
+  paper?: boolean;
 }
 
 export function SparklineChart({
@@ -10,6 +11,7 @@ export function SparklineChart({
   direction = "none",
   width = 160,
   height = 30,
+  paper = false,
 }: SparklineChartProps) {
   const pts = values.filter(
     (v): v is number => v !== null && !isNaN(v)
@@ -28,7 +30,7 @@ export function SparklineChart({
           x="0"
           y={height - 9}
           className="font-mono text-[8px] tracking-[0.1em]"
-          fill="var(--faint)"
+          fill={paper ? "var(--p-faint)" : "var(--faint)"}
         >
           needs 2+ data points
         </text>
@@ -59,19 +61,21 @@ export function SparklineChart({
       .join(" ") +
     ` L${last[0].toFixed(1)} ${(height - pad).toFixed(1)} Z`;
 
-  const strokeColor =
-    direction === "up"
+  const strokeColor = paper
+    ? direction === "up"
+      ? "var(--pos-paper)"
+      : direction === "down"
+        ? "var(--neg-paper)"
+        : "rgba(23,21,15,0.3)"
+    : direction === "up"
       ? "var(--pos)"
       : direction === "down"
         ? "var(--neg)"
         : "rgba(245,244,241,0.5)";
 
-  const fillColor =
-    direction === "up"
-      ? "var(--pos)"
-      : direction === "down"
-        ? "var(--neg)"
-        : "rgba(245,244,241,0.5)";
+  const fillColor = strokeColor;
+
+  const dotFill = paper ? "var(--paper-ink)" : "var(--white)";
 
   return (
     <svg
@@ -92,7 +96,7 @@ export function SparklineChart({
         cx={last[0].toFixed(1)}
         cy={last[1].toFixed(1)}
         r={2.2}
-        fill="var(--white)"
+        fill={dotFill}
         vectorEffect="non-scaling-stroke"
       />
     </svg>

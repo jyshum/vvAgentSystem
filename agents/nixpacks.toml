@@ -2,4 +2,4 @@
 cmds = ["pip install -e ."]
 
 [start]
-cmd = "python run.py --client-id $CLIENT_ID"
+cmd = "python run.py --client-id $CLIENT_ID --upload"

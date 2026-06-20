@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { scoreColor, formatRate, formatDelta } from "@/lib/utils";
 import type { Client, TrackerRun, Report } from "@/lib/types";
@@ -24,18 +23,17 @@ export function ClientRow({ client, latestRun, previousRun, latestReport }: Clie
 
   return (
     <div
-      className="grid items-center py-5 px-4 border-b transition-all duration-[200ms] group cursor-pointer"
+      className="grid items-center py-5 px-4 border-b transition-all duration-[200ms] group"
       style={{
         gridTemplateColumns: "2fr 1fr 1fr 1.4fr 80px",
         gap: "16px",
         borderColor: "var(--hair)",
       }}
-      onClick={() => router.push(`/admin/clients/${client.id}/runs`)}
     >
-      {/* Client name + domain */}
+      {/* Brand name + domain */}
       <div className="group-hover:pl-3 transition-all duration-[200ms]" style={{ transitionTimingFunction: "cubic-bezier(.2,.8,.2,1)" }}>
         <div className="font-serif text-[18px]" style={{ color: "var(--white)" }}>
-          {client.name}
+          {client.brand_name || client.name}
         </div>
         <div className="font-mono text-[9px] tracking-[0.08em] mt-0.5" style={{ color: "var(--faint)" }}>
           {client.website_domain}
@@ -99,13 +97,13 @@ export function ClientRow({ client, latestRun, previousRun, latestReport }: Clie
       </div>
 
       {/* Open button */}
-      <div onClick={(e) => e.stopPropagation()}>
+      <div>
         <button
           onClick={() => router.push(`/admin/clients/${client.id}/runs`)}
-          className="font-mono text-[9px] tracking-[0.1em] py-1.5 px-3 transition-all duration-200 opacity-0 group-hover:opacity-100"
-          style={{ color: "var(--faint)", border: "1px solid var(--hair)", background: "transparent" }}
-          onMouseEnter={e => { (e.target as HTMLButtonElement).style.color = "var(--white)"; (e.target as HTMLButtonElement).style.borderColor = "var(--ghost)"; }}
-          onMouseLeave={e => { (e.target as HTMLButtonElement).style.color = "var(--faint)"; (e.target as HTMLButtonElement).style.borderColor = "var(--hair)"; }}
+          className="font-mono text-[9px] tracking-[0.1em] py-1.5 px-3 transition-all duration-150 active:scale-[0.97]"
+          style={{ color: "var(--white)", border: "1px solid var(--ghost)", background: "transparent" }}
+          onMouseEnter={e => { (e.currentTarget).style.background = "var(--white)"; (e.currentTarget).style.color = "var(--ink)"; }}
+          onMouseLeave={e => { (e.currentTarget).style.background = "transparent"; (e.currentTarget).style.color = "var(--white)"; }}
         >
           OPEN →
         </button>

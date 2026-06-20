@@ -80,7 +80,8 @@ def main():
     args = parser.parse_args()
 
     if not args.client_id and not args.config:
-        parser.error("Either a config file path or --client-id is required.")
+        print("No CLIENT_ID set — waiting for next trigger. Exiting.")
+        raise SystemExit(0)
 
     if args.client_id:
         config = fetch_config_from_supabase(args.client_id)

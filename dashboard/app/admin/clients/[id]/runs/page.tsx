@@ -26,11 +26,10 @@ export default async function RunsPage({
 
   const client = clientData as Pick<Client, "name" | "target_queries"> | null;
   const allRuns = (runs as TrackerRun[]) || [];
-  const reportedRunIds = new Set(
-    ((reports || []) as Pick<Report, "id" | "run_id">[])
-      .map((r) => r.run_id)
-      .filter(Boolean) as string[]
-  );
+  const reportByRunId: Record<string, string> = {};
+  ((reports || []) as Pick<Report, "id" | "run_id">[]).forEach((r) => {
+    if (r.run_id) reportByRunId[r.run_id] = r.id;
+  });
   const expectedQueries = client?.target_queries?.length ?? 8;
 
   // Fetch result counts per run for QUERIES column
@@ -63,7 +62,7 @@ export default async function RunsPage({
             Results are saved automatically when complete.
           </div>
         </div>
-        <TriggerRunButton clientId={id} />
+        <TriggerRunButton clientId={id} latestRunAt={allRuns[0]?.ran_at ?? null} />
       </div>
 
       {allRuns.length === 0 ? (
@@ -76,7 +75,7 @@ export default async function RunsPage({
           <div
             className="grid pb-2.5 border-b font-mono text-[8px] tracking-[0.14em] uppercase"
             style={{
-              gridTemplateColumns: "1.5fr 1fr 1fr 80px 1fr 110px",
+              gridTemplateColumns: "1.5fr 1fr 1fr 80px 1fr 190px",
               gap: "16px",
               borderColor: "var(--hair)",
               color: "var(--faint)",
@@ -87,7 +86,7 @@ export default async function RunsPage({
             <span>CITATION</span>
             <span>QUERIES</span>
             <span>STATUS</span>
-            <span>REPORT</span>
+            <span>ACTIONS</span>
           </div>
 
           {allRuns.map((run) => (
@@ -95,7 +94,7 @@ export default async function RunsPage({
               key={run.id}
               run={run}
               clientId={id}
-              hasReport={reportedRunIds.has(run.id)}
+              reportId={reportByRunId[run.id] ?? null}
               expectedQueries={expectedQueries}
               resultCount={runResultCounts[run.id] ?? 0}
             />

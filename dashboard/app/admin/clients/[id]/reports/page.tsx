@@ -34,16 +34,6 @@ export default async function ReportsPage({
 
   return (
     <div>
-      <div className="flex items-center justify-end mb-8">
-        <Link
-          href={`/api/admin/create-report?clientId=${id}`}
-          className="font-mono text-[9px] tracking-[0.14em] uppercase py-3 px-5 transition-all duration-200 hover:bg-[var(--white)] hover:text-[var(--ink)]"
-          style={{ color: "var(--faint)", border: "1px solid var(--hair)", background: "transparent" }}
-        >
-          + NEW BLANK REPORT
-        </Link>
-      </div>
-
       {allReports.length === 0 ? (
         <p className="font-serif italic" style={{ color: "var(--mute)" }}>
           No reports yet. Go to RUNS to create a report from a tracker run.
