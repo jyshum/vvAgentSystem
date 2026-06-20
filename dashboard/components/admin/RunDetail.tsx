@@ -67,11 +67,26 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
     return { engine: eng, cited, mentioned, notFound: total - cited - mentioned, total };
   });
 
+  // All forms the brand might appear in responses (brand_name, name, variations)
+  const brandTerms: string[] = [
+    client.brand_name,
+    client.name,
+    ...(client.brand_variations || []),
+  ].filter(Boolean).map((t) => t.toLowerCase());
+
+  // Match by exact string OR by stripping spaces from both sides (handles "budgetyourmd" ↔ "Budget Your MD")
+  const isClientBrand = (name: string): boolean => {
+    const nameLower = name.toLowerCase();
+    const nameNorm = nameLower.replace(/\s+/g, "");
+    return brandTerms.some(
+      (term) => nameLower === term || nameNorm === term.replace(/\s+/g, "")
+    );
+  };
+
   const compCounts: Record<string, number> = {};
-  const brandNormalized = (client.brand_name || client.name).toLowerCase().replace(/\s+/g, "");
   results.forEach((r) => {
     r.competitor_mentions.forEach((c) => {
-      if (c.toLowerCase().replace(/\s+/g, "") !== brandNormalized) {
+      if (!isClientBrand(c)) {
         compCounts[c] = (compCounts[c] || 0) + 1;
       }
     });
@@ -329,7 +344,7 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
                       <td colSpan={5} style={{ padding: "0 0 12px 0", background: "rgba(245,244,241,0.02)" }}>
                         <div className="flex flex-col gap-0 pt-1">
                           {qResults.map((r) => (
-                            <ExpandedEngineRow key={r.id} result={r} brandName={client.brand_name || client.name} />
+                            <ExpandedEngineRow key={r.id} result={r} brandTerms={brandTerms} />
                           ))}
                         </div>
                       </td>
@@ -348,18 +363,29 @@ export function RunDetail({ run, results, client, clientId }: RunDetailProps) {
   );
 }
 
+function lineMatchesBrand(line: string, brandTerms: string[]): boolean {
+  const lineLower = line.toLowerCase();
+  const lineNorm = lineLower.replace(/\s+/g, "");
+  return brandTerms.some((term) => {
+    // Exact substring: catches "Budget Your MD" when term is "budget your md"
+    if (lineLower.includes(term)) return true;
+    // Space-stripped: catches "Budget Your MD" when term is "budgetyourmd"
+    const termNorm = term.replace(/\s+/g, "");
+    return termNorm.length > 2 && lineNorm.includes(termNorm);
+  });
+}
+
 function SpotlightText({
   text,
-  brandName,
+  brandTerms,
   open,
   onToggle,
 }: {
   text: string;
-  brandName: string;
+  brandTerms: string[];
   open: boolean;
   onToggle: (e: React.MouseEvent) => void;
 }) {
-  const brandLower = brandName.toLowerCase();
   const allLines = text.split(/\n/).filter((l) => l.trim().length > 0);
 
   // Preview: accumulate lines until ~340 chars
@@ -378,7 +404,7 @@ function SpotlightText({
     <div>
       <div className="flex flex-col gap-[3px]">
         {displayLines.map((line, i) => {
-          const isMatch = line.toLowerCase().includes(brandLower);
+          const isMatch = lineMatchesBrand(line, brandTerms);
           return (
             <div
               key={i}
@@ -410,7 +436,7 @@ function SpotlightText({
   );
 }
 
-function ExpandedEngineRow({ result, brandName }: { result: TrackerResult; brandName: string }) {
+function ExpandedEngineRow({ result, brandTerms }: { result: TrackerResult; brandTerms: string[] }) {
   const [open, setOpen] = useState(false);
   const hasText = result.response_text && result.response_text.length > 0;
   const showable = (result.brand_mentioned || result.brand_cited) && hasText;
@@ -444,7 +470,7 @@ function ExpandedEngineRow({ result, brandName }: { result: TrackerResult; brand
         {showable && (
           <SpotlightText
             text={result.response_text}
-            brandName={brandName}
+            brandTerms={brandTerms}
             open={open}
             onToggle={(e) => { e.stopPropagation(); setOpen(!open); }}
           />
