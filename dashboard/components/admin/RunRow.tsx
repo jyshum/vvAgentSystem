@@ -43,7 +43,7 @@ export function RunRow({ run, clientId, reportId, expectedQueries, resultCount }
       }}
     >
       {/* Date */}
-      <div>
+      <div className="transition-all duration-[200ms] group-hover:pl-3" style={{ transitionTimingFunction: "cubic-bezier(.2,.8,.2,1)" }}>
         <div className="font-serif text-[15px]" style={{ color: "var(--white)" }}>
           {new Date(run.ran_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
         </div>
