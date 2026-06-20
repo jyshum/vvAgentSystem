@@ -63,7 +63,7 @@ export default async function RunsPage({
             Results are saved automatically when complete.
           </div>
         </div>
-        <TriggerRunButton clientId={id} />
+        <TriggerRunButton clientId={id} latestRunAt={allRuns[0]?.ran_at ?? null} />
       </div>
 
       {allRuns.length === 0 ? (
