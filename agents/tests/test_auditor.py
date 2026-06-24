@@ -1,4 +1,4 @@
-from src.auditor import compute_site_summary
+from src.auditor import compute_site_summary, classify_page_type, get_applicable_pillars
 
 
 def test_compute_site_summary_calculates_averages():
@@ -40,3 +40,23 @@ def test_compute_site_summary_calculates_averages():
     assert summary["pillar_averages"]["Content Structure"] == 50
     assert summary["weakest_pillar"] == "Authority Signals"
     assert len(summary["weakest_pages"]) <= 3
+
+
+def test_classify_contact_as_utility():
+    assert classify_page_type("https://example.com/contact", "Contact Us", "") == "utility"
+
+def test_classify_blog_post_as_article():
+    assert classify_page_type("https://example.com/blog/daycare-tips", "5 Daycare Tips", "") == "article"
+
+def test_classify_homepage():
+    assert classify_page_type("https://example.com/", "ChildSpot — Find Childcare", "") == "homepage"
+
+def test_applicable_pillars_utility_only_schema():
+    pillars = get_applicable_pillars("utility")
+    assert "Schema Markup" in pillars
+    assert "Source Citations" not in pillars
+    assert "Fact Density" not in pillars
+
+def test_applicable_pillars_article_all_six():
+    pillars = get_applicable_pillars("article")
+    assert len(pillars) == 6

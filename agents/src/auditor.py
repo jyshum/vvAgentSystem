@@ -21,6 +21,48 @@ PILLAR_NAMES = [
 ]
 
 
+UTILITY_PATTERNS = ["/contact", "/privacy", "/terms", "/thank", "/404", "/sitemap"]
+ARTICLE_PATTERNS = ["/blog/", "/news/", "/post/", "/article/", "/guide/", "/tips/"]
+FAQ_PATTERNS = ["/faq", "/help/", "/support/", "/questions/"]
+ABOUT_PATTERNS = ["/about", "/team", "/story", "/mission"]
+SERVICE_PATTERNS = ["/service", "/product", "/solution", "/feature", "/pricing", "/how-it-works"]
+
+PILLAR_APPLICABILITY = {
+    "homepage": ["Content Structure", "Authority Signals", "Schema Markup"],
+    "about":    ["Content Structure", "Authority Signals", "Schema Markup"],
+    "service":  ["Content Structure", "Fact Density", "Source Citations", "Authority Signals", "Schema Markup"],
+    "article":  ["Content Structure", "Fact Density", "Source Citations", "Authority Signals", "Schema Markup", "Freshness"],
+    "faq":      ["Content Structure", "Source Citations", "Schema Markup"],
+    "utility":  ["Schema Markup"],
+}
+
+
+def classify_page_type(url: str, title: str, raw_text: str) -> str:
+    path = url.lower().split("?")[0]
+
+    if any(p in path for p in UTILITY_PATTERNS):
+        return "utility"
+    if any(p in path for p in ARTICLE_PATTERNS):
+        return "article"
+    if any(p in path for p in FAQ_PATTERNS):
+        return "faq"
+    if any(p in path for p in ABOUT_PATTERNS):
+        return "about"
+    if any(p in path for p in SERVICE_PATTERNS):
+        return "service"
+
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.path.strip("/") == "":
+        return "homepage"
+
+    return "service"
+
+
+def get_applicable_pillars(page_type: str) -> list[str]:
+    return PILLAR_APPLICABILITY.get(page_type, PILLAR_APPLICABILITY["service"])
+
+
 def discover_pages(domain: str, max_pages: int = 20) -> list[str]:
     base = f"https://{domain}"
 
@@ -91,14 +133,19 @@ def score_page(url: str, client_domain: str) -> dict | None:
         "Freshness": rules_scores["Freshness"],
     }
 
-    total_score = sum(p["score"] for p in pillars.values()) // len(pillars)
+    page_type = classify_page_type(url, page.title, page.raw_text)
+    applicable = get_applicable_pillars(page_type)
+
+    filtered_pillars = {name: data for name, data in pillars.items() if name in applicable}
+    total_score = sum(p["score"] for p in filtered_pillars.values()) // len(filtered_pillars)
 
     return {
         "url": url,
         "title": page.title,
+        "page_type": page_type,
         "word_count": page.word_count,
         "total_score": total_score,
-        "pillars": pillars,
+        "pillars": filtered_pillars,
     }
 
 
