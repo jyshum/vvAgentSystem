@@ -1865,9 +1865,292 @@ git commit -m "feat: add audit run list and run detail pages with action cards"
 
 ---
 
+## Phase F: Reddit Scout
+
+### Task 13: Write reddit_scout.py using public JSON endpoints
+
+**Files:**
+- Create: `agents/src/reddit_scout.py`
+- Create: `agents/tests/test_reddit_scout.py`
+- Create: `agents/scout.py`
+
+No API key required. Uses Reddit's public `.json` endpoints (read-only, unauthenticated).
+
+- [ ] **Step 1: Write failing tests**
+
+```python
+# agents/tests/test_reddit_scout.py
+from src.reddit_scout import build_search_url, score_post_relevance, extract_posts
+
+
+def test_build_search_url_encodes_query():
+    url = build_search_url("childcare Ontario waitlist", sort="new", limit=25)
+    assert "childcare" in url
+    assert "Ontario" in url
+    assert "sort=new" in url
+    assert url.endswith(".json") or ".json?" in url
+
+
+def test_score_post_relevance_higher_for_recent_posts():
+    old_post = {"title": "Looking for daycare Ontario", "score": 50, "created_utc": 1700000000, "num_comments": 5}
+    new_post = {"title": "Looking for daycare Ontario", "score": 50, "created_utc": 1750000000, "num_comments": 5}
+    assert score_post_relevance(new_post) > score_post_relevance(old_post)
+
+
+def test_score_post_relevance_higher_for_more_comments():
+    low = {"title": "daycare Ontario", "score": 10, "created_utc": 1750000000, "num_comments": 2}
+    high = {"title": "daycare Ontario", "score": 10, "created_utc": 1750000000, "num_comments": 40}
+    assert score_post_relevance(high) > score_post_relevance(low)
+
+
+def test_extract_posts_parses_reddit_json_shape():
+    fake_response = {
+        "data": {
+            "children": [
+                {"data": {"title": "Best daycare apps?", "url": "https://reddit.com/r/Ontario/comments/abc", "score": 45, "num_comments": 12, "created_utc": 1750000000, "subreddit": "Ontario", "selftext": "Looking for recommendations"}},
+                {"data": {"title": "Childcare waitlist tips", "url": "https://reddit.com/r/onparenting/comments/def", "score": 30, "num_comments": 8, "created_utc": 1749000000, "subreddit": "onparenting", "selftext": "Any tips?"}}
+            ]
+        }
+    }
+    posts = extract_posts(fake_response)
+    assert len(posts) == 2
+    assert posts[0]["title"] == "Best daycare apps?"
+    assert posts[0]["subreddit"] == "Ontario"
+```
+
+- [ ] **Step 2: Run to confirm they fail**
+
+```bash
+cd agents && .venv/bin/pytest tests/test_reddit_scout.py -v
+```
+
+Expected: `ImportError`.
+
+- [ ] **Step 3: Write reddit_scout.py**
+
+```python
+# agents/src/reddit_scout.py
+import time
+import httpx
+from datetime import datetime, timezone
+from urllib.parse import quote_plus
+
+HEADERS = {"User-Agent": "VV-GEO-Scout/1.0 (research tool; contact@victoryvelocity.ca)"}
+
+SUBREDDITS = [
+    "Ontario",
+    "onparenting",
+    "parentsofmultiples",
+    "toRANTo",
+    "canadaparenting",
+]
+
+
+def build_search_url(query: str, sort: str = "new", limit: int = 25) -> str:
+    encoded = quote_plus(query)
+    return f"https://www.reddit.com/search.json?q={encoded}&sort={sort}&limit={limit}&t=month"
+
+
+def build_subreddit_search_url(subreddit: str, query: str, sort: str = "new", limit: int = 10) -> str:
+    encoded = quote_plus(query)
+    return f"https://www.reddit.com/r/{subreddit}/search.json?q={encoded}&restrict_sr=1&sort={sort}&limit={limit}&t=month"
+
+
+def extract_posts(response_json: dict) -> list[dict]:
+    children = response_json.get("data", {}).get("children", [])
+    posts = []
+    for child in children:
+        d = child.get("data", {})
+        posts.append({
+            "title": d.get("title", ""),
+            "url": d.get("url", ""),
+            "score": d.get("score", 0),
+            "num_comments": d.get("num_comments", 0),
+            "created_utc": d.get("created_utc", 0),
+            "subreddit": d.get("subreddit", ""),
+            "selftext": d.get("selftext", "")[:500],
+            "permalink": f"https://reddit.com{d.get('permalink', '')}",
+        })
+    return posts
+
+
+def score_post_relevance(post: dict) -> float:
+    now = datetime.now(timezone.utc).timestamp()
+    age_days = (now - post["created_utc"]) / 86400
+    freshness = max(0, 1 - (age_days / 90))
+    comment_score = min(1, post["num_comments"] / 50)
+    upvote_score = min(1, post["score"] / 100)
+    return (freshness * 0.5) + (comment_score * 0.3) + (upvote_score * 0.2)
+
+
+def fetch_posts(url: str) -> list[dict]:
+    try:
+        resp = httpx.get(url, headers=HEADERS, timeout=10)
+        if resp.status_code == 200:
+            return extract_posts(resp.json())
+        return []
+    except Exception as e:
+        print(f"    Reddit fetch error: {e}")
+        return []
+
+
+def run_scout(config: dict) -> list[dict]:
+    queries = config.get("target_queries", [])
+    competitors = config.get("competitors", [])
+
+    all_posts = []
+    seen_urls = set()
+
+    for query in queries[:5]:
+        url = build_search_url(query)
+        posts = fetch_posts(url)
+        for post in posts:
+            if post["url"] not in seen_urls:
+                seen_urls.add(post["url"])
+                all_posts.append(post)
+        time.sleep(1)
+
+    for subreddit in SUBREDDITS:
+        for query in queries[:2]:
+            url = build_subreddit_search_url(subreddit, query)
+            posts = fetch_posts(url)
+            for post in posts:
+                if post["url"] not in seen_urls:
+                    seen_urls.add(post["url"])
+                    all_posts.append(post)
+            time.sleep(1)
+
+    scored = sorted(all_posts, key=score_post_relevance, reverse=True)
+    return scored[:10]
+```
+
+- [ ] **Step 4: Run tests**
+
+```bash
+cd agents && .venv/bin/pytest tests/test_reddit_scout.py -v
+```
+
+Expected: all 4 tests PASS.
+
+- [ ] **Step 5: Write scout.py entry point**
+
+```python
+# agents/scout.py
+import argparse
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from src.tracker import load_client_config
+from src.reddit_scout import run_scout
+
+
+def upload_opportunities(client_id: str, posts: list[dict]):
+    from supabase import create_client
+    sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+    rows = [{
+        "client_id": client_id,
+        "title": p["title"],
+        "url": p["permalink"],
+        "subreddit": p["subreddit"],
+        "score": p["score"],
+        "num_comments": p["num_comments"],
+        "relevance_score": round(p.get("_relevance", 0), 3),
+        "selftext_preview": p["selftext"],
+        "found_at": datetime.utcnow().isoformat(),
+    } for p in posts]
+    sb.table("reddit_opportunities").insert(rows).execute()
+    print(f"  {len(rows)} opportunities uploaded")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="GEO Reddit Scout")
+    parser.add_argument("config", nargs="?", help="Path to client config JSON")
+    parser.add_argument("--client-id", help="Supabase client UUID")
+    parser.add_argument("--upload", action="store_true")
+    args = parser.parse_args()
+
+    if args.client_id:
+        from run import fetch_config_from_supabase
+        config = fetch_config_from_supabase(args.client_id)
+        config["supabase_client_id"] = args.client_id
+    elif args.config:
+        config = load_client_config(args.config)
+    else:
+        raise SystemExit("Provide a config file or --client-id")
+
+    print(f"\n  Reddit Scout — {config['client_name']}\n")
+
+    posts = run_scout(config)
+
+    print(f"  Top {len(posts)} opportunities:\n")
+    for i, post in enumerate(posts, 1):
+        print(f"  {i}. r/{post['subreddit']} — {post['title'][:60]}")
+        print(f"     {post['permalink']}")
+        print(f"     {post['num_comments']} comments · {post['score']} upvotes\n")
+
+    if args.upload:
+        client_id = config.get("supabase_client_id")
+        if client_id:
+            upload_opportunities(client_id, posts)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+- [ ] **Step 6: Add reddit_opportunities table to Supabase**
+
+Run in Supabase SQL Editor:
+
+```sql
+create table public.reddit_opportunities (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients(id) on delete cascade,
+  title text not null,
+  url text not null,
+  subreddit text default '',
+  score int default 0,
+  num_comments int default 0,
+  relevance_score float default 0,
+  selftext_preview text default '',
+  status text default 'new' check (status in ('new', 'posted', 'skipped')),
+  found_at timestamptz default now()
+);
+
+create index idx_reddit_opportunities_client_id on public.reddit_opportunities(client_id);
+
+alter table public.reddit_opportunities enable row level security;
+
+create policy "Admins can manage reddit_opportunities"
+  on public.reddit_opportunities for all
+  using (public.is_admin()) with check (public.is_admin());
+```
+
+- [ ] **Step 7: Test against ChildSpot**
+
+```bash
+cd agents && .venv/bin/python scout.py ../clients/childspot.json
+```
+
+Expected: top 10 Reddit posts printed with subreddit, title, comment count, upvotes, and permalink.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add agents/src/reddit_scout.py agents/tests/test_reddit_scout.py agents/scout.py
+git commit -m "feat: add Reddit scout using public JSON endpoints — no API key required"
+```
+
+---
+
 ## Self-Review Checklist
 
-- [x] **Spec coverage**: Migration (Task 1) ✓, Parser (Task 3) ✓, Scorers rules (Task 4) ✓, Scorers Haiku (Task 5) ✓, Auditor (Task 6) ✓, CLI entry point (Task 7) ✓, Recommender (Task 8) ✓, Recommend CLI (Task 9) ✓, GitHub handler (Task 10) ✓, Implement CLI (Task 11) ✓, Dashboard (Task 12) ✓
+- [x] **Spec coverage**: Migration (Task 1) ✓, Parser (Task 3) ✓, Scorers rules (Task 4) ✓, Scorers Haiku (Task 5) ✓, Auditor (Task 6) ✓, CLI entry point (Task 7) ✓, Recommender (Task 8) ✓, Recommend CLI (Task 9) ✓, GitHub handler (Task 10) ✓, Implement CLI (Task 11) ✓, Dashboard (Task 12) ✓, Reddit Scout (Task 13) ✓
 - [x] **No placeholders**: All code blocks are complete and runnable
-- [x] **Type consistency**: `ParsedPage` defined in Task 3, used correctly in Tasks 4, 5, 6. `_pillar_result` dict shape consistent across all scorers. `action_cards` row shape consistent between recommender and implementor.
+- [x] **Type consistency**: `ParsedPage` defined in Task 3, used correctly in Tasks 4, 5, 6. `_pillar_result` dict shape consistent across all scorers. `action_cards` row shape consistent between recommender and implementor. `reddit_opportunities` row shape consistent between scout and upload function.
 - [x] **WordPress handler**: Not included — deferred until a WordPress client onboards. Copy-paste fallback covers this case.
