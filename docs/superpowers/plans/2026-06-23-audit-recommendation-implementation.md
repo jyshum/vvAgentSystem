@@ -2148,6 +2148,137 @@ git commit -m "feat: add Reddit scout using public JSON endpoints — no API key
 
 ---
 
+## Phase G: Page-Type Aware Scoring
+
+### Task 14: Add page-type classification and pillar applicability filtering
+
+**Context:** The current scorer runs all 6 pillars on every page regardless of page type. A contact page scoring 0/100 on Source Citations is a false negative — citations don't belong there. This distorts the site score and generates meaningless action cards. The fix is to classify each page type first, then run only the applicable pillar subset.
+
+**Files:**
+- Modify: `agents/src/auditor.py` — add `classify_page_type`, filter pillar results before returning
+- Modify: `agents/tests/test_auditor.py` — add tests for classification and filtered scoring
+
+**Page-type → applicable pillars:**
+
+| Page Type | Content Structure | Fact Density | Source Citations | Authority Signals | Schema Markup | Freshness |
+|---|---|---|---|---|---|---|
+| article | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| service | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| homepage | ✓ | — | — | ✓ | ✓ | — |
+| about | ✓ | — | — | ✓ | ✓ | — |
+| faq | ✓ | — | ✓ | — | ✓ | — |
+| utility | — | — | — | — | ✓ | — |
+
+- [ ] **Step 1: Write failing tests**
+
+```python
+from src.auditor import classify_page_type, get_applicable_pillars
+
+def test_classify_contact_as_utility():
+    assert classify_page_type("https://example.com/contact", "Contact Us", "") == "utility"
+
+def test_classify_blog_post_as_article():
+    assert classify_page_type("https://example.com/blog/daycare-tips", "5 Daycare Tips", "") == "article"
+
+def test_classify_homepage():
+    assert classify_page_type("https://example.com/", "ChildSpot — Find Childcare", "") == "homepage"
+
+def test_applicable_pillars_utility_only_schema():
+    pillars = get_applicable_pillars("utility")
+    assert "Schema Markup" in pillars
+    assert "Source Citations" not in pillars
+    assert "Fact Density" not in pillars
+
+def test_applicable_pillars_article_all_six():
+    pillars = get_applicable_pillars("article")
+    assert len(pillars) == 6
+```
+
+Run: `pytest tests/test_auditor.py -v` — expect failure.
+
+- [ ] **Step 2: Implement `classify_page_type` and `get_applicable_pillars` in auditor.py**
+
+```python
+UTILITY_PATTERNS = ["/contact", "/privacy", "/terms", "/thank", "/404", "/sitemap"]
+ARTICLE_PATTERNS = ["/blog/", "/news/", "/post/", "/article/", "/guide/", "/tips/"]
+FAQ_PATTERNS = ["/faq", "/help/", "/support/", "/questions/"]
+ABOUT_PATTERNS = ["/about", "/team", "/story", "/mission"]
+SERVICE_PATTERNS = ["/service", "/product", "/solution", "/feature", "/pricing", "/how-it-works"]
+
+PILLAR_APPLICABILITY = {
+    "homepage":  ["Content Structure", "Authority Signals", "Schema Markup"],
+    "about":     ["Content Structure", "Authority Signals", "Schema Markup"],
+    "service":   ["Content Structure", "Fact Density", "Source Citations", "Authority Signals", "Schema Markup"],
+    "article":   ["Content Structure", "Fact Density", "Source Citations", "Authority Signals", "Schema Markup", "Freshness"],
+    "faq":       ["Content Structure", "Source Citations", "Schema Markup"],
+    "utility":   ["Schema Markup"],
+}
+
+
+def classify_page_type(url: str, title: str, raw_text: str) -> str:
+    path = url.lower().split("?")[0]
+
+    if any(p in path for p in UTILITY_PATTERNS):
+        return "utility"
+    if any(p in path for p in ARTICLE_PATTERNS):
+        return "article"
+    if any(p in path for p in FAQ_PATTERNS):
+        return "faq"
+    if any(p in path for p in ABOUT_PATTERNS):
+        return "about"
+    if any(p in path for p in SERVICE_PATTERNS):
+        return "service"
+
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.path.strip("/") == "":
+        return "homepage"
+
+    return "service"  # default for unknown content pages
+
+
+def get_applicable_pillars(page_type: str) -> list[str]:
+    return PILLAR_APPLICABILITY.get(page_type, PILLAR_APPLICABILITY["service"])
+```
+
+- [ ] **Step 3: Update `score_page` in auditor.py to filter pillars**
+
+In `score_page`, after computing all pillar scores, add:
+
+```python
+page_type = classify_page_type(url, page.title, page.raw_text)
+applicable = get_applicable_pillars(page_type)
+
+filtered_pillars = {name: data for name, data in pillars.items() if name in applicable}
+total_score = sum(p["score"] for p in filtered_pillars.values()) // len(filtered_pillars)
+
+return {
+    "url": url,
+    "title": page.title,
+    "page_type": page_type,
+    "word_count": page.word_count,
+    "total_score": total_score,
+    "pillars": filtered_pillars,
+}
+```
+
+- [ ] **Step 4: Run tests**
+
+```bash
+cd agents && .venv/bin/pytest tests/test_auditor.py -v
+```
+
+Expected: all tests pass including the 5 new ones.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add agents/src/auditor.py agents/tests/test_auditor.py
+git commit -m "feat: add page-type classification and pillar applicability filtering"
+```
+
+---
+
 ## Self-Review Checklist
 
 - [x] **Spec coverage**: Migration (Task 1) ✓, Parser (Task 3) ✓, Scorers rules (Task 4) ✓, Scorers Haiku (Task 5) ✓, Auditor (Task 6) ✓, CLI entry point (Task 7) ✓, Recommender (Task 8) ✓, Recommend CLI (Task 9) ✓, GitHub handler (Task 10) ✓, Implement CLI (Task 11) ✓, Dashboard (Task 12) ✓, Reddit Scout (Task 13) ✓
