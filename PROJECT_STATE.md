@@ -1,49 +1,75 @@
 # VV Agent System — Project State
 
 ## What This Is
-GEO (Generative Engine Optimization) tracking platform for Victory Velocity agency. Measures how often client brands appear in AI search responses across ChatGPT, Perplexity, Claude, and Gemini.
+GEO (Generative Engine Optimization) platform for Victory Velocity agency. Tracks how often client brands appear in AI responses, audits client websites for GEO health, and generates actionable fixes.
+
+---
+
+## Where Things Live
+
+| Layer | Status | URL / Location |
+|-------|--------|----------------|
+| Dashboard (Next.js) | Live | `dashboard-bice-two-ikwc6u6ndz.vercel.app` |
+| Custom domain | Pending DNS | `app.victoryvelocity.ca` → CNAME → `cname.vercel-dns.com` |
+| Supabase | Live | Project `vv-dashboard` (ref: `nihunlzmqcyqiacnkyxm`, US West) |
+| Python agents | Local only | Run manually from `agents/` |
+
+---
 
 ## Components
 
-### Tracker (`agents/`)
-Python CLI that queries 4 LLM engines with client-defined queries, detects brand mentions/citations, scores competitors, outputs CSV/JSON/HTML, optionally uploads to Supabase.
+### AI Visibility Tracker
+Queries ChatGPT, Perplexity, Claude, and Gemini with client target queries. Detects brand mentions and citations. Results saved to Supabase and viewable in dashboard.
 
-Run: `cd agents && .venv/bin/python run.py ../clients/childspot.json --upload`
+`python run.py --client-id <uuid> --upload`
 
-### Dashboard (`dashboard/`)
-Next.js 16 + Tailwind v4 + Supabase. Deployed on Vercel at `dashboard-bice-two-ikwc6u6ndz.vercel.app`.
+### GEO Audit System *(branch: feat/audit-recommendation-engine — not yet merged)*
+Crawls a client's website, scores each page against 6 GEO pillars (Content Structure, Fact Density, Source Citations, Authority Signals, Schema Markup, Freshness). Uses page-type classification so only relevant pillars apply per page. Generates before/after action cards for weak pages. Can open GitHub PRs with fixes.
 
-- **Admin** (`/admin`): client list, client detail, invite users, create reports, two-pane report editor
-- **Client** (`/dashboard`): visibility overview, trend chart, report list, report view with print-to-PDF
-- **Auth**: magic link, invite-only, role-based routing
+```
+python audit.py --client-id <uuid> --upload
+python recommend.py --run-id <uuid> --upload
+python implement.py --card-id <uuid>
+```
 
-### Client Configs (`clients/`)
-JSON files per client with brand info, target queries, competitors, `supabase_client_id`.
+**Requires:** Run `supabase/migrations/002_audit_schema.sql` in Supabase SQL Editor before using.
 
-## Infrastructure
+### Reddit Scout *(same branch)*
+Surfaces Reddit posts where the client brand should be mentioned but isn't. Uses public `.json` endpoints — no API key required.
 
-| Service | Details |
-|---------|---------|
-| Supabase | Project `vv-dashboard` (ref: `nihunlzmqcyqiacnkyxm`, US West) |
-| Vercel | Project `dashboard` under `jyshums-projects` |
-| DNS | Pending: `app.victoryvelocity.ca` CNAME → `cname.vercel-dns.com` |
+`python scout.py --client-id <uuid> --upload`
+
+---
 
 ## Live Clients
 
-| Client | Supabase ID | Queries | Latest Run |
-|--------|-------------|---------|------------|
-| ChildSpot | `302eb603-3a0c-4429-bd8e-191ac30a965a` | 8 (3 generic, 3 angle, 2 operator) | 2026-06-17 — 16% mention, 0% citation |
+| Client | Supabase ID | Latest Tracker Run |
+|--------|-------------|--------------------|
+| ChildSpot | `302eb603-3a0c-4429-bd8e-191ac30a965a` | 2026-06-17 — 16% mention, 0% citation |
+
+---
 
 ## Key Files
-- Schema: `supabase/migrations/001_initial_schema.sql`
-- Tracker entry: `agents/run.py`
-- Upload module: `agents/src/upload.py`
-- Dashboard env: `dashboard/.env.local`
-- Tracker env: `agents/.env`
 
-## Remaining
-- DNS setup (co-founder adds CNAME)
-- Vercel custom domain (`vercel domains add app.victoryvelocity.ca`)
-- Auto-scheduling tracker runs (deferred)
-- Server-side PDF generation (deferred)
-- GSC integration (deferred)
+| File | Purpose |
+|------|---------|
+| `supabase/migrations/001_initial_schema.sql` | Tracker tables |
+| `supabase/migrations/002_audit_schema.sql` | Audit tables (run manually) |
+| `agents/run.py` | Tracker CLI |
+| `agents/audit.py` | Audit CLI |
+| `agents/recommend.py` | Recommendation engine CLI |
+| `agents/implement.py` | Implementation handler CLI |
+| `agents/scout.py` | Reddit scout CLI |
+| `clients/childspot.json` | ChildSpot config |
+| `agents/.env` | ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY |
+| `dashboard/.env.local` | Supabase keys for Next.js |
+
+---
+
+## Deferred
+
+- Auto-scheduling tracker and audit runs
+- Server-side PDF generation
+- GSC integration
+- WordPress implementation handler (copy-paste fallback used until a WP client onboards)
+- Webflow implementation handler
