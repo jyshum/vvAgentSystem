@@ -9,8 +9,9 @@ HIGH_VALUE_SCHEMA = {"FAQPage", "HowTo", "Article", "NewsArticle", "BlogPosting"
 BASELINE_SCHEMA = {"LocalBusiness", "Organization", "Product", "Service", "BreadcrumbList"}
 
 
-def _pillar_result(score: int, issues: list[str], recommendations: list[str]) -> dict:
-    return {"score": score, "issues": issues, "recommendations": recommendations}
+def _pillar_result(score: int, issues: list[str], recommendations: list[str],
+                   strengths: list[str] | None = None) -> dict:
+    return {"score": score, "strengths": strengths or [], "issues": issues, "recommendations": recommendations}
 
 
 def score_source_citations(page, client_domain: str) -> dict:
@@ -39,7 +40,13 @@ def score_source_citations(page, client_domain: str) -> dict:
     if not authoritative and external:
         recommendations.append("Upgrade at least one citation to a .gov, .edu, or .org source")
 
-    return _pillar_result(score, issues, recommendations)
+    strengths = []
+    if len(external) >= 3:
+        strengths.append(f"{len(external)} external citations in body content")
+    if authoritative:
+        strengths.append(f"{len(authoritative)} authoritative source(s) (.gov, .edu, .org)")
+
+    return _pillar_result(score, issues, recommendations, strengths)
 
 
 def score_schema_markup(page) -> dict:
@@ -85,12 +92,21 @@ def score_schema_markup(page) -> dict:
         recommendations.append("Add FAQPage schema to any page with questions and answers")
         recommendations.append("Add Organization schema to the homepage")
 
-    return _pillar_result(score, issues, recommendations)
+    strengths = []
+    if high_value and baseline:
+        strengths.append(f"{', '.join(high_value)} and {', '.join(baseline)} schema both present — best-in-class coverage")
+    elif high_value:
+        strengths.append(f"High-value schema present: {', '.join(high_value)}")
+    elif baseline:
+        strengths.append(f"Baseline schema present: {', '.join(baseline)}")
+
+    return _pillar_result(score, issues, recommendations, strengths)
 
 
 def score_freshness(page) -> dict:
     issues = []
     recommendations = []
+    strengths = []
 
     date_str = page.modified_date or page.last_modified_header
 
@@ -107,7 +123,7 @@ def score_freshness(page) -> dict:
         issues.append("No publication or modification date found on this page")
         recommendations.append("Add <meta property='article:modified_time' content='YYYY-MM-DDT00:00:00Z'> to the page head")
         recommendations.append("Add a visible 'Last updated [date]' line near the top of the content")
-        return _pillar_result(20, issues, recommendations)
+        return _pillar_result(20, issues, recommendations, strengths)
 
     try:
         try:
@@ -123,6 +139,7 @@ def score_freshness(page) -> dict:
 
         if age_days <= 90:
             score = 100
+            strengths.append(f"Content is current — last modified {age_days} days ago")
         elif age_days <= 180:
             score = 65
             recommendations.append(f"Content is {age_days} days old — add a new section or updated statistic and refresh the modified date")
@@ -140,7 +157,7 @@ def score_freshness(page) -> dict:
         recommendations.append("Use ISO 8601 format: YYYY-MM-DDT00:00:00Z")
         score = 15
 
-    return _pillar_result(score, issues, recommendations)
+    return _pillar_result(score, issues, recommendations, strengths)
 
 
 import json
