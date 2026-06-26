@@ -1,4 +1,6 @@
-from src.auditor import compute_site_summary, classify_page_type, get_applicable_pillars
+from unittest.mock import patch, MagicMock
+from src.auditor import compute_site_summary, classify_page_type, get_applicable_pillars, score_page
+from src.renderer import RenderResult
 
 
 def test_compute_site_summary_calculates_averages():
@@ -79,3 +81,27 @@ def test_classify_register_as_utility():
 
 def test_classify_submit_as_utility():
     assert classify_page_type("https://example.com/submit", "Submit", "") == "utility"
+
+
+def test_score_page_uses_renderer_for_non_utility():
+    mock_render = RenderResult(
+        url="https://example.com/about",
+        html='<html><head><title>About</title></head><body><h1>About Us</h1><p>We are a company that does things and has many employees working hard every day.</p></body></html>',
+        screenshot=b"fake-png",
+        success=True,
+        error=None,
+    )
+
+    fake_haiku = {
+        "content_structure": {"score": 50, "strengths": [], "issues": ["Opening is generic"], "recommendations": ["Rewrite"]},
+        "fact_density": {"score": 30, "strengths": [], "issues": ["Low"], "recommendations": ["Add stats"]},
+        "authority_signals": {"score": 10, "strengths": [], "issues": ["None found"], "recommendations": ["Add press"]},
+    }
+
+    with patch("src.auditor.render_page", return_value=mock_render), \
+         patch("src.auditor.classify_page_with_vision", return_value="about"), \
+         patch("src.auditor.score_with_haiku_batch", return_value=fake_haiku):
+        result = score_page("https://example.com/about", "example.com")
+
+    assert result is not None
+    assert result["page_type"] == "about"
