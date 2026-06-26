@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -8,11 +9,88 @@ from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from src.graph.pipeline import build_graph
 from langgraph.types import Command
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 API_KEY = os.environ.get("API_KEY", "dev-key")
 
-app = FastAPI(title="GEO Agent API")
 graph = build_graph()
+scheduler = BackgroundScheduler()
+
+
+def trigger_scheduled_run(client_id: str):
+    thread_id = f"{client_id}-scheduled-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    config = {"configurable": {"thread_id": thread_id}}
+    print(f"  [Scheduler] Starting pipeline for {client_id} (thread: {thread_id})")
+
+    try:
+        graph.invoke(
+            {
+                "client_id": client_id,
+                "run_type": "full",
+                "thread_id": thread_id,
+                "client_config": {},
+                "tracker_results": [],
+                "tracker_scores": {},
+                "audit_pages": [],
+                "audit_summary": {},
+                "action_cards": [],
+                "approved_card_ids": [],
+                "implementation_results": [],
+                "reddit_posts": [],
+                "error": None,
+            },
+            config=config,
+        )
+        print(f"  [Scheduler] Pipeline paused at approval for {client_id}")
+    except Exception as e:
+        print(f"  [Scheduler] Pipeline failed for {client_id}: {e}")
+
+
+def load_schedules():
+    try:
+        from supabase import create_client
+        sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+        result = sb.table("clients").select("id, cycle_frequency, cycle_day").execute()
+
+        day_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
+        offset_minutes = 0
+
+        for client in result.data:
+            client_id = client["id"]
+            cycle_day = day_map.get(client.get("cycle_day", 1), "mon")
+
+            trigger = CronTrigger(
+                day_of_week=cycle_day,
+                hour=2,
+                minute=offset_minutes,
+            )
+
+            scheduler.add_job(
+                trigger_scheduled_run,
+                trigger=trigger,
+                args=[client_id],
+                id=f"cycle-{client_id}",
+                replace_existing=True,
+            )
+            print(f"  [Scheduler] Scheduled {client_id} for {cycle_day} 02:{offset_minutes:02d}")
+            offset_minutes += 15
+
+    except Exception as e:
+        print(f"  [Scheduler] Failed to load schedules: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    load_schedules()
+    scheduler.start()
+    print("  [Scheduler] Started")
+    yield
+    scheduler.shutdown()
+    print("  [Scheduler] Stopped")
+
+
+app = FastAPI(title="GEO Agent API", lifespan=lifespan)
 
 
 def verify_auth(authorization: str | None = None):
