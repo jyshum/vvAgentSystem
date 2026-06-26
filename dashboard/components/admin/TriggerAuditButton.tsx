@@ -1,25 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export function TriggerRunButton({ clientId, latestRunAt }: { clientId: string; latestRunAt?: string | null }) {
+export function TriggerAuditButton({ clientId, latestAuditAt }: { clientId: string; latestAuditAt?: string | null }) {
   const [state, setState] = useState<"idle" | "loading" | "triggered" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const router = useRouter();
 
-  // After trigger, poll every 15s for a new run row
   const poll = useCallback(async (triggeredAt: number) => {
     const supabase = createClient();
     const elapsed = Date.now() - triggeredAt;
     if (elapsed > 15 * 60 * 1000) {
-      // Give up after 15 min
       setState("idle");
       return;
     }
     const { data } = await supabase
-      .from("tracker_runs")
+      .from("audit_runs")
       .select("id, ran_at")
       .eq("client_id", clientId)
       .order("ran_at", { ascending: false })
@@ -27,14 +25,13 @@ export function TriggerRunButton({ clientId, latestRunAt }: { clientId: string; 
       .single();
 
     const newRunAt = data?.ran_at;
-    if (newRunAt && newRunAt !== latestRunAt) {
-      // New run appeared
+    if (newRunAt && newRunAt !== latestAuditAt) {
       router.refresh();
       setState("idle");
     } else {
       setTimeout(() => poll(triggeredAt), 15000);
     }
-  }, [clientId, latestRunAt, router]);
+  }, [clientId, latestAuditAt, router]);
 
   async function trigger() {
     setState("loading");
@@ -43,7 +40,7 @@ export function TriggerRunButton({ clientId, latestRunAt }: { clientId: string; 
       const res = await fetch("/api/runs/trigger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, runType: "tracker_only" }),
+        body: JSON.stringify({ clientId, runType: "audit_only" }),
       });
       if (!res.ok) {
         let msg = "API error";
@@ -56,7 +53,6 @@ export function TriggerRunButton({ clientId, latestRunAt }: { clientId: string; 
         throw new Error(msg);
       }
       setState("triggered");
-      // Start polling for the new run
       setTimeout(() => poll(Date.now()), 15000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -67,9 +63,9 @@ export function TriggerRunButton({ clientId, latestRunAt }: { clientId: string; 
   }
 
   const labels = {
-    idle: "RUN NOW",
+    idle: "RUN AUDIT",
     loading: "STARTING...",
-    triggered: "RUNNING...",
+    triggered: "AUDITING...",
     error: "ERROR — RETRY",
   };
 
@@ -93,7 +89,7 @@ export function TriggerRunButton({ clientId, latestRunAt }: { clientId: string; 
       </button>
       {state === "triggered" && (
         <div className="font-mono text-[8px] tracking-[0.04em] text-right" style={{ color: "var(--mute)" }}>
-          Agent running · checking every 15s
+          Auditing site · checking every 15s
         </div>
       )}
       {state === "error" && errorMsg && (
