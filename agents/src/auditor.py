@@ -122,7 +122,9 @@ def score_page(url: str, client_domain: str) -> dict | None:
         "Freshness": score_freshness(page),
     }
 
-    haiku_scores = score_with_haiku_batch(page.raw_text, page.paragraphs, page.headings)
+    page_type = classify_page_type(url, page.title, page.raw_text)
+    haiku_scores = score_with_haiku_batch(page.raw_text, page.paragraphs, page.headings,
+                                          page_type=page_type, url=url)
 
     pillars = {
         "Content Structure": haiku_scores.get("content_structure", {"score": 0, "issues": [], "recommendations": []}),
@@ -132,8 +134,6 @@ def score_page(url: str, client_domain: str) -> dict | None:
         "Schema Markup": rules_scores["Schema Markup"],
         "Freshness": rules_scores["Freshness"],
     }
-
-    page_type = classify_page_type(url, page.title, page.raw_text)
     applicable = get_applicable_pillars(page_type)
 
     filtered_pillars = {name: data for name, data in pillars.items() if name in applicable}

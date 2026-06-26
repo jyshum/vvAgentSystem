@@ -153,3 +153,18 @@ def test_haiku_batch_returns_three_pillar_scores():
     assert "fact_density" in result
     assert "authority_signals" in result
     assert result["content_structure"]["score"] == 45
+
+
+def test_haiku_batch_returns_strengths():
+    fake_response = """{
+      "content_structure": {"score": 75, "strengths": ["H2 headings phrased as user questions"], "issues": [], "recommendations": []},
+      "fact_density": {"score": 80, "strengths": ["1.2 specific facts per 200 words"], "issues": [], "recommendations": []},
+      "authority_signals": {"score": 60, "strengths": ["Press mention from Vancouver Sun"], "issues": [], "recommendations": []}
+    }"""
+
+    with patch("src.scorers._call_haiku", return_value=fake_response):
+        result = score_with_haiku_batch("Some page content.", ["p1 text"], [{"level": 2, "text": "How does it work?"}],
+                                        page_type="service", url="https://example.com/services")
+
+    assert "strengths" in result["content_structure"]
+    assert result["content_structure"]["strengths"] == ["H2 headings phrased as user questions"]

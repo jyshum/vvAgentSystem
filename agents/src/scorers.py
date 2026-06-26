@@ -184,6 +184,9 @@ def _call_haiku(prompt: str) -> str:
 
 HAIKU_SCORING_PROMPT = """You are a GEO (Generative Engine Optimization) analyst. Score this webpage content on three pillars. Return ONLY valid JSON, no explanation.
 
+PAGE URL: {url}
+PAGE TYPE: {page_type}
+
 PAGE CONTENT:
 ---
 {raw_text}
@@ -195,22 +198,27 @@ FIRST PARAGRAPH:
 HEADINGS (level and text):
 {headings}
 
-Score each pillar 0-100. For each pillar return: score (int), issues (list of strings describing what's wrong), recommendations (list of specific actionable fixes).
+Score each pillar 0-100. For each pillar return: score (int), strengths (list of specific things the page does WELL for this pillar), issues (list of strings describing what's wrong), recommendations (list of specific actionable fixes).
+
+Strengths must be specific and evidence-based. "Has headings" is NOT a strength. "H2 headings map to the user journey (Rescue, Repurpose, Deliver)" IS a strength.
 
 Rules:
 - content_structure: Does the first paragraph directly answer a user question (not just describe the company)? Are H2/H3 headings phrased as questions? Are there scannable sections?
 - fact_density: Count specific numbers, percentages, dollar amounts, time periods, attributed statistics. Rate per 200 words. Target is 1+. Vague claims like "thousands of customers" do NOT count.
 - authority_signals: Are there press mentions with outlet names? Expert quotes with name and title? Aggregate star ratings? "Great product! - John" does NOT count as an expert quote.
 
+Score the content relevant to this page's purpose as a {page_type} page.
+
 Return exactly this JSON structure:
 {{
-  "content_structure": {{"score": 0-100, "issues": [], "recommendations": []}},
-  "fact_density": {{"score": 0-100, "issues": [], "recommendations": []}},
-  "authority_signals": {{"score": 0-100, "issues": [], "recommendations": []}}
+  "content_structure": {{"score": 0-100, "strengths": [], "issues": [], "recommendations": []}},
+  "fact_density": {{"score": 0-100, "strengths": [], "issues": [], "recommendations": []}},
+  "authority_signals": {{"score": 0-100, "strengths": [], "issues": [], "recommendations": []}}
 }}"""
 
 
-def score_with_haiku_batch(raw_text: str, paragraphs: list[str], headings: list[dict]) -> dict:
+def score_with_haiku_batch(raw_text: str, paragraphs: list[str], headings: list[dict],
+                           page_type: str = "service", url: str = "") -> dict:
     first_paragraph = paragraphs[0] if paragraphs else "(no paragraphs found)"
     headings_text = "\n".join(f"H{h['level']}: {h['text']}" for h in headings) or "(no headings found)"
 
@@ -218,6 +226,8 @@ def score_with_haiku_batch(raw_text: str, paragraphs: list[str], headings: list[
         raw_text=raw_text[:3000],
         first_paragraph=first_paragraph,
         headings=headings_text,
+        page_type=page_type,
+        url=url,
     )
 
     raw = _call_haiku(prompt)
@@ -229,7 +239,7 @@ def score_with_haiku_batch(raw_text: str, paragraphs: list[str], headings: list[
         if match:
             return json.loads(match.group(0))
         return {
-            "content_structure": {"score": 0, "issues": ["Haiku scoring failed"], "recommendations": []},
-            "fact_density": {"score": 0, "issues": ["Haiku scoring failed"], "recommendations": []},
-            "authority_signals": {"score": 0, "issues": ["Haiku scoring failed"], "recommendations": []},
+            "content_structure": {"score": 0, "strengths": [], "issues": ["Haiku scoring failed"], "recommendations": []},
+            "fact_density": {"score": 0, "strengths": [], "issues": ["Haiku scoring failed"], "recommendations": []},
+            "authority_signals": {"score": 0, "strengths": [], "issues": ["Haiku scoring failed"], "recommendations": []},
         }
