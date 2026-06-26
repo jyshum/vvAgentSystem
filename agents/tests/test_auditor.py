@@ -1,4 +1,6 @@
-from src.auditor import compute_site_summary, classify_page_type, get_applicable_pillars
+from unittest.mock import patch, MagicMock
+from src.auditor import compute_site_summary, classify_page_type, get_applicable_pillars, score_page
+from src.renderer import RenderResult
 
 
 def test_compute_site_summary_calculates_averages():
@@ -60,3 +62,46 @@ def test_applicable_pillars_utility_only_schema():
 def test_applicable_pillars_article_all_six():
     pillars = get_applicable_pillars("article")
     assert len(pillars) == 6
+
+
+def test_classify_request_as_utility():
+    assert classify_page_type("https://example.com/request", "Request Flowers", "") == "utility"
+
+def test_classify_donate_as_utility():
+    assert classify_page_type("https://example.com/donate", "Donate", "") == "utility"
+
+def test_classify_signup_as_utility():
+    assert classify_page_type("https://example.com/signup", "Sign Up", "") == "utility"
+
+def test_classify_apply_as_utility():
+    assert classify_page_type("https://example.com/apply", "Apply Now", "") == "utility"
+
+def test_classify_register_as_utility():
+    assert classify_page_type("https://example.com/register", "Register", "") == "utility"
+
+def test_classify_submit_as_utility():
+    assert classify_page_type("https://example.com/submit", "Submit", "") == "utility"
+
+
+def test_score_page_uses_renderer_for_non_utility():
+    mock_render = RenderResult(
+        url="https://example.com/about",
+        html='<html><head><title>About</title></head><body><h1>About Us</h1><p>We are a company that does things and has many employees working hard every day.</p></body></html>',
+        screenshot=b"fake-png",
+        success=True,
+        error=None,
+    )
+
+    fake_haiku = {
+        "content_structure": {"score": 50, "strengths": [], "issues": ["Opening is generic"], "recommendations": ["Rewrite"]},
+        "fact_density": {"score": 30, "strengths": [], "issues": ["Low"], "recommendations": ["Add stats"]},
+        "authority_signals": {"score": 10, "strengths": [], "issues": ["None found"], "recommendations": ["Add press"]},
+    }
+
+    with patch("src.auditor.render_page", return_value=mock_render), \
+         patch("src.auditor.classify_page_with_vision", return_value="about"), \
+         patch("src.auditor.score_with_haiku_batch", return_value=fake_haiku):
+        result = score_page("https://example.com/about", "example.com")
+
+    assert result is not None
+    assert result["page_type"] == "about"

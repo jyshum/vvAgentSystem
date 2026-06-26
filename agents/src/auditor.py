@@ -10,6 +10,8 @@ from src.scorers import (
     score_freshness,
     score_with_haiku_batch,
 )
+from src.renderer import render_page
+from src.classifier import classify_page_with_vision
 
 PILLAR_NAMES = [
     "Content Structure",
@@ -21,7 +23,8 @@ PILLAR_NAMES = [
 ]
 
 
-UTILITY_PATTERNS = ["/contact", "/privacy", "/terms", "/thank", "/404", "/sitemap"]
+UTILITY_PATTERNS = ["/contact", "/privacy", "/terms", "/thank", "/404", "/sitemap",
+                    "/request", "/donate", "/apply", "/signup", "/register", "/submit"]
 ARTICLE_PATTERNS = ["/blog/", "/news/", "/post/", "/article/", "/guide/", "/tips/"]
 FAQ_PATTERNS = ["/faq", "/help/", "/support/", "/questions/"]
 ABOUT_PATTERNS = ["/about", "/team", "/story", "/mission"]
@@ -34,6 +37,9 @@ PILLAR_APPLICABILITY = {
     "article":  ["Content Structure", "Fact Density", "Source Citations", "Authority Signals", "Schema Markup", "Freshness"],
     "faq":      ["Content Structure", "Source Citations", "Schema Markup"],
     "utility":  ["Schema Markup"],
+    "utility/form": ["Schema Markup"],
+    "landing":  ["Content Structure", "Authority Signals", "Schema Markup"],
+    "gallery":  ["Schema Markup"],
 }
 
 
@@ -102,19 +108,36 @@ def discover_pages(domain: str, max_pages: int = 20) -> list[str]:
 
 
 def score_page(url: str, client_domain: str) -> dict | None:
-    try:
-        resp = httpx.get(url, timeout=15, follow_redirects=True,
-                         headers={"User-Agent": "Mozilla/5.0 (compatible; VV-Audit/1.0)"})
-    except httpx.RequestError as e:
-        print(f"    Fetch error: {e}")
-        return None
+    path = url.lower().split("?")[0]
+    is_utility = any(p in path for p in UTILITY_PATTERNS)
 
-    if resp.status_code != 200:
-        print(f"    HTTP {resp.status_code} — skipping")
-        return None
+    if is_utility:
+        try:
+            resp = httpx.get(url, timeout=15, follow_redirects=True,
+                             headers={"User-Agent": "Mozilla/5.0 (compatible; VV-Audit/1.0)"})
+        except httpx.RequestError as e:
+            print(f"    Fetch error: {e}")
+            return None
+        if resp.status_code != 200:
+            print(f"    HTTP {resp.status_code} — skipping")
+            return None
+        html = resp.text
+        page_type = "utility"
+        last_modified = resp.headers.get("last-modified")
+    else:
+        rendered = render_page(url)
+        if not rendered.success and not rendered.html:
+            print(f"    Render failed: {rendered.error}")
+            return None
+        html = rendered.html
+        last_modified = None
+        if rendered.screenshot:
+            page_type = classify_page_with_vision(rendered.screenshot, url)
+        else:
+            page_type = classify_page_type(url, "", "")
 
-    page = parse_html(url, resp.text, client_domain, resp.status_code,
-                      last_modified_header=resp.headers.get("last-modified"))
+    page = parse_html(url, html, client_domain, 200,
+                      last_modified_header=last_modified)
 
     rules_scores = {
         "Source Citations": score_source_citations(page, client_domain),
@@ -122,20 +145,19 @@ def score_page(url: str, client_domain: str) -> dict | None:
         "Freshness": score_freshness(page),
     }
 
-    haiku_scores = score_with_haiku_batch(page.raw_text, page.paragraphs, page.headings)
+    haiku_scores = score_with_haiku_batch(page.raw_text, page.paragraphs, page.headings,
+                                          page_type=page_type, url=url)
 
     pillars = {
-        "Content Structure": haiku_scores.get("content_structure", {"score": 0, "issues": [], "recommendations": []}),
-        "Fact Density": haiku_scores.get("fact_density", {"score": 0, "issues": [], "recommendations": []}),
+        "Content Structure": haiku_scores.get("content_structure", {"score": 0, "strengths": [], "issues": [], "recommendations": []}),
+        "Fact Density": haiku_scores.get("fact_density", {"score": 0, "strengths": [], "issues": [], "recommendations": []}),
         "Source Citations": rules_scores["Source Citations"],
-        "Authority Signals": haiku_scores.get("authority_signals", {"score": 0, "issues": [], "recommendations": []}),
+        "Authority Signals": haiku_scores.get("authority_signals", {"score": 0, "strengths": [], "issues": [], "recommendations": []}),
         "Schema Markup": rules_scores["Schema Markup"],
         "Freshness": rules_scores["Freshness"],
     }
 
-    page_type = classify_page_type(url, page.title, page.raw_text)
     applicable = get_applicable_pillars(page_type)
-
     filtered_pillars = {name: data for name, data in pillars.items() if name in applicable}
     total_score = sum(p["score"] for p in filtered_pillars.values()) // len(filtered_pillars)
 

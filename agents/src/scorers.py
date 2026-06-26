@@ -9,8 +9,9 @@ HIGH_VALUE_SCHEMA = {"FAQPage", "HowTo", "Article", "NewsArticle", "BlogPosting"
 BASELINE_SCHEMA = {"LocalBusiness", "Organization", "Product", "Service", "BreadcrumbList"}
 
 
-def _pillar_result(score: int, issues: list[str], recommendations: list[str]) -> dict:
-    return {"score": score, "issues": issues, "recommendations": recommendations}
+def _pillar_result(score: int, issues: list[str], recommendations: list[str],
+                   strengths: list[str] | None = None) -> dict:
+    return {"score": score, "strengths": strengths or [], "issues": issues, "recommendations": recommendations}
 
 
 def score_source_citations(page, client_domain: str) -> dict:
@@ -39,7 +40,13 @@ def score_source_citations(page, client_domain: str) -> dict:
     if not authoritative and external:
         recommendations.append("Upgrade at least one citation to a .gov, .edu, or .org source")
 
-    return _pillar_result(score, issues, recommendations)
+    strengths = []
+    if len(external) >= 3:
+        strengths.append(f"{len(external)} external citations in body content")
+    if authoritative:
+        strengths.append(f"{len(authoritative)} authoritative source(s) (.gov, .edu, .org)")
+
+    return _pillar_result(score, issues, recommendations, strengths)
 
 
 def score_schema_markup(page) -> dict:
@@ -85,12 +92,21 @@ def score_schema_markup(page) -> dict:
         recommendations.append("Add FAQPage schema to any page with questions and answers")
         recommendations.append("Add Organization schema to the homepage")
 
-    return _pillar_result(score, issues, recommendations)
+    strengths = []
+    if high_value and baseline:
+        strengths.append(f"{', '.join(high_value)} and {', '.join(baseline)} schema both present — best-in-class coverage")
+    elif high_value:
+        strengths.append(f"High-value schema present: {', '.join(high_value)}")
+    elif baseline:
+        strengths.append(f"Baseline schema present: {', '.join(baseline)}")
+
+    return _pillar_result(score, issues, recommendations, strengths)
 
 
 def score_freshness(page) -> dict:
     issues = []
     recommendations = []
+    strengths = []
 
     date_str = page.modified_date or page.last_modified_header
 
@@ -107,7 +123,7 @@ def score_freshness(page) -> dict:
         issues.append("No publication or modification date found on this page")
         recommendations.append("Add <meta property='article:modified_time' content='YYYY-MM-DDT00:00:00Z'> to the page head")
         recommendations.append("Add a visible 'Last updated [date]' line near the top of the content")
-        return _pillar_result(20, issues, recommendations)
+        return _pillar_result(20, issues, recommendations, strengths)
 
     try:
         try:
@@ -123,6 +139,7 @@ def score_freshness(page) -> dict:
 
         if age_days <= 90:
             score = 100
+            strengths.append(f"Content is current — last modified {age_days} days ago")
         elif age_days <= 180:
             score = 65
             recommendations.append(f"Content is {age_days} days old — add a new section or updated statistic and refresh the modified date")
@@ -140,7 +157,7 @@ def score_freshness(page) -> dict:
         recommendations.append("Use ISO 8601 format: YYYY-MM-DDT00:00:00Z")
         score = 15
 
-    return _pillar_result(score, issues, recommendations)
+    return _pillar_result(score, issues, recommendations, strengths)
 
 
 import json
@@ -167,6 +184,9 @@ def _call_haiku(prompt: str) -> str:
 
 HAIKU_SCORING_PROMPT = """You are a GEO (Generative Engine Optimization) analyst. Score this webpage content on three pillars. Return ONLY valid JSON, no explanation.
 
+PAGE URL: {url}
+PAGE TYPE: {page_type}
+
 PAGE CONTENT:
 ---
 {raw_text}
@@ -178,22 +198,27 @@ FIRST PARAGRAPH:
 HEADINGS (level and text):
 {headings}
 
-Score each pillar 0-100. For each pillar return: score (int), issues (list of strings describing what's wrong), recommendations (list of specific actionable fixes).
+Score each pillar 0-100. For each pillar return: score (int), strengths (list of specific things the page does WELL for this pillar), issues (list of strings describing what's wrong), recommendations (list of specific actionable fixes).
+
+Strengths must be specific and evidence-based. "Has headings" is NOT a strength. "H2 headings map to the user journey (Rescue, Repurpose, Deliver)" IS a strength.
 
 Rules:
 - content_structure: Does the first paragraph directly answer a user question (not just describe the company)? Are H2/H3 headings phrased as questions? Are there scannable sections?
 - fact_density: Count specific numbers, percentages, dollar amounts, time periods, attributed statistics. Rate per 200 words. Target is 1+. Vague claims like "thousands of customers" do NOT count.
 - authority_signals: Are there press mentions with outlet names? Expert quotes with name and title? Aggregate star ratings? "Great product! - John" does NOT count as an expert quote.
 
+Score the content relevant to this page's purpose as a {page_type} page.
+
 Return exactly this JSON structure:
 {{
-  "content_structure": {{"score": 0-100, "issues": [], "recommendations": []}},
-  "fact_density": {{"score": 0-100, "issues": [], "recommendations": []}},
-  "authority_signals": {{"score": 0-100, "issues": [], "recommendations": []}}
+  "content_structure": {{"score": 0-100, "strengths": [], "issues": [], "recommendations": []}},
+  "fact_density": {{"score": 0-100, "strengths": [], "issues": [], "recommendations": []}},
+  "authority_signals": {{"score": 0-100, "strengths": [], "issues": [], "recommendations": []}}
 }}"""
 
 
-def score_with_haiku_batch(raw_text: str, paragraphs: list[str], headings: list[dict]) -> dict:
+def score_with_haiku_batch(raw_text: str, paragraphs: list[str], headings: list[dict],
+                           page_type: str = "service", url: str = "") -> dict:
     first_paragraph = paragraphs[0] if paragraphs else "(no paragraphs found)"
     headings_text = "\n".join(f"H{h['level']}: {h['text']}" for h in headings) or "(no headings found)"
 
@@ -201,6 +226,8 @@ def score_with_haiku_batch(raw_text: str, paragraphs: list[str], headings: list[
         raw_text=raw_text[:3000],
         first_paragraph=first_paragraph,
         headings=headings_text,
+        page_type=page_type,
+        url=url,
     )
 
     raw = _call_haiku(prompt)
@@ -212,7 +239,7 @@ def score_with_haiku_batch(raw_text: str, paragraphs: list[str], headings: list[
         if match:
             return json.loads(match.group(0))
         return {
-            "content_structure": {"score": 0, "issues": ["Haiku scoring failed"], "recommendations": []},
-            "fact_density": {"score": 0, "issues": ["Haiku scoring failed"], "recommendations": []},
-            "authority_signals": {"score": 0, "issues": ["Haiku scoring failed"], "recommendations": []},
+            "content_structure": {"score": 0, "strengths": [], "issues": ["Haiku scoring failed"], "recommendations": []},
+            "fact_density": {"score": 0, "strengths": [], "issues": ["Haiku scoring failed"], "recommendations": []},
+            "authority_signals": {"score": 0, "strengths": [], "issues": ["Haiku scoring failed"], "recommendations": []},
         }
