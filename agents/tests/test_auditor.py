@@ -60,3 +60,22 @@ def test_applicable_pillars_utility_only_schema():
 def test_applicable_pillars_article_all_six():
     pillars = get_applicable_pillars("article")
     assert len(pillars) == 6
+
+
+def test_classify_request_as_utility():
+    assert classify_page_type("https://example.com/request", "Request Flowers", "") == "utility"
+
+def test_classify_donate_as_utility():
+    assert classify_page_type("https://example.com/donate", "Donate", "") == "utility"
+
+def test_classify_signup_as_utility():
+    assert classify_page_type("https://example.com/signup", "Sign Up", "") == "utility"
+
+def test_classify_apply_as_utility():
+    assert classify_page_type("https://example.com/apply", "Apply Now", "") == "utility"
+
+def test_classify_register_as_utility():
+    assert classify_page_type("https://example.com/register", "Register", "") == "utility"
+
+def test_classify_submit_as_utility():
+    assert classify_page_type("https://example.com/submit", "Submit", "") == "utility"

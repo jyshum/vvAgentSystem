@@ -21,7 +21,8 @@ PILLAR_NAMES = [
 ]
 
 
-UTILITY_PATTERNS = ["/contact", "/privacy", "/terms", "/thank", "/404", "/sitemap"]
+UTILITY_PATTERNS = ["/contact", "/privacy", "/terms", "/thank", "/404", "/sitemap",
+                    "/request", "/donate", "/apply", "/signup", "/register", "/submit"]
 ARTICLE_PATTERNS = ["/blog/", "/news/", "/post/", "/article/", "/guide/", "/tips/"]
 FAQ_PATTERNS = ["/faq", "/help/", "/support/", "/questions/"]
 ABOUT_PATTERNS = ["/about", "/team", "/story", "/mission"]
