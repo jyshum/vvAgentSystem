@@ -6,6 +6,9 @@ export interface Client {
   brand_variations: string[];
   target_queries: string[];
   competitors: string[];
+  cms_type: string;
+  cms_config: Record<string, string>;
+  gsc_site_url: string;
   created_at: string;
 }
 
