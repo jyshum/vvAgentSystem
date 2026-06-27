@@ -75,7 +75,7 @@ export default async function RunsPage({
           <div
             className="grid pb-2.5 border-b font-mono text-[8px] tracking-[0.14em] uppercase"
             style={{
-              gridTemplateColumns: "1.5fr 1fr 1fr 80px 1fr 190px",
+              gridTemplateColumns: "1.5fr 0.8fr 0.8fr 0.7fr 0.7fr 80px 150px",
               gap: "16px",
               borderColor: "var(--hair)",
               color: "var(--faint)",
@@ -84,8 +84,9 @@ export default async function RunsPage({
             <span>DATE</span>
             <span>MENTION</span>
             <span>CITATION</span>
+            <span>GSC CLICKS</span>
+            <span>GSC POS</span>
             <span>QUERIES</span>
-            <span>STATUS</span>
             <span>ACTIONS</span>
           </div>
 

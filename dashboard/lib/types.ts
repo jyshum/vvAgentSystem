@@ -31,6 +31,11 @@ export interface TrackerRun {
     { mention_rate: number; citation_rate: number }
   >;
   competitor_scores: Record<string, { mention_rate: number }>;
+  gsc_clicks: number;
+  gsc_impressions: number;
+  gsc_ctr: number;
+  gsc_position: number;
+  gsc_top_queries: { query: string; clicks: number; impressions: number; ctr: number; position: number }[];
 }
 
 export interface TrackerResult {
