@@ -6,8 +6,10 @@ class GEOState(TypedDict):
     client_config: dict
     tracker_results: list[dict]
     tracker_scores: dict
+    gsc_metrics: dict
     audit_pages: list[dict]
     audit_summary: dict
+    audit_run_id: str | None
     action_cards: list[dict]
     approved_card_ids: list[str]
     implementation_results: list[dict]

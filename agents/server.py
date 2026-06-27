@@ -1,4 +1,5 @@
 import os
+import threading
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
@@ -32,8 +33,10 @@ def trigger_scheduled_run(client_id: str):
                 "client_config": {},
                 "tracker_results": [],
                 "tracker_scores": {},
+                "gsc_metrics": {},
                 "audit_pages": [],
                 "audit_summary": {},
+                "audit_run_id": None,
                 "action_cards": [],
                 "approved_card_ids": [],
                 "implementation_results": [],
@@ -113,23 +116,21 @@ async def health():
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
-@app.post("/api/run")
-async def trigger_run(req: RunRequest, authorization: str | None = Header(None)):
-    verify_auth(authorization)
-    thread_id = f"{req.client_id}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+def _run_graph_background(client_id: str, run_type: str, thread_id: str):
     config = {"configurable": {"thread_id": thread_id}}
-
     try:
         graph.invoke(
             {
-                "client_id": req.client_id,
-                "run_type": req.run_type,
+                "client_id": client_id,
+                "run_type": run_type,
                 "thread_id": thread_id,
                 "client_config": {},
                 "tracker_results": [],
                 "tracker_scores": {},
+                "gsc_metrics": {},
                 "audit_pages": [],
                 "audit_summary": {},
+                "audit_run_id": None,
                 "action_cards": [],
                 "approved_card_ids": [],
                 "implementation_results": [],
@@ -138,9 +139,24 @@ async def trigger_run(req: RunRequest, authorization: str | None = Header(None))
             },
             config=config,
         )
-        return {"thread_id": thread_id, "status": "started"}
+        print(f"  [Pipeline] Completed {run_type} for {client_id} (thread: {thread_id})")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"  [Pipeline] Failed {run_type} for {client_id}: {e}")
+
+
+@app.post("/api/run")
+async def trigger_run(req: RunRequest, authorization: str | None = Header(None)):
+    verify_auth(authorization)
+    thread_id = f"{req.client_id}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+
+    t = threading.Thread(
+        target=_run_graph_background,
+        args=(req.client_id, req.run_type, thread_id),
+        daemon=True,
+    )
+    t.start()
+
+    return {"thread_id": thread_id, "status": "started"}
 
 
 @app.post("/api/approve")
