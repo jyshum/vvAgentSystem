@@ -14,6 +14,9 @@ def load_config(state: GEOState) -> dict:
         "brand_variations": row["brand_variations"] or [],
         "target_queries": row["target_queries"] or [],
         "competitors": row["competitors"] or [],
+        "gsc_site_url": row.get("gsc_site_url", ""),
+        "cms_type": row.get("cms_type", "copy_paste"),
+        "cms_config": row.get("cms_config", {}),
     }
     return {"client_config": config}
 
@@ -56,6 +59,43 @@ def run_tracker_node(state: GEOState) -> dict:
         return {"tracker_results": [], "tracker_scores": {}, "error": str(e)}
 
 
+def run_gsc_node(state: GEOState) -> dict:
+    gsc_site_url = state["client_config"].get("gsc_site_url", "")
+    if not gsc_site_url:
+        print("  GSC: no site URL configured, skipping")
+        return {"gsc_metrics": {}}
+
+    from src.gsc import fetch_gsc_metrics
+    try:
+        metrics = fetch_gsc_metrics(gsc_site_url)
+        if metrics.get("error"):
+            print(f"  GSC: {metrics['error']}")
+        else:
+            print(f"  GSC: {metrics['totals']['clicks']} clicks, {metrics['totals']['impressions']} impressions")
+
+        sb = _get_supabase()
+        latest = sb.table("tracker_runs") \
+            .select("id") \
+            .eq("client_id", state["client_id"]) \
+            .order("ran_at", desc=True) \
+            .limit(1) \
+            .execute()
+
+        if latest.data:
+            sb.table("tracker_runs").update({
+                "gsc_clicks": metrics["totals"]["clicks"],
+                "gsc_impressions": metrics["totals"]["impressions"],
+                "gsc_ctr": metrics["totals"]["ctr"],
+                "gsc_position": metrics["totals"]["position"],
+                "gsc_top_queries": metrics["queries"][:20],
+            }).eq("id", latest.data[0]["id"]).execute()
+
+        return {"gsc_metrics": metrics}
+    except Exception as e:
+        print(f"  GSC failed: {e}")
+        return {"gsc_metrics": {}}
+
+
 def run_audit_node(state: GEOState) -> dict:
     from src.auditor import run_audit
     try:
@@ -70,8 +110,9 @@ def run_audit_node(state: GEOState) -> dict:
             "weakest_pillar": summary["weakest_pillar"],
         }).execute()
 
+        audit_run_id = run_row.data[0]["id"]
         page_rows = [{
-            "run_id": run_row.data[0]["id"],
+            "run_id": audit_run_id,
             "url": p["url"],
             "title": p["title"],
             "word_count": p["word_count"],
@@ -80,16 +121,17 @@ def run_audit_node(state: GEOState) -> dict:
         } for p in pages]
         sb.table("page_scores").insert(page_rows).execute()
 
-        return {"audit_pages": pages, "audit_summary": summary}
+        return {"audit_pages": pages, "audit_summary": summary, "audit_run_id": audit_run_id}
     except Exception as e:
         print(f"  Audit failed: {e}")
         return {"audit_pages": [], "audit_summary": {}, "error": str(e)}
 
 
 def run_recommender_node(state: GEOState) -> dict:
-    from src.recommender import generate_action_cards
+    from src.recommender import run_recommender
     try:
-        cards = generate_action_cards(state["audit_pages"], state["client_config"])
+        run_id = state.get("audit_run_id") or state["thread_id"]
+        cards = run_recommender(run_id, state["audit_pages"])
 
         sb = _get_supabase()
         sb.table("action_cards").insert(cards).execute()

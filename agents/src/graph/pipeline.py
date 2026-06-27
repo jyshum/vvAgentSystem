@@ -4,6 +4,7 @@ from src.graph.state import GEOState
 from src.graph.nodes import (
     load_config,
     run_tracker_node,
+    run_gsc_node,
     run_audit_node,
     run_recommender_node,
     await_approval,
@@ -18,6 +19,10 @@ def route_after_config(state: GEOState) -> str:
 
 
 def route_after_tracker(state: GEOState) -> str:
+    return "run_gsc"
+
+
+def route_after_gsc(state: GEOState) -> str:
     if state.get("run_type") == "tracker_only":
         return END
     return "run_audit"
@@ -28,6 +33,7 @@ def build_graph(checkpointer=None):
 
     graph.add_node("load_config", load_config)
     graph.add_node("run_tracker", run_tracker_node)
+    graph.add_node("run_gsc", run_gsc_node)
     graph.add_node("run_audit", run_audit_node)
     graph.add_node("run_recommender", run_recommender_node)
     graph.add_node("await_approval", await_approval)
@@ -40,7 +46,9 @@ def build_graph(checkpointer=None):
         "run_audit": "run_audit",
     })
 
-    graph.add_conditional_edges("run_tracker", route_after_tracker, {
+    graph.add_edge("run_tracker", "run_gsc")
+
+    graph.add_conditional_edges("run_gsc", route_after_gsc, {
         END: END,
         "run_audit": "run_audit",
     })
