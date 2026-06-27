@@ -8,3 +8,7 @@ __pycache__/
 node_modules/
 .next/
 .env.local
+
+# GSC credentials
+gsc-credentials.json
+**/gsc-credentials.json
