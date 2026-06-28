@@ -57,17 +57,25 @@ def load_schedules():
         result = sb.table("clients").select("id, cycle_frequency, cycle_day").execute()
 
         day_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
+
+        # Remove all existing cycle jobs before re-adding
+        for job in scheduler.get_jobs():
+            if job.id.startswith("cycle-"):
+                scheduler.remove_job(job.id)
+
         offset_minutes = 0
 
         for client in result.data:
             client_id = client["id"]
-            cycle_day = day_map.get(client.get("cycle_day", 1), "mon")
+            frequency = client.get("cycle_frequency", "weekly")
+            cycle_day = day_map.get(client.get("cycle_day", 1), "tue")
 
-            trigger = CronTrigger(
-                day_of_week=cycle_day,
-                hour=2,
-                minute=offset_minutes,
-            )
+            if frequency == "monthly":
+                trigger = CronTrigger(day="1", hour=2, minute=offset_minutes)
+            elif frequency == "biweekly":
+                trigger = CronTrigger(day_of_week=cycle_day, hour=2, minute=offset_minutes, week="*/2")
+            else:
+                trigger = CronTrigger(day_of_week=cycle_day, hour=2, minute=offset_minutes)
 
             scheduler.add_job(
                 trigger_scheduled_run,
@@ -76,7 +84,8 @@ def load_schedules():
                 id=f"cycle-{client_id}",
                 replace_existing=True,
             )
-            print(f"  [Scheduler] Scheduled {client_id} for {cycle_day} 02:{offset_minutes:02d}")
+            label = f"{cycle_day} 02:{offset_minutes:02d}" if frequency != "monthly" else f"1st of month 02:{offset_minutes:02d}"
+            print(f"  [Scheduler] Scheduled {client_id} ({frequency}) for {label}")
             offset_minutes += 15
 
     except Exception as e:
@@ -187,3 +196,11 @@ async def get_status(thread_id: str, authorization: str | None = Header(None)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/reload-schedules")
+async def reload_schedules(authorization: str | None = Header(None)):
+    verify_auth(authorization)
+    load_schedules()
+    jobs = [{"id": j.id, "next_run": j.next_run_time.isoformat() if j.next_run_time else None} for j in scheduler.get_jobs() if j.id.startswith("cycle-")]
+    return {"status": "reloaded", "jobs": jobs}
