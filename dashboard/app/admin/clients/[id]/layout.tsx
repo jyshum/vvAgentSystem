@@ -18,7 +18,7 @@ export default async function ClientLayout({
   const [{ data: client }, { data: latestRuns }] = await Promise.all([
     supabase
       .from("clients")
-      .select("id, name, website_domain")
+      .select("id, name, website_domain, cycle_frequency, cycle_day")
       .eq("id", id)
       .single(),
     supabase
@@ -30,7 +30,7 @@ export default async function ClientLayout({
   ]);
 
   if (!client) notFound();
-  const c = client as Pick<Client, "id" | "name" | "website_domain">;
+  const c = client as Pick<Client, "id" | "name" | "website_domain" | "cycle_frequency" | "cycle_day">;
   const latestRunAt = (latestRuns as Pick<TrackerRun, "ran_at">[] | null)?.[0]?.ran_at ?? null;
 
   const tabs = [
@@ -68,6 +68,12 @@ export default async function ClientLayout({
             style={{ color: "var(--faint)" }}
           >
             {c.website_domain}
+          </div>
+          <div
+            className="font-mono text-[8px] tracking-[0.06em] mt-1"
+            style={{ color: "var(--faint)", opacity: 0.7 }}
+          >
+            {c.cycle_frequency === "monthly" ? "Monthly" : c.cycle_frequency === "biweekly" ? "Bi-weekly" : "Weekly"} · {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][c.cycle_day ?? 1]} 2:00 AM UTC
           </div>
         </div>
         <TriggerRunButton clientId={id} latestRunAt={latestRunAt} />

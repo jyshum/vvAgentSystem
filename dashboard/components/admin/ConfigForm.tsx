@@ -48,6 +48,10 @@ export function ConfigForm({ client }: { client: Client }) {
       return;
     }
     setSaved(true);
+    // Tell the agent server to reload schedules
+    try {
+      await fetch("/api/runs/reload-schedules", { method: "POST" });
+    } catch {}
     setTimeout(() => setSaved(false), 2000);
   }
 
