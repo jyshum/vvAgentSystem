@@ -162,13 +162,34 @@ def await_approval(state: GEOState) -> dict:
 
 
 def run_implementation_node(state: GEOState) -> dict:
+    from src.implementors.router import route_card
+
+    cms_type = state["client_config"].get("cms_type", "copy_paste")
+    cms_config = state["client_config"].get("cms_config", {})
+    sb = _get_supabase()
+
     results = []
     for card in state["action_cards"]:
         card_id = card.get("id", "")
         if card_id not in state["approved_card_ids"]:
             continue
+
+        print(f"  Implementing card {card_id} via {cms_type}...")
         try:
-            results.append({"card_id": card_id, "status": "implemented"})
+            result = route_card(card, cms_type, cms_config)
+            result["card_id"] = card_id
+
+            new_status = "implemented" if result.get("status") == "implemented" else "approved"
+            sb.table("action_cards").update({"status": new_status}).eq("id", card_id).execute()
+
+            if result.get("status") == "error":
+                print(f"    Failed: {result.get('error')}")
+            else:
+                print(f"    Done: {result.get('status')}")
+
+            results.append(result)
         except Exception as e:
+            print(f"    Exception: {e}")
             results.append({"card_id": card_id, "status": "error", "error": str(e)})
+
     return {"implementation_results": results}

@@ -144,13 +144,15 @@ export function ConfigForm({ client }: { client: Client }) {
           <option value="copy_paste" style={{ background: "var(--ink)" }}>Copy & Paste</option>
           <option value="github" style={{ background: "var(--ink)" }}>GitHub PR</option>
           <option value="wordpress" style={{ background: "var(--ink)" }}>WordPress API</option>
-          <option value="webflow" style={{ background: "var(--ink)" }}>Webflow API</option>
+          <option value="shopify" style={{ background: "var(--ink)" }}>Shopify API</option>
+          <option value="webflow" style={{ background: "var(--ink)" }}>Webflow CMS (manual)</option>
         </select>
         <div className="font-mono text-[8px] mt-1.5" style={{ color: "var(--faint)" }}>
           {cmsType === "copy_paste" && "Approved changes exported as text — no setup needed"}
           {cmsType === "github" && "Auto-creates PRs with content changes"}
-          {cmsType === "wordpress" && "Pushes changes via WordPress REST API"}
-          {cmsType === "webflow" && "Pushes changes via Webflow CMS API"}
+          {cmsType === "wordpress" && "Pushes changes directly via WordPress REST API"}
+          {cmsType === "shopify" && "Pushes changes directly via Shopify Admin API"}
+          {cmsType === "webflow" && "Webflow static pages can't be updated via API — uses copy & paste export"}
         </div>
       </div>
 
@@ -182,6 +184,18 @@ export function ConfigForm({ client }: { client: Client }) {
           </div>
           <div>
             <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
+              Content Path
+            </div>
+            <input
+              className="w-full font-mono text-[12px] py-2 outline-none"
+              style={{ background: "transparent", borderBottom: "1px solid var(--hair)", color: "var(--white)" }}
+              value={cmsConfig.content_path || ""}
+              onChange={(e) => updateCmsField("content_path", e.target.value)}
+              placeholder="src/content/pages/index.html"
+            />
+          </div>
+          <div>
+            <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
               GitHub Token
             </div>
             <input
@@ -207,7 +221,22 @@ export function ConfigForm({ client }: { client: Client }) {
               style={{ background: "transparent", borderBottom: "1px solid var(--hair)", color: "var(--white)" }}
               value={cmsConfig.wp_url || ""}
               onChange={(e) => updateCmsField("wp_url", e.target.value)}
-              placeholder="https://example.com/wp-json"
+              placeholder="https://example.com"
+            />
+            <div className="font-mono text-[8px] mt-1" style={{ color: "var(--faint)" }}>
+              Base URL without /wp-json
+            </div>
+          </div>
+          <div>
+            <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
+              Username
+            </div>
+            <input
+              className="w-full font-mono text-[12px] py-2 outline-none"
+              style={{ background: "transparent", borderBottom: "1px solid var(--hair)", color: "var(--white)" }}
+              value={cmsConfig.wp_username || ""}
+              onChange={(e) => updateCmsField("wp_username", e.target.value)}
+              placeholder="admin"
             />
           </div>
           <div>
@@ -222,6 +251,42 @@ export function ConfigForm({ client }: { client: Client }) {
               onChange={(e) => updateCmsField("app_password", e.target.value)}
               placeholder="WordPress application password"
             />
+            <div className="font-mono text-[8px] mt-1" style={{ color: "var(--faint)" }}>
+              Generate in WordPress → Users → Application Passwords
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cmsType === "shopify" && (
+        <div className="space-y-4 mb-6">
+          <div>
+            <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
+              Shop Domain
+            </div>
+            <input
+              className="w-full font-mono text-[12px] py-2 outline-none"
+              style={{ background: "transparent", borderBottom: "1px solid var(--hair)", color: "var(--white)" }}
+              value={cmsConfig.shop_domain || ""}
+              onChange={(e) => updateCmsField("shop_domain", e.target.value)}
+              placeholder="your-store.myshopify.com"
+            />
+          </div>
+          <div>
+            <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
+              Admin API Token
+            </div>
+            <input
+              type="password"
+              className="w-full font-mono text-[12px] py-2 outline-none"
+              style={{ background: "transparent", borderBottom: "1px solid var(--hair)", color: "var(--white)" }}
+              value={cmsConfig.api_token || ""}
+              onChange={(e) => updateCmsField("api_token", e.target.value)}
+              placeholder="shpat_..."
+            />
+            <div className="font-mono text-[8px] mt-1" style={{ color: "var(--faint)" }}>
+              Create a custom app in Shopify Admin → Settings → Apps → Develop apps
+            </div>
           </div>
         </div>
       )}
