@@ -1,8 +1,30 @@
 import json
+import re
 import os
 import anthropic
 
 SCORE_THRESHOLD = 60
+
+
+def _parse_json_response(raw: str) -> dict | None:
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    fence_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw, re.DOTALL)
+    if fence_match:
+        try:
+            return json.loads(fence_match.group(1))
+        except json.JSONDecodeError:
+            pass
+    start = raw.find('{')
+    end = raw.rfind('}')
+    if start != -1 and end > start:
+        try:
+            return json.loads(raw[start:end+1])
+        except json.JSONDecodeError:
+            pass
+    return None
 
 _client = None
 
@@ -91,7 +113,10 @@ def generate_cards_for_page(page: dict, run_id: str) -> list[dict]:
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text
-            card_data = json.loads(raw)
+            card_data = _parse_json_response(raw)
+            if card_data is None:
+                print(f"    Could not parse Haiku response for {pillar_name}: {raw[:200]}")
+                continue
         except Exception as e:
             print(f"    Haiku card generation failed for {pillar_name}: {e}")
             continue
