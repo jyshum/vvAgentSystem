@@ -275,3 +275,22 @@ async def reload_schedules(authorization: str | None = Header(None)):
     load_schedules()
     jobs = [{"id": j.id, "next_run": j.next_run_time.isoformat() if j.next_run_time else None} for j in scheduler.get_jobs() if j.id.startswith("cycle-")]
     return {"status": "reloaded", "jobs": jobs}
+
+
+@app.post("/api/run-all")
+async def run_all_clients(authorization: str | None = Header(None)):
+    verify_auth(authorization)
+    sb = _get_supabase()
+    result = sb.table("clients").select("id").execute()
+    threads = []
+    for client in result.data:
+        client_id = client["id"]
+        thread_id = f"{client_id}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+        t = threading.Thread(
+            target=_run_graph_background,
+            args=(client_id, "full", thread_id),
+            daemon=True,
+        )
+        t.start()
+        threads.append({"client_id": client_id, "thread_id": thread_id})
+    return {"status": "started", "count": len(threads), "runs": threads}

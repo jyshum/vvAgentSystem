@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ClientRow } from "@/components/admin/ClientRow";
 import { AddClientButton } from "@/components/admin/AddClientButton";
+import { RunAllButton } from "@/components/admin/RunAllButton";
 import type { Client, TrackerRun, Report } from "@/lib/types";
 
 export default async function AdminPage() {
@@ -58,7 +59,10 @@ export default async function AdminPage() {
             {allClients.length} active account{allClients.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <AddClientButton />
+        <div className="flex items-center gap-3">
+          <RunAllButton />
+          <AddClientButton />
+        </div>
       </div>
 
       {/* Stats strip */}
