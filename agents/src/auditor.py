@@ -168,6 +168,7 @@ def score_page(url: str, client_domain: str) -> dict | None:
         "word_count": page.word_count,
         "total_score": total_score,
         "pillars": filtered_pillars,
+        "paragraphs": page.paragraphs[:10],
     }
 
 
