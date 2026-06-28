@@ -2,7 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SubTab } from "@/components/admin/SubTab";
-import type { Client } from "@/lib/types";
+import { TriggerRunButton } from "@/components/admin/TriggerRunButton";
+import type { Client, TrackerRun } from "@/lib/types";
 
 export default async function ClientLayout({
   children,
@@ -14,14 +15,23 @@ export default async function ClientLayout({
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const { data: client } = await supabase
-    .from("clients")
-    .select("id, name, website_domain")
-    .eq("id", id)
-    .single();
+  const [{ data: client }, { data: latestRuns }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, name, website_domain")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("tracker_runs")
+      .select("ran_at")
+      .eq("client_id", id)
+      .order("ran_at", { ascending: false })
+      .limit(1),
+  ]);
 
   if (!client) notFound();
   const c = client as Pick<Client, "id" | "name" | "website_domain">;
+  const latestRunAt = (latestRuns as Pick<TrackerRun, "ran_at">[] | null)?.[0]?.ran_at ?? null;
 
   const tabs = [
     { label: "CONFIG", href: `/admin/clients/${id}/config` },
@@ -45,19 +55,22 @@ export default async function ClientLayout({
       </div>
 
       {/* Client header */}
-      <div className="pt-8 mb-0">
-        <h1
-          className="font-display text-[48px] font-light leading-[0.95]"
-          style={{ color: "var(--white)" }}
-        >
-          {c.name}
-        </h1>
-        <div
-          className="font-mono text-[10px] tracking-[0.1em] mt-1.5"
-          style={{ color: "var(--faint)" }}
-        >
-          {c.website_domain}
+      <div className="pt-8 mb-0 flex items-start justify-between">
+        <div>
+          <h1
+            className="font-display text-[48px] font-light leading-[0.95]"
+            style={{ color: "var(--white)" }}
+          >
+            {c.name}
+          </h1>
+          <div
+            className="font-mono text-[10px] tracking-[0.1em] mt-1.5"
+            style={{ color: "var(--faint)" }}
+          >
+            {c.website_domain}
+          </div>
         </div>
+        <TriggerRunButton clientId={id} latestRunAt={latestRunAt} />
       </div>
 
       {/* Sub-nav */}

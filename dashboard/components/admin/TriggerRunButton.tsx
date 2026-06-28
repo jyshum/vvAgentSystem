@@ -43,7 +43,7 @@ export function TriggerRunButton({ clientId, latestRunAt }: { clientId: string; 
       const res = await fetch("/api/runs/trigger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, runType: "tracker_only" }),
+        body: JSON.stringify({ clientId, runType: "full" }),
       });
       if (!res.ok) {
         let msg = "API error";

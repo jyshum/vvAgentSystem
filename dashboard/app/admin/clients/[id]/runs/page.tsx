@@ -1,5 +1,4 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { TriggerRunButton } from "@/components/admin/TriggerRunButton";
 import { RunRow } from "@/components/admin/RunRow";
 import type { TrackerRun, Report, Client } from "@/lib/types";
 
@@ -48,23 +47,6 @@ export default async function RunsPage({
 
   return (
     <div>
-      {/* Run box */}
-      <div
-        className="flex items-center justify-between mb-9 p-6"
-        style={{ border: "1px solid var(--hair)" }}
-      >
-        <div>
-          <div className="font-serif text-[17px] mb-1.5" style={{ color: "var(--white)" }}>
-            Run AI Visibility Tracker
-          </div>
-          <div className="font-mono text-[9px] leading-relaxed tracking-[0.06em]" style={{ color: "var(--faint)" }}>
-            Queries all 4 engines (ChatGPT · Perplexity · Claude · Gemini) against {client?.name ?? "this client"}&apos;s {expectedQueries} tracked queries.<br />
-            Results are saved automatically when complete.
-          </div>
-        </div>
-        <TriggerRunButton clientId={id} latestRunAt={allRuns[0]?.ran_at ?? null} />
-      </div>
-
       {allRuns.length === 0 ? (
         <p className="font-serif italic" style={{ color: "var(--mute)" }}>
           No runs yet. Click RUN NOW to start the first one.
