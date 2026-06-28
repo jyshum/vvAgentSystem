@@ -19,10 +19,23 @@ graph = build_graph()
 scheduler = BackgroundScheduler()
 
 
+def _get_supabase():
+    from supabase import create_client
+    return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+
+
 def trigger_scheduled_run(client_id: str):
     thread_id = f"{client_id}-scheduled-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
     config = {"configurable": {"thread_id": thread_id}}
+    sb = _get_supabase()
     print(f"  [Scheduler] Starting pipeline for {client_id} (thread: {thread_id})")
+
+    sb.table("pipeline_runs").insert({
+        "client_id": client_id,
+        "thread_id": thread_id,
+        "run_type": "full",
+        "status": "running",
+    }).execute()
 
     try:
         graph.invoke(
@@ -45,8 +58,25 @@ def trigger_scheduled_run(client_id: str):
             },
             config=config,
         )
-        print(f"  [Scheduler] Pipeline paused at approval for {client_id}")
+
+        state = graph.get_state(config=config)
+        if state.next and "await_approval" in state.next:
+            sb.table("pipeline_runs").update({
+                "status": "awaiting_approval",
+            }).eq("thread_id", thread_id).execute()
+            print(f"  [Scheduler] Pipeline paused at approval for {client_id}")
+        else:
+            sb.table("pipeline_runs").update({
+                "status": "completed",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("thread_id", thread_id).execute()
+            print(f"  [Scheduler] Pipeline completed for {client_id}")
     except Exception as e:
+        sb.table("pipeline_runs").update({
+            "status": "error",
+            "error_message": str(e)[:500],
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("thread_id", thread_id).execute()
         print(f"  [Scheduler] Pipeline failed for {client_id}: {e}")
 
 
@@ -127,6 +157,15 @@ async def health():
 
 def _run_graph_background(client_id: str, run_type: str, thread_id: str):
     config = {"configurable": {"thread_id": thread_id}}
+    sb = _get_supabase()
+
+    sb.table("pipeline_runs").insert({
+        "client_id": client_id,
+        "thread_id": thread_id,
+        "run_type": run_type,
+        "status": "running",
+    }).execute()
+
     try:
         graph.invoke(
             {
@@ -148,8 +187,25 @@ def _run_graph_background(client_id: str, run_type: str, thread_id: str):
             },
             config=config,
         )
-        print(f"  [Pipeline] Completed {run_type} for {client_id} (thread: {thread_id})")
+
+        state = graph.get_state(config=config)
+        if state.next and "await_approval" in state.next:
+            sb.table("pipeline_runs").update({
+                "status": "awaiting_approval",
+            }).eq("thread_id", thread_id).execute()
+            print(f"  [Pipeline] Paused at approval for {client_id} (thread: {thread_id})")
+        else:
+            sb.table("pipeline_runs").update({
+                "status": "completed",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("thread_id", thread_id).execute()
+            print(f"  [Pipeline] Completed {run_type} for {client_id} (thread: {thread_id})")
     except Exception as e:
+        sb.table("pipeline_runs").update({
+            "status": "error",
+            "error_message": str(e)[:500],
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("thread_id", thread_id).execute()
         print(f"  [Pipeline] Failed {run_type} for {client_id}: {e}")
 
 
@@ -173,13 +229,28 @@ async def approve_cards(req: ApproveRequest, authorization: str | None = Header(
     verify_auth(authorization)
     config = {"configurable": {"thread_id": req.thread_id}}
 
+    sb = _get_supabase()
+    sb.table("pipeline_runs").update({
+        "status": "implementing",
+    }).eq("thread_id", req.thread_id).execute()
+
     try:
         result = graph.invoke(
             Command(resume=req.approved_card_ids),
             config=config,
         )
+        sb.table("pipeline_runs").update({
+            "status": "completed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("thread_id", req.thread_id).execute()
+
         return {"status": "implementation_complete", "results": result.get("implementation_results", [])}
     except Exception as e:
+        sb.table("pipeline_runs").update({
+            "status": "error",
+            "error_message": str(e)[:500],
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("thread_id", req.thread_id).execute()
         raise HTTPException(status_code=500, detail=str(e))
 
 
