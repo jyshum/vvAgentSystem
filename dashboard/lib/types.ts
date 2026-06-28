@@ -9,6 +9,8 @@ export interface Client {
   cms_type: string;
   cms_config: Record<string, string>;
   gsc_site_url: string;
+  cycle_frequency: string;
+  cycle_day: number;
   created_at: string;
 }
 

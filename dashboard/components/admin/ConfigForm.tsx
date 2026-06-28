@@ -13,6 +13,8 @@ export function ConfigForm({ client }: { client: Client }) {
   const [queries, setQueries] = useState<string[]>(client.target_queries || []);
   const [competitors, setCompetitors] = useState<string[]>(client.competitors || []);
   const [gscSiteUrl, setGscSiteUrl] = useState(client.gsc_site_url || "");
+  const [cycleFrequency, setCycleFrequency] = useState(client.cycle_frequency || "weekly");
+  const [cycleDay, setCycleDay] = useState(client.cycle_day ?? 1);
   const [cmsType, setCmsType] = useState(client.cms_type || "copy_paste");
   const [cmsConfig, setCmsConfig] = useState<Record<string, string>>(client.cms_config || {});
   const [saving, setSaving] = useState(false);
@@ -37,6 +39,8 @@ export function ConfigForm({ client }: { client: Client }) {
       gsc_site_url: gscSiteUrl,
       cms_type: cmsType,
       cms_config: cmsConfig,
+      cycle_frequency: cycleFrequency,
+      cycle_day: cycleDay,
     }).eq("id", client.id);
     setSaving(false);
     if (error) {
@@ -106,6 +110,52 @@ export function ConfigForm({ client }: { client: Client }) {
         />
         <div className="font-mono text-[8px] mt-1.5" style={{ color: "var(--faint)" }}>
           Must match exactly as shown in Google Search Console (including trailing slash)
+        </div>
+      </div>
+
+      {/* Schedule */}
+      <div className="mb-6 mt-10 pt-8" style={{ borderTop: "1px solid var(--hair)" }}>
+        <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-4" style={{ color: "var(--faint)" }}>
+          Pipeline Schedule
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
+              Frequency
+            </div>
+            <select
+              className="w-full font-mono text-[12px] py-2 outline-none cursor-pointer"
+              style={{ background: "transparent", borderBottom: "1px solid var(--hair)", color: "var(--white)" }}
+              value={cycleFrequency}
+              onChange={(e) => setCycleFrequency(e.target.value)}
+            >
+              <option value="weekly" style={{ background: "var(--ink)" }}>Weekly</option>
+              <option value="biweekly" style={{ background: "var(--ink)" }}>Bi-weekly</option>
+              <option value="monthly" style={{ background: "var(--ink)" }}>Monthly</option>
+            </select>
+          </div>
+          <div>
+            <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
+              Day
+            </div>
+            <select
+              className="w-full font-mono text-[12px] py-2 outline-none cursor-pointer"
+              style={{ background: "transparent", borderBottom: "1px solid var(--hair)", color: "var(--white)" }}
+              value={cycleDay}
+              onChange={(e) => setCycleDay(Number(e.target.value))}
+            >
+              <option value={0} style={{ background: "var(--ink)" }}>Monday</option>
+              <option value={1} style={{ background: "var(--ink)" }}>Tuesday</option>
+              <option value={2} style={{ background: "var(--ink)" }}>Wednesday</option>
+              <option value={3} style={{ background: "var(--ink)" }}>Thursday</option>
+              <option value={4} style={{ background: "var(--ink)" }}>Friday</option>
+              <option value={5} style={{ background: "var(--ink)" }}>Saturday</option>
+              <option value={6} style={{ background: "var(--ink)" }}>Sunday</option>
+            </select>
+          </div>
+        </div>
+        <div className="font-mono text-[8px] mt-2" style={{ color: "var(--faint)" }}>
+          Full pipeline runs automatically at 2:00 AM UTC on the selected day
         </div>
       </div>
 
