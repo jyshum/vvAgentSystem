@@ -1,40 +1,60 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export function TriggerRunButton({ clientId, latestRunAt }: { clientId: string; latestRunAt?: string | null }) {
+export function TriggerRunButton({ clientId }: { clientId: string }) {
   const [state, setState] = useState<"idle" | "loading" | "triggered" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const router = useRouter();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // After trigger, poll every 15s for a new run row
-  const poll = useCallback(async (triggeredAt: number) => {
+  function startPolling() {
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    async function poll() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("pipeline_runs")
+        .select("id")
+        .eq("client_id", clientId)
+        .in("status", ["running", "awaiting_approval", "implementing"])
+        .limit(1);
+
+      if (!data || data.length === 0) {
+        setState("idle");
+        router.refresh();
+        timerRef.current = null;
+      } else {
+        timerRef.current = setTimeout(poll, 10000);
+      }
+    }
+
+    timerRef.current = setTimeout(poll, 10000);
+  }
+
+  useEffect(() => {
     const supabase = createClient();
-    const elapsed = Date.now() - triggeredAt;
-    if (elapsed > 15 * 60 * 1000) {
-      // Give up after 15 min
-      setState("idle");
-      return;
-    }
-    const { data } = await supabase
-      .from("tracker_runs")
-      .select("id, ran_at")
-      .eq("client_id", clientId)
-      .order("ran_at", { ascending: false })
-      .limit(1)
-      .single();
+    let cancelled = false;
 
-    const newRunAt = data?.ran_at;
-    if (newRunAt && newRunAt !== latestRunAt) {
-      // New run appeared
-      router.refresh();
-      setState("idle");
-    } else {
-      setTimeout(() => poll(triggeredAt), 15000);
+    async function checkActive() {
+      const { data } = await supabase
+        .from("pipeline_runs")
+        .select("id")
+        .eq("client_id", clientId)
+        .in("status", ["running", "awaiting_approval", "implementing"])
+        .limit(1);
+
+      if (!cancelled && data && data.length > 0) {
+        setState("triggered");
+        startPolling();
+      }
     }
-  }, [clientId, latestRunAt, router]);
+
+    checkActive();
+    return () => { cancelled = true; };
+  }, [clientId]);
 
   async function trigger() {
     setState("loading");
@@ -56,8 +76,7 @@ export function TriggerRunButton({ clientId, latestRunAt }: { clientId: string; 
         throw new Error(msg);
       }
       setState("triggered");
-      // Start polling for the new run
-      setTimeout(() => poll(Date.now()), 15000);
+      startPolling();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       setErrorMsg(msg);

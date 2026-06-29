@@ -79,6 +79,8 @@ def generate_cards_for_page(page: dict, run_id: str) -> list[dict]:
             continue
 
         issues = pillar_data.get("issues", [])
+        if issues and issues[0] == "Haiku scoring unavailable":
+            continue
         recommendations = pillar_data.get("recommendations", [])
 
         if pillar_name == "Authority Signals":

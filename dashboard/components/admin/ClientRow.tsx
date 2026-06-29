@@ -8,18 +8,20 @@ interface ClientRowProps {
   client: Client;
   latestRun: TrackerRun | null;
   previousRun: TrackerRun | null;
-  latestReport: Report | null; // kept for compatibility, unused
+  latestReport: Report | null;
 }
 
-export function ClientRow({ client, latestRun, previousRun, latestReport }: ClientRowProps) {
+function checkStale(ranAt: string): boolean {
+  return (Date.now() - new Date(ranAt).getTime()) > 7 * 24 * 60 * 60 * 1000;
+}
+
+export function ClientRow({ client, latestRun, previousRun }: ClientRowProps) {
   const router = useRouter();
   const mentionDelta = latestRun && previousRun
     ? formatDelta(latestRun.aggregate_mention_rate, previousRun.aggregate_mention_rate)
     : null;
 
-  const isStale = latestRun
-    ? (Date.now() - new Date(latestRun.ran_at).getTime()) > 7 * 24 * 60 * 60 * 1000
-    : true;
+  const isStale = latestRun ? checkStale(latestRun.ran_at) : true;
 
   return (
     <div
@@ -30,13 +32,13 @@ export function ClientRow({ client, latestRun, previousRun, latestReport }: Clie
         borderColor: "var(--hair)",
       }}
     >
-      {/* Brand name + domain */}
+      {/* Brand name + client name */}
       <div className="group-hover:pl-3 transition-all duration-[200ms]" style={{ transitionTimingFunction: "cubic-bezier(.2,.8,.2,1)" }}>
         <div className="font-serif text-[18px]" style={{ color: "var(--white)" }}>
           {client.brand_name || client.name}
         </div>
         <div className="font-mono text-[9px] tracking-[0.08em] mt-0.5" style={{ color: "var(--faint)" }}>
-          {client.website_domain}
+          {client.name}
         </div>
       </div>
 
