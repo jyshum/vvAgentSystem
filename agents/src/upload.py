@@ -17,6 +17,7 @@ def upload_run(
     client_id: str,
     results: list[dict],
     scores: dict,
+    competitive_gaps: list[dict] | None = None,
 ) -> str | None:
     try:
         sb = create_client()
@@ -62,7 +63,11 @@ def upload_run(
         if prompt_scores:
             sb.from_("prompt_scores").insert(prompt_scores).execute()
 
-        print(f"  Uploaded to Supabase: run {run_id} ({len(result_rows)} results, {len(prompt_scores)} prompt scores)")
+        gap_rows = _build_competitive_gap_rows(client_id, run_id, competitive_gaps or [])
+        if gap_rows:
+            sb.from_("competitive_gaps").insert(gap_rows).execute()
+
+        print(f"  Uploaded to Supabase: run {run_id} ({len(result_rows)} results, {len(prompt_scores)} prompt scores, {len(gap_rows)} gaps)")
         return run_id
 
     except Exception as e:
@@ -102,3 +107,17 @@ def _compute_prompt_scores(client_id: str, run_id: str, results: list[dict]) -> 
         })
 
     return scores
+
+
+def _build_competitive_gap_rows(client_id: str, run_id: str, gaps: list[dict]) -> list[dict]:
+    rows = []
+    for gap in gaps:
+        rows.append({
+            "run_id": run_id,
+            "client_id": client_id,
+            "query": gap["query"],
+            "client_mention_rate": gap["client_mention_rate"],
+            "client_avg_mention_level": gap["client_avg_mention_level"],
+            "competitor_data": gap["competitor_data"],
+        })
+    return rows

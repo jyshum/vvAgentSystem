@@ -27,9 +27,11 @@ def _get_supabase():
 
 
 def run_tracker_node(state: GEOState) -> dict:
-    from src.tracker import run_tracker
+    from src.tracker import run_tracker, compute_competitive_gaps
     try:
         results, scores = run_tracker(state["client_config"])
+        competitors = state["client_config"].get("competitors", [])
+        gaps = compute_competitive_gaps(results, competitors)
 
         sb = _get_supabase()
         run_row = sb.table("tracker_runs").insert({
@@ -38,6 +40,7 @@ def run_tracker_node(state: GEOState) -> dict:
             "aggregate_avg_mention_level": scores.get("aggregate_avg_mention_level", 0),
             "per_engine_scores": scores.get("per_engine", {}),
             "competitor_scores": scores.get("competitor_scores", {}),
+            "discovered_competitors": [],
         }).execute()
 
         run_id = run_row.data[0]["id"]
@@ -58,15 +61,19 @@ def run_tracker_node(state: GEOState) -> dict:
         } for r in results]
         sb.table("tracker_results").insert(result_rows).execute()
 
-        from src.upload import _compute_prompt_scores
+        from src.upload import _compute_prompt_scores, _build_competitive_gap_rows
         prompt_scores = _compute_prompt_scores(state["client_id"], run_id, results)
         if prompt_scores:
             sb.table("prompt_scores").insert(prompt_scores).execute()
 
-        return {"tracker_results": results, "tracker_scores": scores}
+        gap_rows = _build_competitive_gap_rows(state["client_id"], run_id, gaps)
+        if gap_rows:
+            sb.table("competitive_gaps").insert(gap_rows).execute()
+
+        return {"tracker_results": results, "tracker_scores": scores, "competitive_gaps": gaps}
     except Exception as e:
         print(f"  Tracker failed: {e}")
-        return {"tracker_results": [], "tracker_scores": {}, "error": str(e)}
+        return {"tracker_results": [], "tracker_scores": {}, "competitive_gaps": [], "error": str(e)}
 
 
 def run_gsc_node(state: GEOState) -> dict:

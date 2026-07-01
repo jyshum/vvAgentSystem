@@ -156,3 +156,65 @@ def compute_scores(results: list[dict], engines: dict, competitors: list[str] | 
         "aggregate_avg_mention_level": aggregate_avg_level,
         "competitor_scores": competitor_scores,
     }
+
+
+def compute_competitive_gaps(results: list[dict], competitors: list[str]) -> list[dict]:
+    if not results:
+        return []
+
+    queries = []
+    seen = set()
+    for r in results:
+        if r["query"] not in seen:
+            queries.append(r["query"])
+            seen.add(r["query"])
+
+    gaps = []
+    for query in queries:
+        query_results = [r for r in results if r["query"] == query]
+        total = len(query_results)
+
+        client_mentions = [r for r in query_results if r["brand_mentioned"]]
+        client_mention_rate = len(client_mentions) / total if total > 0 else 0
+        client_avg_level = (
+            sum(r["mention_level"] for r in client_mentions) / len(client_mentions)
+            if client_mentions else 0
+        )
+
+        engines = []
+        engine_seen = set()
+        for r in query_results:
+            if r["engine"] not in engine_seen:
+                engines.append(r["engine"])
+                engine_seen.add(r["engine"])
+
+        competitor_data = []
+        for comp in competitors:
+            comp_total = 0
+            comp_mentioned = 0
+            per_engine = {}
+
+            for engine in engines:
+                engine_results = [r for r in query_results if r["engine"] == engine]
+                engine_total = len(engine_results)
+                engine_mentioned = sum(
+                    1 for r in engine_results if comp in r.get("competitor_mentions", [])
+                )
+                per_engine[engine] = engine_mentioned / engine_total if engine_total > 0 else 0
+                comp_total += engine_total
+                comp_mentioned += engine_mentioned
+
+            competitor_data.append({
+                "name": comp,
+                "mention_rate": comp_mentioned / comp_total if comp_total > 0 else 0,
+                "per_engine": per_engine,
+            })
+
+        gaps.append({
+            "query": query,
+            "client_mention_rate": client_mention_rate,
+            "client_avg_mention_level": client_avg_level,
+            "competitor_data": competitor_data,
+        })
+
+    return gaps

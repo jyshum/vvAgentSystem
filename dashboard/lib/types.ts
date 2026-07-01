@@ -38,6 +38,7 @@ export interface TrackerRun {
   gsc_ctr: number;
   gsc_position: number;
   gsc_top_queries: { query: string; clicks: number; impressions: number; ctr: number; position: number }[];
+  discovered_competitors: { name: string; prompt_count: number; total_mentions: number }[];
 }
 
 export interface TrackerResult {
@@ -83,6 +84,21 @@ export interface PromptScore {
   mention_rate: number;
   avg_mention_level: number;
   citation_rate: number;
+  created_at: string;
+}
+
+export interface CompetitiveGap {
+  id: string;
+  run_id: string;
+  client_id: string;
+  query: string;
+  client_mention_rate: number;
+  client_avg_mention_level: number;
+  competitor_data: {
+    name: string;
+    mention_rate: number;
+    per_engine: Record<string, number>;
+  }[];
   created_at: string;
 }
 
