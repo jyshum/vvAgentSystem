@@ -10,8 +10,8 @@ export function AddClientButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="font-mono text-[10px] tracking-[0.14em] py-3 px-6 transition-all duration-200 hover:bg-[var(--white)] hover:text-[var(--ink)]"
-        style={{ border: "1px solid var(--ghost)", background: "transparent", color: "var(--white)", cursor: "pointer" }}
+        className="font-mono text-[10px] tracking-[0.14em] py-3 px-6 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:bg-[var(--white)] hover:text-[var(--ink)]"
+        style={{ border: "1px solid var(--ghost)", background: "transparent", color: "var(--white)" }}
       >
         + ADD CLIENT
       </button>

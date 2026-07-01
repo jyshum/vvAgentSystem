@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { NavLinks } from "@/components/admin/NavLinks";
 
 export default async function AdminLayout({
   children,
@@ -28,22 +28,7 @@ export default async function AdminLayout({
           Victory<em style={{ fontStyle: "italic", color: "var(--mute)" }}>Velocity</em>
         </div>
 
-        <div className="flex items-center gap-8">
-          <Link
-            href="/admin"
-            className="font-mono text-[10px] tracking-[0.12em] uppercase transition-colors hover:text-[var(--white)]"
-            style={{ color: "var(--faint)", textDecoration: "none" }}
-          >
-            CLIENTS
-          </Link>
-          <Link
-            href="/admin/approvals"
-            className="font-mono text-[10px] tracking-[0.12em] uppercase transition-colors hover:text-[var(--white)]"
-            style={{ color: "var(--faint)", textDecoration: "none" }}
-          >
-            APPROVALS
-          </Link>
-        </div>
+        <NavLinks />
 
         <form action="/api/auth/signout" method="POST">
           <button

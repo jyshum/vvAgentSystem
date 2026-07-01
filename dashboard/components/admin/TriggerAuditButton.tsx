@@ -89,7 +89,7 @@ export function TriggerAuditButton({ clientId, latestAuditAt }: { clientId: stri
       <button
         onClick={trigger}
         disabled={state === "loading" || state === "triggered"}
-        className="font-mono text-[10px] tracking-[0.14em] uppercase py-3 px-7 transition-all duration-200 hover:bg-[var(--white)] hover:text-[var(--ink)] hover:border-[var(--white)] flex-shrink-0 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--pos)] disabled:hover:border-[var(--pos)]"
+        className="font-mono text-[10px] tracking-[0.14em] uppercase py-3 px-7 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:bg-[var(--white)] hover:text-[var(--ink)] hover:border-[var(--white)] flex-shrink-0 disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:bg-transparent disabled:hover:text-[var(--pos)] disabled:hover:border-[var(--pos)]"
         style={styles[state]}
       >
         {labels[state]}
