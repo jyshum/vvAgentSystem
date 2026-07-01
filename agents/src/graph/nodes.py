@@ -35,13 +35,15 @@ def run_tracker_node(state: GEOState) -> dict:
         run_row = sb.table("tracker_runs").insert({
             "client_id": state["client_id"],
             "aggregate_mention_rate": scores.get("aggregate_mention_rate", 0),
-            "aggregate_citation_rate": scores.get("aggregate_citation_rate", 0),
+            "aggregate_avg_mention_level": scores.get("aggregate_avg_mention_level", 0),
             "per_engine_scores": scores.get("per_engine", {}),
             "competitor_scores": scores.get("competitor_scores", {}),
         }).execute()
 
+        run_id = run_row.data[0]["id"]
+
         result_rows = [{
-            "run_id": run_row.data[0]["id"],
+            "run_id": run_id,
             "query": r["query"],
             "engine": r["engine"],
             "model": r.get("model", ""),
@@ -50,8 +52,16 @@ def run_tracker_node(state: GEOState) -> dict:
             "citation_url": r.get("citation_url"),
             "competitor_mentions": r.get("competitor_mentions", []),
             "response_text": r.get("response_text", ""),
+            "run_number": r.get("run_number"),
+            "mention_level": r.get("mention_level", 0),
+            "mention_level_label": r.get("mention_level_label", "not_mentioned"),
         } for r in results]
         sb.table("tracker_results").insert(result_rows).execute()
+
+        from src.upload import _compute_prompt_scores
+        prompt_scores = _compute_prompt_scores(state["client_id"], run_id, results)
+        if prompt_scores:
+            sb.table("prompt_scores").insert(prompt_scores).execute()
 
         return {"tracker_results": results, "tracker_scores": scores}
     except Exception as e:

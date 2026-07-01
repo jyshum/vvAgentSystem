@@ -44,8 +44,8 @@ export default async function AdminPage() {
   const avgMention = allClients.length > 0
     ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.aggregate_mention_rate ?? 0), 0) / allClients.length
     : 0;
-  const avgCitation = allClients.length > 0
-    ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.aggregate_citation_rate ?? 0), 0) / allClients.length
+  const avgLevel = allClients.length > 0
+    ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.aggregate_avg_mention_level ?? 0), 0) / allClients.length
     : 0;
 
   return (
@@ -80,10 +80,10 @@ export default async function AdminPage() {
           <div className="font-mono text-[8px] tracking-[0.14em]" style={{ color: "var(--faint)" }}>AVG MENTION RATE</div>
         </div>
         <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
-          <div className="font-display font-light text-[38px] leading-none mb-1.5" style={{ color: avgCitation > 0.3 ? "var(--pos)" : avgCitation > 0.1 ? "var(--white)" : "var(--faint)" }}>
-            {allClients.length > 0 ? Math.round(avgCitation * 100) + "%" : "—"}
+          <div className="font-display font-light text-[38px] leading-none mb-1.5" style={{ color: avgLevel >= 3 ? "var(--pos)" : avgLevel >= 2 ? "var(--white)" : "var(--faint)" }}>
+            {allClients.length > 0 ? avgLevel.toFixed(1) : "—"}
           </div>
-          <div className="font-mono text-[8px] tracking-[0.14em]" style={{ color: "var(--faint)" }}>AVG CITATION RATE</div>
+          <div className="font-mono text-[8px] tracking-[0.14em]" style={{ color: "var(--faint)" }}>AVG MENTION LEVEL</div>
         </div>
       </div>
 
@@ -93,7 +93,7 @@ export default async function AdminPage() {
         gap: "16px",
         borderColor: "var(--hair)"
       }}>
-        {["CLIENT", "MENTION", "CITATION", "LAST RUN", ""].map((h) => (
+        {["CLIENT", "MENTION", "AVG LEVEL", "LAST RUN", ""].map((h) => (
           <div key={h} className="font-mono text-[8px] tracking-[0.18em]" style={{ color: "var(--faint)" }}>
             {h}
           </div>

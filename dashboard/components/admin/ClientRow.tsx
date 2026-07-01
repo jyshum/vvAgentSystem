@@ -68,12 +68,12 @@ export function ClientRow({ client, latestRun, previousRun }: ClientRowProps) {
         )}
       </div>
 
-      {/* Citation rate */}
+      {/* Avg mention level */}
       <div>
         {latestRun ? (
           <div className="font-display text-[26px] font-light leading-none"
-            style={{ color: scoreColor(latestRun.aggregate_citation_rate) }}>
-            {formatRate(latestRun.aggregate_citation_rate)}
+            style={{ color: (latestRun.aggregate_avg_mention_level ?? 0) >= 3 ? "var(--pos)" : (latestRun.aggregate_avg_mention_level ?? 0) >= 2 ? "var(--white)" : "var(--faint)" }}>
+            {(latestRun.aggregate_avg_mention_level ?? 0).toFixed(1)}
           </div>
         ) : (
           <span className="font-mono text-[11px]" style={{ color: "var(--faint)" }}>—</span>

@@ -57,3 +57,32 @@ export function weekRangeLabel(weekStart: string | null): string {
 
   return `${startStr} – ${endStr}, ${end.getFullYear()}`;
 }
+
+const MENTION_LEVEL_LABELS: Record<number, string> = {
+  0: "Not Mentioned",
+  1: "Passing Mention",
+  2: "Listed with Context",
+  3: "Recommended",
+  4: "Primary Recommendation",
+};
+
+export function getMentionLevelLabel(level: number): string {
+  return MENTION_LEVEL_LABELS[Math.round(level)] ?? "Unknown";
+}
+
+export function getMentionLevelColor(level: number, paper?: boolean): string {
+  if (paper) {
+    if (level < 1) return "var(--neg-paper)";
+    if (level < 2) return "#c45c00";
+    if (level < 3) return "#8a6a00";
+    return "var(--pos-paper)";
+  }
+  if (level < 1) return "var(--neg)";
+  if (level < 2) return "#fd7e14";
+  if (level < 3) return "#ffc107";
+  return "var(--pos)";
+}
+
+export function formatMentionLevel(level: number): string {
+  return level.toFixed(1);
+}
