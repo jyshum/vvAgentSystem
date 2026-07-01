@@ -1,5 +1,8 @@
+export const dynamic = "force-dynamic";
+
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ApprovalsClient } from "@/components/admin/ApprovalsClient";
+import Link from "next/link";
 
 export default async function ApprovalsPage() {
   const supabase = createAdminClient();
@@ -12,15 +15,15 @@ export default async function ApprovalsPage() {
 
   // Get client names for the cards via audit_runs
   const runIds = [...new Set((cards || []).map(c => c.run_id).filter(Boolean))];
-  let clientMap: Record<string, string> = {};
+  const clientMap: Record<string, string> = {};
   if (runIds.length > 0) {
     const { data: runs } = await supabase
       .from("audit_runs")
       .select("id, client_id, clients(brand_name)")
       .in("id", runIds);
     for (const run of runs || []) {
-      const brandName = (run as any).clients?.brand_name || "Unknown";
-      clientMap[run.id] = brandName;
+      const clients = (run as Record<string, unknown>).clients as { brand_name?: string } | null;
+      clientMap[run.id] = clients?.brand_name || "Unknown";
     }
   }
 
@@ -40,6 +43,13 @@ export default async function ApprovalsPage() {
 
   return (
     <div>
+      <Link
+        href="/admin"
+        className="inline-block font-mono text-[10px] tracking-[0.1em] uppercase mb-6 transition-colors hover:text-[var(--white)]"
+        style={{ color: "var(--faint)", textDecoration: "none" }}
+      >
+        &larr; Back to Clients
+      </Link>
       <h1
         className="font-display text-[52px] font-light leading-[0.96] mb-2"
         style={{ color: "var(--white)" }}

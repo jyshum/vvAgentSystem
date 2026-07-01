@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SubTab } from "@/components/admin/SubTab";
 import { TriggerRunButton } from "@/components/admin/TriggerRunButton";
-import type { Client, TrackerRun } from "@/lib/types";
+import type { Client } from "@/lib/types";
 
 export default async function ClientLayout({
   children,
@@ -15,24 +15,14 @@ export default async function ClientLayout({
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const [{ data: client }, { data: latestRuns }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("id, name, website_domain, cycle_frequency, cycle_day")
-      .eq("id", id)
-      .single(),
-    supabase
-      .from("tracker_runs")
-      .select("ran_at")
-      .eq("client_id", id)
-      .order("ran_at", { ascending: false })
-      .limit(1),
-  ]);
+  const { data: client } = await supabase
+    .from("clients")
+    .select("id, name, website_domain, cycle_frequency, cycle_day")
+    .eq("id", id)
+    .single();
 
   if (!client) notFound();
   const c = client as Pick<Client, "id" | "name" | "website_domain" | "cycle_frequency" | "cycle_day">;
-  const latestRunAt = (latestRuns as Pick<TrackerRun, "ran_at">[] | null)?.[0]?.ran_at ?? null;
-
   const tabs = [
     { label: "CONFIG", href: `/admin/clients/${id}/config` },
     { label: "RUNS", href: `/admin/clients/${id}/runs` },
@@ -76,7 +66,7 @@ export default async function ClientLayout({
             {c.cycle_frequency === "monthly" ? "Monthly" : c.cycle_frequency === "biweekly" ? "Bi-weekly" : "Weekly"} · {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][c.cycle_day ?? 1]} 2:00 AM UTC
           </div>
         </div>
-        <TriggerRunButton clientId={id} latestRunAt={latestRunAt} />
+        <TriggerRunButton clientId={id} />
       </div>
 
       {/* Sub-nav */}

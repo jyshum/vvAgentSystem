@@ -174,12 +174,23 @@ def _get_client():
 
 
 def _call_haiku(prompt: str) -> str:
-    response = _get_client().messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return response.content[0].text
+    import time
+    for attempt in range(3):
+        try:
+            response = _get_client().messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.content[0].text
+        except Exception as e:
+            if attempt < 2:
+                wait = 2 ** attempt
+                print(f"    Haiku API error (attempt {attempt+1}/3): {e}, retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                print(f"    Haiku API failed after 3 attempts: {e}")
+                return ""
 
 
 HAIKU_SCORING_PROMPT = """You are a GEO (Generative Engine Optimization) analyst. Score this webpage content on three pillars. Return ONLY valid JSON, no explanation.
@@ -232,14 +243,46 @@ def score_with_haiku_batch(raw_text: str, paragraphs: list[str], headings: list[
 
     raw = _call_haiku(prompt)
 
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if match:
-            return json.loads(match.group(0))
-        return {
-            "content_structure": {"score": 0, "strengths": [], "issues": ["Haiku scoring failed"], "recommendations": []},
-            "fact_density": {"score": 0, "strengths": [], "issues": ["Haiku scoring failed"], "recommendations": []},
-            "authority_signals": {"score": 0, "strengths": [], "issues": ["Haiku scoring failed"], "recommendations": []},
-        }
+    fallback = {
+        "content_structure": {"score": 0, "strengths": [], "issues": ["Haiku scoring unavailable"], "recommendations": []},
+        "fact_density": {"score": 0, "strengths": [], "issues": ["Haiku scoring unavailable"], "recommendations": []},
+        "authority_signals": {"score": 0, "strengths": [], "issues": ["Haiku scoring unavailable"], "recommendations": []},
+    }
+
+    def _try_parse(text: str) -> dict | None:
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict) and "content_structure" in parsed:
+                return parsed
+        except json.JSONDecodeError:
+            pass
+        return None
+
+    result = _try_parse(raw)
+    if result:
+        return result
+
+    # Try extracting JSON from markdown code fences or surrounding text
+    fence_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw, re.DOTALL)
+    if fence_match:
+        result = _try_parse(fence_match.group(1))
+        if result:
+            return result
+
+    # Try finding the outermost JSON object
+    brace_depth = 0
+    start = None
+    for i, ch in enumerate(raw):
+        if ch == '{':
+            if brace_depth == 0:
+                start = i
+            brace_depth += 1
+        elif ch == '}':
+            brace_depth -= 1
+            if brace_depth == 0 and start is not None:
+                result = _try_parse(raw[start:i+1])
+                if result:
+                    return result
+
+    print(f"    Haiku returned unparseable response — using fallback scores")
+    return fallback
