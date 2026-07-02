@@ -115,6 +115,19 @@ export interface PromptStability {
   }[];
 }
 
+export interface Query {
+  id: string;
+  client_id: string;
+  prompt_text: string;
+  slug: string;
+  bucket: "awareness" | "consideration" | "branded";
+  set_type: "core" | "discovery";
+  status: "active" | "retired";
+  version: number;
+  retired_at: string | null;
+  created_at: string;
+}
+
 export interface Report {
   id: string;
   client_id: string;

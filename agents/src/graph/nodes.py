@@ -7,12 +7,16 @@ def load_config(state: GEOState) -> dict:
     sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
     result = sb.table("clients").select("*").eq("id", state["client_id"]).single().execute()
     row = result.data
+
+    queries_resp = sb.table("queries").select("prompt_text").eq("client_id", state["client_id"]).eq("status", "active").execute()
+    target_queries = [q["prompt_text"] for q in queries_resp.data] if queries_resp.data else []
+
     config = {
         "client_name": row["brand_name"],
         "brand_name": row["brand_name"],
         "website_domain": row["website_domain"],
         "brand_variations": row["brand_variations"] or [],
-        "target_queries": row["target_queries"] or [],
+        "target_queries": target_queries,
         "competitors": row["competitors"] or [],
         "gsc_site_url": row.get("gsc_site_url", ""),
         "cms_type": row.get("cms_type", "copy_paste"),
