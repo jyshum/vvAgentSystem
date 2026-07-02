@@ -102,6 +102,19 @@ export interface CompetitiveGap {
   created_at: string;
 }
 
+export interface PromptStability {
+  query: string;
+  stability_class: "locked_in" | "gaining" | "declining" | "volatile" | "absent";
+  current_mention_rate: number;
+  current_avg_level: number;
+  trend: {
+    run_id: string;
+    ran_at: string;
+    mention_rate: number;
+    avg_mention_level: number;
+  }[];
+}
+
 export interface Report {
   id: string;
   client_id: string;
