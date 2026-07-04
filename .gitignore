@@ -3,6 +3,11 @@ output/
 __pycache__/
 *.egg-info/
 .venv/
+.DS_Store
+
+# Local agent work artifacts
+.claude/worktrees/
+.superpowers/brainstorm/
 
 # Dashboard
 node_modules/

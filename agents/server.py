@@ -127,6 +127,8 @@ def load_schedules():
 
 @asynccontextmanager
 async def lifespan(app):
+    if os.environ.get("LANGCHAIN_TRACING_V2") == "true":
+        print(f"  [Tracing] LangSmith enabled — project: {os.environ.get('LANGCHAIN_PROJECT', 'default')}")
     load_schedules()
     scheduler.start()
     print("  [Scheduler] Started")
