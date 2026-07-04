@@ -12,7 +12,7 @@ export default function ReportsLoading() {
       >
         <span>WEEK</span>
         <span>MENTION</span>
-        <span>AVG LEVEL</span>
+        <span>CITATION</span>
         <span>STATUS</span>
         <span>ACTIONS</span>
       </div>

@@ -8,7 +8,7 @@ import type { Report, TrackerRun } from "@/lib/types";
 interface ReportRowProps {
   report: Report;
   clientId: string;
-  run: Pick<TrackerRun, "id" | "aggregate_mention_rate" | "aggregate_avg_mention_level"> | null;
+  run: Pick<TrackerRun, "id" | "aggregate_mention_rate" | "aggregate_citation_rate"> | null;
 }
 
 export function ReportRow({ report, clientId, run }: ReportRowProps) {
@@ -46,12 +46,12 @@ export function ReportRow({ report, clientId, run }: ReportRowProps) {
         )}
       </div>
 
-      {/* Avg mention level */}
+      {/* Citation rate */}
       <div>
         {run ? (
           <div className="font-display font-light text-[22px] leading-none"
-            style={{ color: scoreColor(run.aggregate_avg_mention_level / 4) }}>
-            {run.aggregate_avg_mention_level.toFixed(1)}
+            style={{ color: scoreColor(run.aggregate_citation_rate) }}>
+            {formatRate(run.aggregate_citation_rate)}
           </div>
         ) : (
           <span className="font-mono text-[11px]" style={{ color: "var(--faint)" }}>—</span>

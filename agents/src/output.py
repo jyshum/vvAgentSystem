@@ -9,12 +9,9 @@ CSV_FIELDS = [
     "query",
     "engine",
     "model",
-    "run_number",
     "brand_mentioned",
     "brand_cited",
     "citation_url",
-    "mention_level",
-    "mention_level_label",
     "competitor_mentions",
     "response_text",
     "timestamp",
@@ -48,51 +45,32 @@ def write_json(
         json.dump(report, f, indent=2, ensure_ascii=False)
 
 
-LEVEL_LABELS = {
-    0: "Not Mentioned",
-    1: "Passing Mention",
-    2: "Listed with Context",
-    3: "Recommended",
-    4: "Primary Recommendation",
-}
-
-
 def format_summary(scores: dict, client_name: str) -> str:
     lines = [
-        f"\n{'='*60}",
+        f"\n{'='*50}",
         f"  GEO Visibility Report: {client_name}",
-        f"{'='*60}",
+        f"{'='*50}",
     ]
-    for engine, es in scores["per_engine"].items():
-        mention = es["mention_rate"]
-        avg_lvl = es.get("avg_mention_level", 0)
-        citation = es.get("citation_rate", 0)
-        lvl_label = LEVEL_LABELS.get(round(avg_lvl), "—")
-        lines.append(
-            f"  {engine:<15} mention: {mention:>6.0%}   "
-            f"avg level: {avg_lvl:.1f} ({lvl_label})   "
-            f"citation: {citation:>6.0%}"
-        )
-    lines.append(f"{'─'*60}")
+    for engine, engine_scores in scores["per_engine"].items():
+        mention = engine_scores["mention_rate"]
+        citation = engine_scores["citation_rate"]
+        lines.append(f"  {engine:<15} mention: {mention:>6.0%}   cited: {citation:>6.0%}")
+    lines.append(f"{'─'*50}")
     agg_mention = scores["aggregate_mention_rate"]
-    agg_level = scores.get("aggregate_avg_mention_level", 0)
-    lvl_label = LEVEL_LABELS.get(round(agg_level), "—")
-    lines.append(
-        f"  {'AGGREGATE':<15} mention: {agg_mention:>6.0%}   "
-        f"avg level: {agg_level:.1f} ({lvl_label})"
-    )
-    lines.append(f"{'='*60}")
+    agg_citation = scores["aggregate_citation_rate"]
+    lines.append(f"  {'AGGREGATE':<15} mention: {agg_mention:>6.0%}   cited: {agg_citation:>6.0%}")
+    lines.append(f"{'='*50}")
 
     comp_scores = scores.get("competitor_scores", {})
     if comp_scores:
-        lines.append(f"\n  {'Competitor Comparison':^58}")
-        lines.append(f"{'─'*60}")
+        lines.append(f"\n  {'Competitor Comparison':^48}")
+        lines.append(f"{'─'*50}")
         lines.append(f"  {'Brand/Competitor':<30} {'Mention Rate':>16}")
-        lines.append(f"{'─'*60}")
+        lines.append(f"{'─'*50}")
         lines.append(f"  {client_name:<30} {agg_mention:>15.0%}")
         for comp, cs in comp_scores.items():
             lines.append(f"  {comp:<30} {cs['mention_rate']:>15.0%}")
-        lines.append(f"{'='*60}")
+        lines.append(f"{'='*50}")
 
     lines.append("")
     return "\n".join(lines)
@@ -108,27 +86,12 @@ def _score_color(rate: float) -> str:
     return "#28a745"
 
 
-def _level_color(level: float) -> str:
-    if level < 1:
-        return "#dc3545"
-    if level < 2:
-        return "#fd7e14"
-    if level < 3:
-        return "#ffc107"
-    return "#28a745"
-
-
-def _level_badge(level: int, label: str) -> str:
-    colors = {
-        0: ("#f8d7da", "#721c24"),
-        1: ("#fff3cd", "#856404"),
-        2: ("#d4edda", "#155724"),
-        3: ("#d1ecf1", "#0c5460"),
-        4: ("#cce5ff", "#004085"),
-    }
-    bg, fg = colors.get(level, ("#e2e3e5", "#383d41"))
-    display = label.replace("_", " ").title()
-    return f'<span class="badge" style="background:{bg};color:{fg}">{display}</span>'
+def _badge(mentioned: bool, cited: bool) -> str:
+    if cited:
+        return '<span class="badge cited">CITED</span>'
+    if mentioned:
+        return '<span class="badge mentioned">MENTIONED</span>'
+    return '<span class="badge not-found">NOT FOUND</span>'
 
 
 def write_html(
@@ -138,7 +101,7 @@ def write_html(
     output_path: Path,
 ) -> None:
     agg_mention = scores["aggregate_mention_rate"]
-    agg_level = scores.get("aggregate_avg_mention_level", 0)
+    agg_citation = scores["aggregate_citation_rate"]
     comp_scores = scores.get("competitor_scores", {})
     per_engine = scores["per_engine"]
     generated = datetime.now().strftime("%B %d, %Y at %I:%M %p")
@@ -152,19 +115,12 @@ def write_html(
 
     engine_cards = ""
     for eng, es in per_engine.items():
-        m_color = _score_color(es["mention_rate"])
-        l_color = _level_color(es.get("avg_mention_level", 0))
-        c_rate = es.get("citation_rate", 0)
+        color = _score_color(es["mention_rate"])
         engine_cards += f"""
         <div class="engine-card">
             <div class="engine-name">{html.escape(eng)}</div>
-            <div class="engine-score" style="color:{m_color}">{es['mention_rate']:.0%}</div>
+            <div class="engine-score" style="color:{color}">{es['mention_rate']:.0%}</div>
             <div class="engine-label">mention rate</div>
-            <div style="font-size:18px;font-weight:600;color:{l_color};margin-top:4px">
-                {es.get('avg_mention_level', 0):.1f}
-            </div>
-            <div class="engine-label">avg level</div>
-            <div style="font-size:14px;color:#86868b;margin-top:4px">{c_rate:.0%} citation</div>
         </div>"""
 
     comp_rows = ""
@@ -188,16 +144,14 @@ def write_html(
         query_results = [r for r in results if r["query"] == query]
         engine_blocks = ""
         for r in query_results:
-            level_badge = _level_badge(r.get("mention_level", 0), r.get("mention_level_label", "not_mentioned"))
+            badge = _badge(r["brand_mentioned"], r["brand_cited"])
             comps = ", ".join(r["competitor_mentions"]) if r["competitor_mentions"] else "none"
             resp = html.escape(r["response_text"])
-            run_num = r.get("run_number", "")
             engine_blocks += f"""
                 <details>
                     <summary>
                         <span class="engine-tag">{html.escape(r['engine'])}</span>
-                        <span style="font-size:11px;color:#86868b">Run {run_num}</span>
-                        {level_badge}
+                        {badge}
                         <span class="competitors-tag">competitors: {html.escape(comps)}</span>
                     </summary>
                     <div class="response-text">{resp}</div>
@@ -208,8 +162,6 @@ def write_html(
             <h3>{html.escape(query)}</h3>
             {engine_blocks}
         </div>"""
-
-    lvl_label = LEVEL_LABELS.get(round(agg_level), "—")
 
     page = f"""<!DOCTYPE html>
 <html lang="en">
@@ -254,6 +206,9 @@ details[open] summary {{ border-bottom: 1px solid #e5e5ea; border-radius: 8px 8p
 .engine-tag {{ font-weight: 600; min-width: 90px; }}
 .badge {{ display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
           font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }}
+.badge.cited {{ background: #d1ecf1; color: #0c5460; }}
+.badge.mentioned {{ background: #d4edda; color: #155724; }}
+.badge.not-found {{ background: #f8d7da; color: #721c24; }}
 .competitors-tag {{ font-size: 12px; color: #86868b; margin-left: auto; }}
 .response-text {{ padding: 16px; font-size: 14px; line-height: 1.7; white-space: pre-wrap;
                   word-wrap: break-word; max-height: 500px; overflow-y: auto; color: #333; }}
@@ -266,36 +221,26 @@ details[open] summary {{ border-bottom: 1px solid #e5e5ea; border-radius: 8px 8p
 
 <div class="dashboard">
     <div class="score-card">
-        <div class="label">Mention Rate</div>
+        <div class="label">Aggregate Mention Rate</div>
         <div class="value" style="color:{_score_color(agg_mention)}">{agg_mention:.0%}</div>
         <div class="detail">across all engines &amp; queries</div>
     </div>
     <div class="score-card">
-        <div class="label">Avg Mention Level</div>
-        <div class="value" style="color:{_level_color(agg_level)}">{agg_level:.1f}</div>
-        <div class="detail">{lvl_label}</div>
+        <div class="label">Citation Rate</div>
+        <div class="value" style="color:{_score_color(agg_citation)}">{agg_citation:.0%}</div>
+        <div class="detail">linked to {html.escape(client_name)}'s website</div>
     </div>
     <div class="score-card">
         <div class="label">Queries Tracked</div>
         <div class="value" style="color:#1d1d1f">{len(queries)}</div>
-        <div class="detail">across {len(per_engine)} engines &middot; 5 runs each</div>
+        <div class="detail">across {len(per_engine)} engines</div>
     </div>
 </div>
 
 <div class="engines-row">{engine_cards}
 </div>
 
-{"" if not comp_scores else "COMP_SECTION_PLACEHOLDER"}
-
-<h2 style="font-size:20px; margin-bottom:16px;">Query Results</h2>
-{query_sections}
-
-</body>
-</html>"""
-
-    # Handle competitor section separately to avoid nested f-string issues
-    if comp_scores:
-        comp_section = f"""
+{"" if not comp_scores else f'''
 <div class="comp-section">
     <h2>Competitor Comparison</h2>
     <table class="comp-table">
@@ -304,8 +249,13 @@ details[open] summary {{ border-bottom: 1px solid #e5e5ea; border-radius: 8px 8p
         </tbody>
     </table>
 </div>
-"""
-        page = page.replace("COMP_SECTION_PLACEHOLDER", comp_section)
+'''}
+
+<h2 style="font-size:20px; margin-bottom:16px;">Query Results</h2>
+{query_sections}
+
+</body>
+</html>"""
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(page)

@@ -27,10 +27,10 @@ export interface TrackerRun {
   client_id: string;
   ran_at: string;
   aggregate_mention_rate: number;
-  aggregate_avg_mention_level: number;
+  aggregate_citation_rate: number;
   per_engine_scores: Record<
     string,
-    { mention_rate: number; avg_mention_level: number; citation_rate: number }
+    { mention_rate: number; citation_rate: number }
   >;
   competitor_scores: Record<string, { mention_rate: number }>;
   gsc_clicks: number;
@@ -38,7 +38,6 @@ export interface TrackerRun {
   gsc_ctr: number;
   gsc_position: number;
   gsc_top_queries: { query: string; clicks: number; impressions: number; ctr: number; position: number }[];
-  discovered_competitors: { name: string; prompt_count: number; total_mentions: number }[];
 }
 
 export interface TrackerResult {
@@ -53,9 +52,6 @@ export interface TrackerResult {
   competitor_mentions: string[];
   response_text: string;
   queried_at: string;
-  run_number: number;
-  mention_level: number;
-  mention_level_label: string;
 }
 
 export interface TrackerResultClient {
@@ -70,62 +66,6 @@ export interface TrackerResultClient {
   competitor_mentions: string[];
   response_text?: string;
   queried_at: string;
-  run_number: number;
-  mention_level: number;
-  mention_level_label: string;
-}
-
-export interface PromptScore {
-  id: string;
-  run_id: string;
-  client_id: string;
-  query: string;
-  llm: string;
-  mention_rate: number;
-  avg_mention_level: number;
-  citation_rate: number;
-  created_at: string;
-}
-
-export interface CompetitiveGap {
-  id: string;
-  run_id: string;
-  client_id: string;
-  query: string;
-  client_mention_rate: number;
-  client_avg_mention_level: number;
-  competitor_data: {
-    name: string;
-    mention_rate: number;
-    per_engine: Record<string, number>;
-  }[];
-  created_at: string;
-}
-
-export interface PromptStability {
-  query: string;
-  stability_class: "locked_in" | "gaining" | "declining" | "volatile" | "absent";
-  current_mention_rate: number;
-  current_avg_level: number;
-  trend: {
-    run_id: string;
-    ran_at: string;
-    mention_rate: number;
-    avg_mention_level: number;
-  }[];
-}
-
-export interface Query {
-  id: string;
-  client_id: string;
-  prompt_text: string;
-  slug: string;
-  bucket: "awareness" | "consideration" | "branded";
-  set_type: "core" | "discovery";
-  status: "active" | "retired";
-  version: number;
-  retired_at: string | null;
-  created_at: string;
 }
 
 export interface Report {

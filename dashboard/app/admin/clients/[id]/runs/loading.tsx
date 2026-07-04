@@ -22,7 +22,7 @@ export default function RunsLoading() {
       >
         <span>DATE</span>
         <span>MENTION</span>
-        <span>AVG LEVEL</span>
+        <span>CITATION</span>
         <span>QUERIES</span>
         <span>STATUS</span>
         <span>REPORT</span>

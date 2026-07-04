@@ -20,16 +20,12 @@ def fetch_config_from_supabase(client_id: str) -> dict:
     supabase = create_client(url, key)
     result = supabase.table("clients").select("*").eq("id", client_id).single().execute()
     row = result.data
-
-    queries_resp = supabase.table("queries").select("prompt_text").eq("client_id", client_id).eq("status", "active").execute()
-    target_queries = [q["prompt_text"] for q in queries_resp.data] if queries_resp.data else []
-
     return {
         "client_name": row["brand_name"],
         "brand_name": row["brand_name"],
         "website_domain": row["website_domain"],
         "brand_variations": row["brand_variations"] or [],
-        "target_queries": target_queries,
+        "target_queries": row["target_queries"] or [],
         "competitors": row["competitors"] or [],
     }
 

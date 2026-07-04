@@ -60,11 +60,11 @@ export function RunRow({ run, clientId, reportId, expectedQueries, resultCount }
         </div>
       </div>
 
-      {/* Avg Level */}
+      {/* Citation */}
       <div>
         <div className="font-display font-light text-[22px] leading-none"
-          style={{ color: hasData ? ((run.aggregate_avg_mention_level ?? 0) >= 3 ? "var(--pos)" : (run.aggregate_avg_mention_level ?? 0) >= 2 ? "var(--white)" : "var(--faint)") : "var(--faint)" }}>
-          {hasData ? (run.aggregate_avg_mention_level ?? 0).toFixed(1) : "—"}
+          style={{ color: hasData ? scoreColor(run.aggregate_citation_rate) : "var(--faint)" }}>
+          {hasData ? formatRate(run.aggregate_citation_rate) : "—"}
         </div>
       </div>
 

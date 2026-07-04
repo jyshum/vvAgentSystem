@@ -65,7 +65,7 @@ export default async function RunsPage({
           >
             <span>DATE</span>
             <span>MENTION</span>
-            <span>AVG LEVEL</span>
+            <span>CITATION</span>
             <span>GSC CLICKS</span>
             <span>GSC POS</span>
             <span>QUERIES</span>

@@ -202,15 +202,7 @@ function EngineRow({
       ? "mentioned-paper"
       : "not-found-paper";
 
-  const levelLabel = result.mention_level_label
-    ? result.mention_level_label.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-    : result.brand_cited
-      ? "Cited"
-      : result.brand_mentioned
-        ? "Mentioned"
-        : "Not Found";
-
-  const label = result.brand_mentioned ? levelLabel : "Not Found";
+  const label = result.brand_cited ? "Cited" : "Mentioned";
 
   const mentionLines =
     result.response_text ? extractMentionLines(result.response_text, brandTerms) : [];
