@@ -283,6 +283,43 @@ async def reload_schedules(authorization: str | None = Header(None)):
     return {"status": "reloaded", "jobs": jobs}
 
 
+@app.get("/api/schedules")
+async def get_schedules(authorization: str | None = Header(None)):
+    verify_auth(authorization)
+    sb = _get_supabase()
+
+    clients_resp = sb.table("clients").select("id, brand_name, cycle_frequency, cycle_day").execute()
+    client_map = {c["id"]: c for c in clients_resp.data}
+
+    runs_resp = sb.table("pipeline_runs").select("client_id, status, created_at").order("created_at", desc=True).execute()
+    latest_runs = {}
+    for run in runs_resp.data:
+        cid = run["client_id"]
+        if cid not in latest_runs:
+            latest_runs[cid] = run
+
+    day_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
+    schedules = []
+    for job in scheduler.get_jobs():
+        if not job.id.startswith("cycle-"):
+            continue
+        client_id = job.id.replace("cycle-", "")
+        client = client_map.get(client_id, {})
+        last_run = latest_runs.get(client_id)
+
+        schedules.append({
+            "client_id": client_id,
+            "client_name": client.get("brand_name", "Unknown"),
+            "cycle_frequency": client.get("cycle_frequency", "weekly"),
+            "cycle_day": day_map.get(client.get("cycle_day", 1), "tue"),
+            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+            "last_run_status": last_run["status"] if last_run else None,
+            "last_run_at": last_run["created_at"] if last_run else None,
+        })
+
+    return {"schedules": schedules}
+
+
 @app.post("/api/run-all")
 async def run_all_clients(authorization: str | None = Header(None)):
     verify_auth(authorization)

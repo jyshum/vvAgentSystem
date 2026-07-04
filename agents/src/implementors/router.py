@@ -15,5 +15,9 @@ def route_card(card: dict, cms_type: str, cms_config: dict) -> dict:
         from src.implementors.github_impl import apply_github_change
         return apply_github_change(card, cms_config)
 
+    if cms_type == "webflow":
+        from src.implementors.webflow_impl import apply_webflow_change
+        return apply_webflow_change(card, cms_config)
+
     print(f"    Unknown cms_type '{cms_type}', falling back to copy_paste")
     return {"status": "approved", "method": "copy_paste"}

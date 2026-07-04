@@ -14,3 +14,10 @@ def test_run_endpoint_requires_auth():
     client = TestClient(app)
     resp = client.post("/api/run", json={"client_id": "test"})
     assert resp.status_code == 401
+
+
+def test_schedules_endpoint_requires_auth():
+    from server import app
+    client = TestClient(app)
+    resp = client.get("/api/schedules")
+    assert resp.status_code == 401
