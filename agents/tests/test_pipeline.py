@@ -12,7 +12,8 @@ def test_build_graph_has_expected_nodes():
     node_names = set(graph.get_graph().nodes.keys())
     assert "load_config" in node_names
     assert "run_tracker" in node_names
-    assert "run_audit" in node_names
-    assert "run_recommender" in node_names
+    assert "run_improvement_pipeline" in node_names
     assert "await_approval" in node_names
+    assert "run_audit" not in node_names
+    assert "run_recommender" not in node_names
     assert "run_implementation" in node_names

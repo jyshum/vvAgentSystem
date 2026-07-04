@@ -117,60 +117,45 @@ def run_gsc_node(state: GEOState) -> dict:
         return {"gsc_metrics": {}}
 
 
-def run_audit_node(state: GEOState) -> dict:
-    from src.auditor import run_audit
+def run_improvement_pipeline_node(state: GEOState) -> dict:
+    from src.improvement.pipeline import run_improvement_pipeline
+    sb = _get_supabase()
+
+    queries_resp = sb.table("queries").select("*").eq("client_id", state["client_id"]).eq("status", "active").execute()
+    queries = queries_resp.data or []
+
+    competitive_gaps = []
+    if state.get("tracker_results"):
+        latest_run = sb.table("tracker_runs") \
+            .select("id") \
+            .eq("client_id", state["client_id"]) \
+            .order("ran_at", desc=True) \
+            .limit(1) \
+            .execute()
+        if latest_run.data:
+            run_id = latest_run.data[0]["id"]
+            gaps_resp = sb.table("competitive_gaps") \
+                .select("*") \
+                .eq("run_id", run_id) \
+                .execute()
+            competitive_gaps = gaps_resp.data or []
+
     try:
-        pages, summary = run_audit(state["client_config"])
-
-        sb = _get_supabase()
-        run_row = sb.table("audit_runs").insert({
-            "client_id": state["client_id"],
-            "pages_audited": summary["pages_audited"],
-            "site_score": summary["site_score"],
-            "pillar_averages": summary["pillar_averages"],
-            "weakest_pillar": summary["weakest_pillar"],
-        }).execute()
-
-        audit_run_id = run_row.data[0]["id"]
-        page_rows = [{
-            "run_id": audit_run_id,
-            "url": p["url"],
-            "title": p["title"],
-            "word_count": p["word_count"],
-            "total_score": p["total_score"],
-            "pillar_scores": p["pillars"],
-        } for p in pages]
-        sb.table("page_scores").insert(page_rows).execute()
-
-        return {"audit_pages": pages, "audit_summary": summary, "audit_run_id": audit_run_id}
+        result = run_improvement_pipeline(state, queries, competitive_gaps)
+        return result
     except Exception as e:
-        print(f"  Audit failed: {e}")
-        return {"audit_pages": [], "audit_summary": {}, "error": str(e)}
-
-
-def run_recommender_node(state: GEOState) -> dict:
-    from src.recommender import run_recommender
-    try:
-        run_id = state.get("audit_run_id") or state["thread_id"]
-        cards = run_recommender(run_id, state["audit_pages"])
-
-        sb = _get_supabase()
-        sb.table("action_cards").insert(cards).execute()
-
-        return {"action_cards": cards}
-    except Exception as e:
-        print(f"  Recommender failed: {e}")
-        return {"action_cards": [], "error": str(e)}
-
-
-def run_reddit_scout_node(state: GEOState) -> dict:
-    from src.reddit_scout import run_scout
-    try:
-        posts = run_scout(state["client_config"])
-        return {"reddit_posts": posts}
-    except Exception as e:
-        print(f"  Reddit scout failed: {e}")
-        return {"reddit_posts": []}
+        print(f"  Improvement pipeline failed: {e}")
+        return {
+            "improvement_run_id": None,
+            "crawlability_report": {},
+            "page_inventory": [],
+            "query_matches": [],
+            "citation_scores": [],
+            "competitive_gap_data": [],
+            "reddit_scout_data": [],
+            "action_cards": [],
+            "error": str(e),
+        }
 
 
 def await_approval(state: GEOState) -> dict:

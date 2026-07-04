@@ -5,27 +5,22 @@ from src.graph.nodes import (
     load_config,
     run_tracker_node,
     run_gsc_node,
-    run_audit_node,
-    run_recommender_node,
+    run_improvement_pipeline_node,
     await_approval,
     run_implementation_node,
 )
 
 
 def route_after_config(state: GEOState) -> str:
-    if state.get("run_type") == "audit_only":
-        return "run_audit"
+    if state.get("run_type") == "improvement_only":
+        return "run_improvement_pipeline"
     return "run_tracker"
-
-
-def route_after_tracker(state: GEOState) -> str:
-    return "run_gsc"
 
 
 def route_after_gsc(state: GEOState) -> str:
     if state.get("run_type") == "tracker_only":
         return END
-    return "run_audit"
+    return "run_improvement_pipeline"
 
 
 def build_graph(checkpointer=None):
@@ -34,8 +29,7 @@ def build_graph(checkpointer=None):
     graph.add_node("load_config", load_config)
     graph.add_node("run_tracker", run_tracker_node)
     graph.add_node("run_gsc", run_gsc_node)
-    graph.add_node("run_audit", run_audit_node)
-    graph.add_node("run_recommender", run_recommender_node)
+    graph.add_node("run_improvement_pipeline", run_improvement_pipeline_node)
     graph.add_node("await_approval", await_approval)
     graph.add_node("run_implementation", run_implementation_node)
 
@@ -43,18 +37,17 @@ def build_graph(checkpointer=None):
 
     graph.add_conditional_edges("load_config", route_after_config, {
         "run_tracker": "run_tracker",
-        "run_audit": "run_audit",
+        "run_improvement_pipeline": "run_improvement_pipeline",
     })
 
     graph.add_edge("run_tracker", "run_gsc")
 
     graph.add_conditional_edges("run_gsc", route_after_gsc, {
         END: END,
-        "run_audit": "run_audit",
+        "run_improvement_pipeline": "run_improvement_pipeline",
     })
 
-    graph.add_edge("run_audit", "run_recommender")
-    graph.add_edge("run_recommender", "await_approval")
+    graph.add_edge("run_improvement_pipeline", "await_approval")
     graph.add_edge("await_approval", "run_implementation")
     graph.add_edge("run_implementation", END)
 
