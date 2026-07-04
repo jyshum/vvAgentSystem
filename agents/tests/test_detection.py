@@ -1,4 +1,14 @@
+import pytest
+
 from src.detection import detect_brand, detect_competitors
+
+
+@pytest.fixture(autouse=True)
+def mock_classify(monkeypatch):
+    monkeypatch.setattr(
+        "src.detection.classify_mention_level",
+        lambda text, brand: {"mention_level": 2, "mention_level_label": "listed_with_context"},
+    )
 
 
 class TestDetectBrand:

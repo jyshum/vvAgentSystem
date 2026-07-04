@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from datetime import datetime, timezone
 
 
@@ -16,6 +17,7 @@ def upload_run(
     client_id: str,
     results: list[dict],
     scores: dict,
+    competitive_gaps: list[dict] | None = None,
 ) -> str | None:
     try:
         sb = create_client()
@@ -28,7 +30,7 @@ def upload_run(
             "client_id": client_id,
             "ran_at": datetime.now(timezone.utc).isoformat(),
             "aggregate_mention_rate": scores.get("aggregate_mention_rate", 0),
-            "aggregate_citation_rate": scores.get("aggregate_citation_rate", 0),
+            "aggregate_avg_mention_level": scores.get("aggregate_avg_mention_level", 0),
             "per_engine_scores": scores.get("per_engine", {}),
             "competitor_scores": scores.get("competitor_scores", {}),
         }
@@ -49,14 +51,73 @@ def upload_run(
                 "competitor_mentions": r.get("competitor_mentions", []),
                 "response_text": r.get("response_text", ""),
                 "queried_at": r.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                "run_number": r.get("run_number"),
+                "mention_level": r.get("mention_level", 0),
+                "mention_level_label": r.get("mention_level_label", "not_mentioned"),
             })
 
         if result_rows:
             sb.from_("tracker_results").insert(result_rows).execute()
 
-        print(f"  Uploaded to Supabase: run {run_id} ({len(result_rows)} results)")
+        prompt_scores = _compute_prompt_scores(client_id, run_id, results)
+        if prompt_scores:
+            sb.from_("prompt_scores").insert(prompt_scores).execute()
+
+        gap_rows = _build_competitive_gap_rows(client_id, run_id, competitive_gaps or [])
+        if gap_rows:
+            sb.from_("competitive_gaps").insert(gap_rows).execute()
+
+        print(f"  Uploaded to Supabase: run {run_id} ({len(result_rows)} results, {len(prompt_scores)} prompt scores, {len(gap_rows)} gaps)")
         return run_id
 
     except Exception as e:
         print(f"  Supabase upload failed: {e}")
         return None
+
+
+def _compute_prompt_scores(client_id: str, run_id: str, results: list[dict]) -> list[dict]:
+    groups = defaultdict(list)
+    for r in results:
+        groups[(r["query"], r["engine"])].append(r)
+
+    scores = []
+    for (query, engine), runs in groups.items():
+        total = len(runs)
+        mentions = [r for r in runs if r.get("brand_mentioned")]
+        mention_count = len(mentions)
+
+        mention_rate = mention_count / total if total > 0 else 0
+        avg_level = (
+            sum(r.get("mention_level", 0) for r in mentions) / mention_count
+            if mention_count > 0 else 0
+        )
+        citation_rate = (
+            sum(1 for r in mentions if r.get("brand_cited")) / mention_count
+            if mention_count > 0 else 0
+        )
+
+        scores.append({
+            "run_id": run_id,
+            "client_id": client_id,
+            "query": query,
+            "llm": engine,
+            "mention_rate": mention_rate,
+            "avg_mention_level": avg_level,
+            "citation_rate": citation_rate,
+        })
+
+    return scores
+
+
+def _build_competitive_gap_rows(client_id: str, run_id: str, gaps: list[dict]) -> list[dict]:
+    rows = []
+    for gap in gaps:
+        rows.append({
+            "run_id": run_id,
+            "client_id": client_id,
+            "query": gap["query"],
+            "client_mention_rate": gap["client_mention_rate"],
+            "client_avg_mention_level": gap["client_avg_mention_level"],
+            "competitor_data": gap["competitor_data"],
+        })
+    return rows

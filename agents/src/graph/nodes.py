@@ -7,12 +7,16 @@ def load_config(state: GEOState) -> dict:
     sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
     result = sb.table("clients").select("*").eq("id", state["client_id"]).single().execute()
     row = result.data
+
+    queries_resp = sb.table("queries").select("prompt_text").eq("client_id", state["client_id"]).eq("status", "active").execute()
+    target_queries = [q["prompt_text"] for q in queries_resp.data] if queries_resp.data else []
+
     config = {
         "client_name": row["brand_name"],
         "brand_name": row["brand_name"],
         "website_domain": row["website_domain"],
         "brand_variations": row["brand_variations"] or [],
-        "target_queries": row["target_queries"] or [],
+        "target_queries": target_queries,
         "competitors": row["competitors"] or [],
         "gsc_site_url": row.get("gsc_site_url", ""),
         "cms_type": row.get("cms_type", "copy_paste"),
@@ -27,21 +31,26 @@ def _get_supabase():
 
 
 def run_tracker_node(state: GEOState) -> dict:
-    from src.tracker import run_tracker
+    from src.tracker import run_tracker, compute_competitive_gaps
     try:
         results, scores = run_tracker(state["client_config"])
+        competitors = state["client_config"].get("competitors", [])
+        gaps = compute_competitive_gaps(results, competitors)
 
         sb = _get_supabase()
         run_row = sb.table("tracker_runs").insert({
             "client_id": state["client_id"],
             "aggregate_mention_rate": scores.get("aggregate_mention_rate", 0),
-            "aggregate_citation_rate": scores.get("aggregate_citation_rate", 0),
+            "aggregate_avg_mention_level": scores.get("aggregate_avg_mention_level", 0),
             "per_engine_scores": scores.get("per_engine", {}),
             "competitor_scores": scores.get("competitor_scores", {}),
+            "discovered_competitors": [],
         }).execute()
 
+        run_id = run_row.data[0]["id"]
+
         result_rows = [{
-            "run_id": run_row.data[0]["id"],
+            "run_id": run_id,
             "query": r["query"],
             "engine": r["engine"],
             "model": r.get("model", ""),
@@ -50,13 +59,25 @@ def run_tracker_node(state: GEOState) -> dict:
             "citation_url": r.get("citation_url"),
             "competitor_mentions": r.get("competitor_mentions", []),
             "response_text": r.get("response_text", ""),
+            "run_number": r.get("run_number"),
+            "mention_level": r.get("mention_level", 0),
+            "mention_level_label": r.get("mention_level_label", "not_mentioned"),
         } for r in results]
         sb.table("tracker_results").insert(result_rows).execute()
 
-        return {"tracker_results": results, "tracker_scores": scores}
+        from src.upload import _compute_prompt_scores, _build_competitive_gap_rows
+        prompt_scores = _compute_prompt_scores(state["client_id"], run_id, results)
+        if prompt_scores:
+            sb.table("prompt_scores").insert(prompt_scores).execute()
+
+        gap_rows = _build_competitive_gap_rows(state["client_id"], run_id, gaps)
+        if gap_rows:
+            sb.table("competitive_gaps").insert(gap_rows).execute()
+
+        return {"tracker_results": results, "tracker_scores": scores, "competitive_gaps": gaps}
     except Exception as e:
         print(f"  Tracker failed: {e}")
-        return {"tracker_results": [], "tracker_scores": {}, "error": str(e)}
+        return {"tracker_results": [], "tracker_scores": {}, "competitive_gaps": [], "error": str(e)}
 
 
 def run_gsc_node(state: GEOState) -> dict:

@@ -21,14 +21,15 @@ export default async function ReportsPage({
 
   // Fetch runs for reports that have a run_id
   const runIds = allReports.map((r) => r.run_id).filter(Boolean) as string[];
-  const runsById: Record<string, TrackerRun> = {};
+  type RunSummary = Pick<TrackerRun, "id" | "aggregate_mention_rate" | "aggregate_avg_mention_level">;
+  const runsById: Record<string, RunSummary> = {};
   if (runIds.length > 0) {
     const { data: runs } = await supabase
       .from("tracker_runs")
-      .select("id, aggregate_mention_rate, aggregate_citation_rate")
+      .select("id, aggregate_mention_rate, aggregate_avg_mention_level")
       .in("id", runIds);
     if (runs) {
-      (runs as TrackerRun[]).forEach((run) => { runsById[run.id] = run; });
+      (runs as unknown as RunSummary[]).forEach((run) => { runsById[run.id] = run; });
     }
   }
 
@@ -52,7 +53,7 @@ export default async function ReportsPage({
           >
             <span>WEEK</span>
             <span>MENTION</span>
-            <span>CITATION</span>
+            <span>LEVEL</span>
             <span>STATUS</span>
             <span>ACTIONS</span>
           </div>

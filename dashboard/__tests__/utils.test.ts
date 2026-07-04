@@ -5,6 +5,9 @@ import {
   formatDelta,
   weekRangeLabel,
   scoreLevel,
+  getMentionLevelLabel,
+  getMentionLevelColor,
+  formatMentionLevel,
 } from "@/lib/utils";
 
 describe("scoreColor", () => {
@@ -84,5 +87,48 @@ describe("weekRangeLabel", () => {
   });
   it("returns empty string for null", () => {
     expect(weekRangeLabel(null)).toBe("");
+  });
+});
+
+describe("getMentionLevelLabel", () => {
+  it("returns Not Mentioned for 0", () => {
+    expect(getMentionLevelLabel(0)).toBe("Not Mentioned");
+  });
+  it("returns Passing Mention for 1", () => {
+    expect(getMentionLevelLabel(1)).toBe("Passing Mention");
+  });
+  it("returns Listed with Context for 2", () => {
+    expect(getMentionLevelLabel(2)).toBe("Listed with Context");
+  });
+  it("returns Recommended for 3", () => {
+    expect(getMentionLevelLabel(3)).toBe("Recommended");
+  });
+  it("returns Primary Recommendation for 4", () => {
+    expect(getMentionLevelLabel(4)).toBe("Primary Recommendation");
+  });
+});
+
+describe("getMentionLevelColor", () => {
+  it("returns red for 0", () => {
+    expect(getMentionLevelColor(0)).toBe("var(--neg)");
+  });
+  it("returns orange for 1", () => {
+    expect(getMentionLevelColor(1)).toBe("#fd7e14");
+  });
+  it("returns yellow for 2", () => {
+    expect(getMentionLevelColor(2)).toBe("#ffc107");
+  });
+  it("returns pos for 3+", () => {
+    expect(getMentionLevelColor(3)).toBe("var(--pos)");
+    expect(getMentionLevelColor(4)).toBe("var(--pos)");
+  });
+});
+
+describe("formatMentionLevel", () => {
+  it("formats level with label", () => {
+    expect(formatMentionLevel(2.8)).toBe("2.8");
+  });
+  it("formats zero", () => {
+    expect(formatMentionLevel(0)).toBe("0.0");
   });
 });
