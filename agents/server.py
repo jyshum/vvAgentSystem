@@ -293,7 +293,7 @@ async def get_schedules(authorization: str | None = Header(None)):
     clients_resp = sb.table("clients").select("id, brand_name, cycle_frequency, cycle_day").execute()
     client_map = {c["id"]: c for c in clients_resp.data}
 
-    runs_resp = sb.table("pipeline_runs").select("client_id, status, created_at").order("created_at", desc=True).execute()
+    runs_resp = sb.table("pipeline_runs").select("client_id, status, started_at").order("started_at", desc=True).execute()
     latest_runs = {}
     for run in runs_resp.data:
         cid = run["client_id"]
@@ -316,7 +316,7 @@ async def get_schedules(authorization: str | None = Header(None)):
             "cycle_day": day_map.get(client.get("cycle_day", 1), "tue"),
             "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
             "last_run_status": last_run["status"] if last_run else None,
-            "last_run_at": last_run["created_at"] if last_run else None,
+            "last_run_at": last_run["started_at"] if last_run else None,
         })
 
     return {"schedules": schedules}
