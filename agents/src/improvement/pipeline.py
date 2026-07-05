@@ -238,7 +238,10 @@ def run_improvement_pipeline(
                 if "reddit_data" in row and not isinstance(row["reddit_data"], (dict, type(None))):
                     del row["reddit_data"]
                 card_rows.append(row)
-            sb.table("action_cards").insert(card_rows).execute()
+            insert_resp = sb.table("action_cards").insert(card_rows).execute()
+            inserted_rows = insert_resp.data or []
+            for card, row in zip(all_cards, inserted_rows):
+                card["id"] = row.get("id")
 
         content_gaps = sum(1 for m in matches if m["match_type"] == "content_gap")
         comp_gaps = sum(1 for g in gap_results if g["competitive_gap"] > 0)
