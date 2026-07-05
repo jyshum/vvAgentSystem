@@ -28,6 +28,10 @@ def test_schedules_uses_started_at(monkeypatch):
     import server as server_mod
 
     captured = {}
+    rows = {
+        "clients": [{"id": "c1", "brand_name": "Brand", "cycle_frequency": "weekly", "cycle_day": 1}],
+        "pipeline_runs": [{"client_id": "c1", "status": "completed", "started_at": "2026-07-01T00:00:00Z"}],
+    }
 
     class FakeQuery:
         def __init__(self, table):
@@ -39,13 +43,18 @@ def test_schedules_uses_started_at(monkeypatch):
             captured[self.table + "_order"] = col
             return self
         def execute(self):
-            return type("R", (), {"data": []})()
+            return type("R", (), {"data": rows.get(self.table, [])})()
 
     class FakeSB:
         def table(self, name):
             return FakeQuery(name)
 
+    class FakeJob:
+        id = "cycle-c1"
+        next_run_time = None
+
     monkeypatch.setattr(server_mod, "_get_supabase", lambda: FakeSB())
+    monkeypatch.setattr(server_mod.scheduler, "get_jobs", lambda: [FakeJob()])
 
     client = TestClient(server_mod.app)
     resp = client.get("/api/schedules", headers={"Authorization": f"Bearer {server_mod.API_KEY}"})
@@ -53,3 +62,7 @@ def test_schedules_uses_started_at(monkeypatch):
     assert resp.status_code == 200
     assert "started_at" in captured["pipeline_runs"]
     assert captured["pipeline_runs_order"] == "started_at"
+
+    body = resp.json()
+    assert body["schedules"][0]["last_run_at"] == "2026-07-01T00:00:00Z"
+    assert body["schedules"][0]["last_run_status"] == "completed"
