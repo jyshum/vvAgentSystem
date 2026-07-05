@@ -66,3 +66,9 @@ def test_schedules_uses_started_at(monkeypatch):
     body = resp.json()
     assert body["schedules"][0]["last_run_at"] == "2026-07-01T00:00:00Z"
     assert body["schedules"][0]["last_run_status"] == "completed"
+
+
+def test_build_checkpointer_returns_none_without_database_url(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    import server as server_mod
+    assert server_mod._build_checkpointer() is None

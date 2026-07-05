@@ -15,7 +15,25 @@ from apscheduler.triggers.cron import CronTrigger
 
 API_KEY = os.environ.get("API_KEY", "dev-key")
 
-graph = build_graph()
+def _build_checkpointer():
+    """Postgres-backed checkpointer so paused approval threads survive restarts.
+
+    Requires DATABASE_URL (Supabase direct connection string, port 5432).
+    Returns None when unset — build_graph falls back to MemorySaver (local dev).
+    """
+    db_url = os.environ.get("DATABASE_URL", "")
+    if not db_url:
+        return None
+    from psycopg_pool import ConnectionPool
+    from langgraph.checkpoint.postgres import PostgresSaver
+    pool = ConnectionPool(db_url, kwargs={"autocommit": True, "prepare_threshold": 0}, open=True)
+    saver = PostgresSaver(pool)
+    saver.setup()
+    print("  [Checkpointer] PostgresSaver enabled")
+    return saver
+
+
+graph = build_graph(checkpointer=_build_checkpointer())
 scheduler = BackgroundScheduler()
 
 
