@@ -240,6 +240,10 @@ def run_improvement_pipeline(
                 card_rows.append(row)
             insert_resp = sb.table("action_cards").insert(card_rows).execute()
             inserted_rows = insert_resp.data or []
+            if len(inserted_rows) != len(all_cards):
+                print(f"  Warning: inserted {len(inserted_rows)} card rows but generated {len(all_cards)} cards — some cards will lack ids")
+            # Assumes PostgREST returns inserted rows in submission order,
+            # so positional zip pairing attaches the right id to each card.
             for card, row in zip(all_cards, inserted_rows):
                 card["id"] = row.get("id")
 
