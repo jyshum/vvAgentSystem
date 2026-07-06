@@ -12,6 +12,7 @@ the pipeline. A card that can't be QA'd goes to human review as normal.
 import os
 import json
 import re
+import unicodedata
 import anthropic
 
 HAIKU_MODEL = "claude-haiku-4-5"
@@ -26,7 +27,22 @@ def _get_client():
     return _client
 
 
+# Unicode punctuation → ASCII, so a Sonnet quote (typically ASCII) still matches
+# page text that uses curly quotes, em/en dashes, or non-breaking spaces.
+_PUNCT_TRANSLATION = str.maketrans({
+    "‘": "'",   # left single quote
+    "’": "'",   # right single quote
+    "“": '"',   # left double quote
+    "”": '"',   # right double quote
+    "–": "-",   # en dash
+    "—": "-",   # em dash
+    " ": " ",   # non-breaking space
+})
+
+
 def _normalize(text: str) -> str:
+    text = unicodedata.normalize("NFKC", text)
+    text = text.translate(_PUNCT_TRANSLATION)
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
@@ -64,7 +80,7 @@ Return ONLY valid JSON: {{"verdict": "pass" or "fail", "reason": "one sentence"}
     try:
         response = _get_client().messages.create(
             model=HAIKU_MODEL,
-            max_tokens=128,
+            max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
         )
         raw = response.content[0].text
