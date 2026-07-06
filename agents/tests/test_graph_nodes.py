@@ -110,3 +110,57 @@ def test_implementation_runs_auto_approved_card_with_id(mock_sb):
 
         mock_route.assert_called_once()
         assert result["implementation_results"][0]["card_id"] == "card-1"
+
+
+@patch("src.improvement.verifier.verify_implementation")
+@patch("src.implementors.router.route_card")
+@patch("src.graph.nodes._get_supabase")
+def test_implementation_node_verifies_implemented_cards(mock_sb, mock_route, mock_verify):
+    mock_table = MagicMock()
+    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
+    mock_sb.return_value.table.return_value = mock_table
+
+    mock_route.return_value = {"status": "implemented"}
+    mock_verify.return_value = {"verified": True, "skipped": False,
+                                "checks": {"page_renders": True, "change_present": True},
+                                "error": None, "checked_at": "2026-07-04T00:00:00Z"}
+
+    from src.graph.nodes import run_implementation_node
+    state = {
+        "client_config": {"cms_type": "wordpress", "cms_config": {}},
+        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
+                          "action_type": "add_faq_schema", "code_block": "{}", "after_text": ""}],
+        "approved_card_ids": ["card-1"],
+    }
+    result = run_implementation_node(state)
+
+    mock_verify.assert_called_once()
+    assert result["implementation_results"][0]["verification"]["verified"] is True
+    # verification persisted to the card row
+    update_payload = mock_table.update.call_args[0][0]
+    assert "verification" in update_payload
+
+
+@patch("src.improvement.verifier.verify_implementation")
+@patch("src.implementors.router.route_card")
+@patch("src.graph.nodes._get_supabase")
+def test_implementation_node_skips_verification_for_non_implemented_status(mock_sb, mock_route, mock_verify):
+    mock_table = MagicMock()
+    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
+    mock_sb.return_value.table.return_value = mock_table
+
+    mock_route.return_value = {"status": "approved"}
+
+    from src.graph.nodes import run_implementation_node
+    state = {
+        "client_config": {"cms_type": "copy_paste", "cms_config": {}},
+        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
+                          "action_type": "restructure_intro", "code_block": "", "after_text": "x"}],
+        "approved_card_ids": ["card-1"],
+    }
+    result = run_implementation_node(state)
+
+    mock_verify.assert_not_called()
+    assert "verification" not in result["implementation_results"][0]
+    update_payload = mock_table.update.call_args[0][0]
+    assert "verification" not in update_payload

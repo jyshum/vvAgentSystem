@@ -190,7 +190,21 @@ def run_implementation_node(state: GEOState) -> dict:
             result["card_id"] = card_id
 
             new_status = "implemented" if result.get("status") == "implemented" else "approved"
-            sb.table("action_cards").update({"status": new_status}).eq("id", card_id).execute()
+
+            verification = None
+            if result.get("status") == "implemented":
+                from src.improvement.verifier import verify_implementation
+                verification = verify_implementation(card)
+                result["verification"] = verification
+                if verification["verified"]:
+                    print(f"    Verified live: {card.get('page_url')}")
+                else:
+                    print(f"    NOT verified: {verification.get('error') or verification['checks']}")
+
+            update_fields = {"status": new_status}
+            if verification is not None:
+                update_fields["verification"] = verification
+            sb.table("action_cards").update(update_fields).eq("id", card_id).execute()
 
             if result.get("status") == "error":
                 print(f"    Failed: {result.get('error')}")
