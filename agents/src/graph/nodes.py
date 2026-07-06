@@ -125,20 +125,19 @@ def run_improvement_pipeline_node(state: GEOState) -> dict:
     queries = queries_resp.data or []
 
     competitive_gaps = []
-    if state.get("tracker_results"):
-        latest_run = sb.table("tracker_runs") \
-            .select("id") \
-            .eq("client_id", state["client_id"]) \
-            .order("ran_at", desc=True) \
-            .limit(1) \
+    latest_run = sb.table("tracker_runs") \
+        .select("id") \
+        .eq("client_id", state["client_id"]) \
+        .order("ran_at", desc=True) \
+        .limit(1) \
+        .execute()
+    if latest_run.data:
+        run_id = latest_run.data[0]["id"]
+        gaps_resp = sb.table("competitive_gaps") \
+            .select("*") \
+            .eq("run_id", run_id) \
             .execute()
-        if latest_run.data:
-            run_id = latest_run.data[0]["id"]
-            gaps_resp = sb.table("competitive_gaps") \
-                .select("*") \
-                .eq("run_id", run_id) \
-                .execute()
-            competitive_gaps = gaps_resp.data or []
+        competitive_gaps = gaps_resp.data or []
 
     try:
         result = run_improvement_pipeline(state, queries, competitive_gaps)
