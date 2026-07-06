@@ -17,6 +17,7 @@ from src.improvement.card_generator import (
     prioritize_cards,
 )
 from src.improvement.validators import validate_json_ld
+from src.improvement.card_qa import qa_card
 
 
 def _get_supabase():
@@ -175,13 +176,26 @@ def run_improvement_pipeline(
             for action in actions:
                 gap_text = f"Competitor {gap_info['top_competitor']} has {gap_info['competitive_gap']:.0%} advantage" if has_gap and gap_info else "No competitive gap"
 
-                specifics = generate_sonnet_specifics(
-                    page_text,
-                    primary["query"],
-                    action["action_type"],
-                    action["issue"],
-                    gap_text,
-                )
+                specifics = None
+                for attempt in range(2):
+                    candidate = generate_sonnet_specifics(
+                        page_text,
+                        primary["query"],
+                        action["action_type"],
+                        action["issue"],
+                        gap_text,
+                    )
+                    qa = qa_card(
+                        {**candidate, "action_type": action["action_type"]},
+                        page_text,
+                    )
+                    if qa["passed"]:
+                        specifics = candidate
+                        break
+                    print(f"    QA failed ({action['action_type']}, attempt {attempt + 1}): {qa['reason']}")
+
+                if specifics is None:
+                    continue  # dropped — regeneration didn't fix it
 
                 validation_passed = True
                 if action["action_type"] in ("generate_schema", "fix_schema", "add_faq_schema") and specifics.get("code_block"):
