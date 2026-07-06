@@ -26,8 +26,18 @@ def _build_checkpointer():
         return None
     from psycopg_pool import ConnectionPool
     from langgraph.checkpoint.postgres import PostgresSaver
-    pool = ConnectionPool(db_url, kwargs={"autocommit": True, "prepare_threshold": 0}, open=True)
+    min_size = int(os.environ.get("DB_POOL_MIN_SIZE", "4"))
+    max_size = int(os.environ.get("DB_POOL_MAX_SIZE", "4"))
+    # Pool intentionally lives for the process lifetime — no close handler.
+    pool = ConnectionPool(
+        db_url,
+        kwargs={"autocommit": True, "prepare_threshold": 0},
+        open=True,
+        min_size=min_size,
+        max_size=max_size,
+    )
     saver = PostgresSaver(pool)
+    print("  [Checkpointer] Connecting to Postgres...")
     saver.setup()
     print("  [Checkpointer] PostgresSaver enabled")
     return saver
