@@ -68,3 +68,45 @@ def test_improvement_node_fetches_gaps_without_tracker_results(mock_sb):
         # Third positional arg = competitive_gaps, must be the stored rows, not []
         passed_gaps = mock_run.call_args[0][2]
         assert passed_gaps == [{"query": "q1", "client_mention_rate": 0.1, "competitor_data": []}]
+
+
+@patch("src.graph.nodes._get_supabase")
+def test_implementation_skips_auto_approved_card_without_id(mock_sb):
+    """Id-less cards (partial insert) must never reach route_card — no audit trail."""
+    mock_sb.return_value.table.return_value = MagicMock()
+
+    from src.graph.nodes import run_implementation_node
+
+    with patch("src.implementors.router.route_card") as mock_route:
+        state = {
+            "client_config": {"cms_type": "wordpress", "cms_config": {}},
+            "action_cards": [
+                {"action_type": "add_faq_schema", "status": "approved", "auto_approved": True},  # no id
+            ],
+            "approved_card_ids": [],
+        }
+        result = run_implementation_node(state)
+
+        mock_route.assert_not_called()
+        assert result["implementation_results"] == []
+
+
+@patch("src.graph.nodes._get_supabase")
+def test_implementation_runs_auto_approved_card_with_id(mock_sb):
+    mock_sb.return_value.table.return_value = MagicMock()
+
+    from src.graph.nodes import run_implementation_node
+
+    with patch("src.implementors.router.route_card") as mock_route:
+        mock_route.return_value = {"status": "implemented"}
+        state = {
+            "client_config": {"cms_type": "wordpress", "cms_config": {}},
+            "action_cards": [
+                {"id": "card-1", "action_type": "add_faq_schema", "status": "approved", "auto_approved": True},
+            ],
+            "approved_card_ids": [],
+        }
+        result = run_implementation_node(state)
+
+        mock_route.assert_called_once()
+        assert result["implementation_results"][0]["card_id"] == "card-1"

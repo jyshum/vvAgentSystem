@@ -18,7 +18,11 @@ from src.improvement.card_generator import (
 )
 from src.improvement.validators import validate_json_ld
 from src.improvement.card_qa import qa_card
-from src.improvement.auto_approve import compute_eligible_action_types, apply_auto_approve
+from src.improvement.auto_approve import (
+    compute_eligible_action_types,
+    apply_auto_approve,
+    HISTORY_ELIGIBLE_TYPES,
+)
 
 
 def _get_supabase():
@@ -274,7 +278,10 @@ def run_improvement_pipeline(
             .execute()
         earned = compute_eligible_action_types(history_resp.data or [])
         configured = set(config.get("auto_approve_action_types") or [])
-        eligible = earned | configured
+        disallowed = configured - HISTORY_ELIGIBLE_TYPES
+        if disallowed:
+            print(f"  Warning: auto_approve_action_types contains non-schema types {sorted(disallowed)} — ignored (content changes always need human review)")
+        eligible = earned | (configured & HISTORY_ELIGIBLE_TYPES)
         if eligible:
             n_auto = apply_auto_approve(all_cards, eligible)
             if n_auto:

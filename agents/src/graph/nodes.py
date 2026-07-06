@@ -178,6 +178,9 @@ def run_implementation_node(state: GEOState) -> dict:
     approved_ids = set(state.get("approved_card_ids") or [])
     for card in state["action_cards"]:
         card_id = card.get("id", "")
+        if not card_id:
+            print(f"    Skipping card with no id (insert may have partially failed): {card.get('action_type')}")
+            continue
         if not (card.get("auto_approved") or card_id in approved_ids):
             continue
 

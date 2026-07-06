@@ -4,10 +4,15 @@ Schema-only changes validated programmatically (JSON-LD parse + required
 fields) carry near-zero risk. A client earns auto-approval for an action type
 after `min_cycles` runs where every card of that type was approved or
 implemented and none was ever rejected. Admins can also grant types explicitly
-via clients.auto_approve_action_types.
+via clients.auto_approve_action_types, but that allowlist is bounded to
+HISTORY_ELIGIBLE_TYPES — non-schema entries are ignored (with a warning) at
+apply time in the pipeline.
 
 Content-changing action types (intro rewrites, citations, freshness) are never
-auto-approved from history — humans review anything that changes visible copy.
+auto-approved — humans review anything that changes visible copy.
+
+Note: min_cycles counts distinct runs, not distinct days — rapid re-runs can
+satisfy it (documented limitation; a temporal guard is deferred).
 """
 
 from collections import defaultdict
