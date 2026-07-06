@@ -10,6 +10,7 @@ from src.improvement.reddit_scout import run_reddit_scout
 from src.improvement.card_generator import (
     classify_actions,
     build_content_brief,
+    build_crawlability_card,
     build_reddit_card,
     generate_sonnet_specifics,
     generate_sonnet_quality,
@@ -132,6 +133,19 @@ def run_improvement_pipeline(
 
         print("  Step 6: Generating action cards...")
         all_cards = []
+
+        if crawl_report.get("has_critical_blocker"):
+            crawl_card = build_crawlability_card(crawl_report, domain)
+            crawl_card["run_id"] = run_id
+            crawl_card["client_id"] = client_id
+            crawl_card["pillar"] = "crawlability"
+            crawl_card["score"] = 0
+            crawl_card["before_text"] = ""
+            crawl_card["after_text"] = ""
+            crawl_card["code_block"] = ""
+            crawl_card["validation_passed"] = True
+            all_cards.append(crawl_card)
+
         score_by_url = {s["url"]: s for s in citation_scores}
 
         gap_by_query = {g["query"]: g for g in gap_results}

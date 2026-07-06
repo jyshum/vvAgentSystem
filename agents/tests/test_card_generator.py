@@ -1,6 +1,7 @@
 from src.improvement.card_generator import (
     classify_actions,
     build_content_brief,
+    build_crawlability_card,
     prioritize_cards,
 )
 
@@ -108,3 +109,31 @@ class TestPrioritizeCards:
         ]
         sorted_cards = prioritize_cards(cards)
         assert sorted_cards[0]["competitive_gap"] == 0.8
+
+
+class TestBuildCrawlabilityCard:
+    def test_lists_failing_critical_checks(self):
+        report = {
+            "robots_txt": {"status": "fail", "detail": "GPTBot disallowed in robots.txt"},
+            "js_rendering": {"status": "pass"},
+            "cdn_blocks": {"status": "fail", "detail": "403 for GPTBot user agent"},
+            "has_critical_blocker": True,
+        }
+        card = build_crawlability_card(report, "example.com")
+        assert card["action_type"] == "fix_crawlability"
+        assert card["track"] == "manual"
+        assert card["priority"] == 0
+        assert card["status"] == "pending"
+        assert card["page_url"] == "https://example.com"
+        assert "GPTBot disallowed" in card["issue"]
+        assert "403 for GPTBot" in card["issue"]
+
+    def test_check_without_detail_falls_back_to_check_name(self):
+        report = {
+            "robots_txt": {"status": "fail"},
+            "js_rendering": {"status": "pass"},
+            "cdn_blocks": {"status": "pass"},
+            "has_critical_blocker": True,
+        }
+        card = build_crawlability_card(report, "example.com")
+        assert "robots_txt" in card["issue"]

@@ -120,6 +120,29 @@ def build_reddit_card(query: str, scout_data: dict) -> dict:
     }
 
 
+CRITICAL_CRAWL_CHECKS = ("robots_txt", "js_rendering", "cdn_blocks")
+
+
+def build_crawlability_card(crawl_report: dict, domain: str) -> dict:
+    failing = [
+        name for name in CRITICAL_CRAWL_CHECKS
+        if crawl_report.get(name, {}).get("status") == "fail"
+    ]
+    details = "; ".join(
+        crawl_report[name].get("detail") or name for name in failing
+    )
+    return {
+        "page_url": f"https://{domain}",
+        "action_type": "fix_crawlability",
+        "track": "manual",
+        "priority": 0,
+        "competitive_gap": None,
+        "issue": f"AI crawlers cannot access the site — every other action is blocked until fixed: {details}",
+        "status": "pending",
+        "cms_action": "none",
+    }
+
+
 def generate_sonnet_specifics(
     page_content: str,
     query: str,
