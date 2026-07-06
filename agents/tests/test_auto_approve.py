@@ -38,6 +38,15 @@ class TestComputeEligibleActionTypes:
         ]
         assert "add_faq_schema" not in compute_eligible_action_types(history, min_cycles=3)
 
+    def test_mixed_status_within_run_blocks_eligibility(self):
+        history = [
+            _card("add_faq_schema", "implemented", "r1"),
+            _card("add_faq_schema", "implemented", "r2"),
+            _card("add_faq_schema", "pending", "r2"),
+            _card("add_faq_schema", "implemented", "r3"),
+        ]
+        assert "add_faq_schema" not in compute_eligible_action_types(history, min_cycles=3)
+
     def test_content_action_types_never_eligible_from_history(self):
         history = [_card("restructure_intro", "implemented", f"r{i}") for i in range(10)]
         assert "restructure_intro" not in compute_eligible_action_types(history, min_cycles=3)

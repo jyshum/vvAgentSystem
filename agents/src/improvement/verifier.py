@@ -8,6 +8,10 @@ Checks:
 
 The result is advisory: it's stored on the card for the dashboard, it never
 rolls anything back on its own.
+
+Verification runs immediately after publish, so CDN/cache lag can cause
+transient false negatives; this is advisory-only, retry/backoff is future
+hardening.
 """
 
 import json
@@ -40,6 +44,16 @@ def _extract_schema_types(soup: BeautifulSoup) -> set[str]:
                 types.update(t)
             elif t:
                 types.add(t)
+            graph = block.get("@graph")
+            if isinstance(graph, list):
+                for node in graph:
+                    if not isinstance(node, dict):
+                        continue
+                    nt = node.get("@type")
+                    if isinstance(nt, list):
+                        types.update(nt)
+                    elif nt:
+                        types.add(nt)
     return types
 
 

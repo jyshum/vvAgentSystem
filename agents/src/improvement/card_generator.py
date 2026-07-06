@@ -124,6 +124,8 @@ CRITICAL_CRAWL_CHECKS = ("robots_txt", "js_rendering", "cdn_blocks")
 
 
 def build_crawlability_card(crawl_report: dict, domain: str) -> dict:
+    # Callers gate on has_critical_blocker, which guarantees at least one
+    # failing critical check — the empty-details branch below is defensive only.
     failing = [
         name for name in CRITICAL_CRAWL_CHECKS
         if crawl_report.get(name, {}).get("status") == "fail"

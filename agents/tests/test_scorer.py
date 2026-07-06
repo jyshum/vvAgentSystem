@@ -171,6 +171,17 @@ class TestExtractBodyText:
         assert "Menu Home About" not in text
         assert "Copyright" not in text
 
+    def test_strips_script_and_style_in_body(self):
+        html = """<html><head><title>T</title></head>
+        <body><style>.y{color:blue}</style>
+        <script>var b=2;</script>
+        <p>Actual visible content about widgets.</p>
+        </body></html>"""
+        text = extract_body_text(html)
+        assert "Actual visible content about widgets." in text
+        assert "var b=2" not in text
+        assert "color:blue" not in text
+
     def test_respects_max_chars(self):
         html = "<html><body><p>" + ("word " * 2000) + "</p></body></html>"
         assert len(extract_body_text(html, max_chars=500)) <= 500

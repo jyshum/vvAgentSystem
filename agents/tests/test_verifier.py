@@ -61,6 +61,21 @@ class TestVerifyImplementation:
         assert result["verified"] is False
         assert result["checks"]["page_renders"] is False
 
+    @patch("src.improvement.verifier.httpx.get")
+    def test_schema_card_verified_when_type_only_in_graph(self, mock_get):
+        html = ('<html><head><title>T</title></head><body><p>x</p>'
+                '<script type="application/ld+json">'
+                '{"@context":"https://schema.org","@graph":['
+                '{"@type":"WebPage"},{"@type":"FAQPage","mainEntity":[]}]}'
+                '</script></body></html>')
+        mock_get.return_value = _mock_response(html=html)
+        card = {"page_url": "https://x.com/p1", "action_type": "add_faq_schema",
+                "code_block": '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[]}',
+                "after_text": ""}
+        result = verify_implementation(card)
+        assert result["verified"] is True
+        assert result["checks"]["change_present"] is True
+
     def test_card_without_page_url_is_skipped(self):
         card = {"page_url": None, "action_type": "content_brief", "code_block": "", "after_text": ""}
         result = verify_implementation(card)

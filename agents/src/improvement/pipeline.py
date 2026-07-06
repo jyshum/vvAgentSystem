@@ -161,15 +161,16 @@ def run_improvement_pipeline(
             if m["match_type"] == "matched" and m["matched_page_url"]:
                 matches_by_page.setdefault(m["matched_page_url"], []).append(m)
 
+        def _gap_value(m: dict) -> float:
+            g = gap_by_query.get(m["query"])
+            return g["competitive_gap"] if g else 0.0
+
         for page_url, page_matches in matches_by_page.items():
             score = score_by_url.get(page_url)
             if not score:
                 continue
 
-            def _gap_value(m: dict) -> float:
-                g = gap_by_query.get(m["query"])
-                return g["competitive_gap"] if g else 0.0
-
+            # Ties break to the first match in list order (deterministic).
             primary = max(page_matches, key=_gap_value)
             gap_info = gap_by_query.get(primary["query"])
             has_gap = bool(gap_info and gap_info["competitive_gap"] > 0)
