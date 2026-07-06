@@ -25,6 +25,8 @@ USER_AGENT = "Mozilla/5.0 (compatible; VV-Verify/1.0)"
 
 
 def _normalize(text: str) -> str:
+    # Simpler than card_qa._normalize (no unicode punctuation folding) on purpose:
+    # verification is advisory, whereas a grounding false-fail drops cards.
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
