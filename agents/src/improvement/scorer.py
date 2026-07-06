@@ -21,6 +21,18 @@ BASELINE_SCHEMA_TYPES = {"Organization", "WebSite", "BreadcrumbList"}
 HIGH_VALUE_SCHEMA_TYPES = {"FAQPage", "HowTo", "Article", "NewsArticle", "BlogPosting", "Product"}
 
 
+def extract_body_text(html: str, max_chars: int = 3000) -> str:
+    """Visible body text for LLM input — strips chrome, scripts, and styles."""
+    if not html:
+        return ""
+    soup = BeautifulSoup(html, "html.parser")
+    body = soup.find("body") or soup
+    for tag in body.find_all(["nav", "footer", "header", "aside", "script", "style"]):
+        tag.decompose()
+    text = " ".join(body.get_text(separator=" ").split())
+    return text[:max_chars]
+
+
 def check_answer_first(html: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
     body = soup.find("body")

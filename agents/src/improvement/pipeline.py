@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from src.improvement.crawlability import run_crawlability_gate
 from src.improvement.inventory import build_inventory
 from src.improvement.matcher import match_queries_to_pages
-from src.improvement.scorer import compute_structural_score
+from src.improvement.scorer import compute_structural_score, extract_body_text
 from src.improvement.gap_check import check_competitive_gaps
 from src.improvement.reddit_scout import run_reddit_scout
 from src.improvement.card_generator import (
@@ -99,8 +99,9 @@ def run_improvement_pipeline(
 
             matched_queries = [m["query"] for m in matches if m["matched_page_url"] == page_url]
             query_text = matched_queries[0] if matched_queries else ""
+            page_text = extract_body_text(page.get("raw_html", ""))
             sonnet_quality = generate_sonnet_quality(
-                page.get("raw_html", "")[:3000],
+                page_text,
                 query_text,
                 score_result["check_results"],
             )
@@ -147,12 +148,13 @@ def run_improvement_pipeline(
 
             actions = classify_actions(score, page_url)
             page = page_by_url.get(page_url, {})
+            page_text = extract_body_text(page.get("raw_html", ""))
 
             for action in actions:
                 gap_text = f"Competitor {gap_info['top_competitor']} has {gap_info['competitive_gap']:.0%} advantage" if has_gap and gap_info else "No competitive gap"
 
                 specifics = generate_sonnet_specifics(
-                    page.get("raw_html", "")[:3000],
+                    page_text,
                     match["query"],
                     action["action_type"],
                     action["issue"],

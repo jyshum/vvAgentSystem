@@ -9,6 +9,7 @@ from src.improvement.scorer import (
     check_author_attribution,
     check_schema_validation,
     compute_structural_score,
+    extract_body_text,
 )
 
 
@@ -154,6 +155,28 @@ class TestCheckSchemaValidation:
         html = '<html><head><script type="application/ld+json">{not valid json}</script></head><body></body></html>'
         result = check_schema_validation(html)
         assert result["schema_status"] == "broken"
+
+
+class TestExtractBodyText:
+    def test_strips_head_nav_and_scripts(self):
+        html = """<html><head><title>T</title><style>.x{color:red}</style>
+        <script>var a=1;</script></head>
+        <body><nav>Menu Home About</nav>
+        <p>Actual visible content about widgets.</p>
+        <footer>Copyright</footer></body></html>"""
+        text = extract_body_text(html)
+        assert "Actual visible content about widgets." in text
+        assert "var a=1" not in text
+        assert "color:red" not in text
+        assert "Menu Home About" not in text
+        assert "Copyright" not in text
+
+    def test_respects_max_chars(self):
+        html = "<html><body><p>" + ("word " * 2000) + "</p></body></html>"
+        assert len(extract_body_text(html, max_chars=500)) <= 500
+
+    def test_empty_html_returns_empty_string(self):
+        assert extract_body_text("") == ""
 
 
 class TestComputeStructuralScore:
