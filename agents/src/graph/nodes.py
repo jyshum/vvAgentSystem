@@ -21,6 +21,7 @@ def load_config(state: GEOState) -> dict:
         "gsc_site_url": row.get("gsc_site_url", ""),
         "cms_type": row.get("cms_type", "copy_paste"),
         "cms_config": row.get("cms_config", {}),
+        "auto_approve_action_types": row.get("auto_approve_action_types") or [],
     }
     return {"client_config": config}
 
@@ -174,9 +175,10 @@ def run_implementation_node(state: GEOState) -> dict:
     sb = _get_supabase()
 
     results = []
+    approved_ids = set(state.get("approved_card_ids") or [])
     for card in state["action_cards"]:
         card_id = card.get("id", "")
-        if card_id not in state["approved_card_ids"]:
+        if not (card.get("auto_approved") or card_id in approved_ids):
             continue
 
         print(f"  Implementing card {card_id} via {cms_type}...")

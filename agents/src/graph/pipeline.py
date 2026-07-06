@@ -23,6 +23,15 @@ def route_after_gsc(state: GEOState) -> str:
     return "run_improvement_pipeline"
 
 
+def route_after_improvement(state: GEOState) -> str:
+    cards = state.get("action_cards", [])
+    pending = [c for c in cards if c.get("status") == "pending"]
+    auto_approved = [c for c in cards if c.get("auto_approved")]
+    if auto_approved and not pending:
+        return "run_implementation"
+    return "await_approval"
+
+
 def build_graph(checkpointer=None):
     graph = StateGraph(GEOState)
 
@@ -47,7 +56,10 @@ def build_graph(checkpointer=None):
         "run_improvement_pipeline": "run_improvement_pipeline",
     })
 
-    graph.add_edge("run_improvement_pipeline", "await_approval")
+    graph.add_conditional_edges("run_improvement_pipeline", route_after_improvement, {
+        "await_approval": "await_approval",
+        "run_implementation": "run_implementation",
+    })
     graph.add_edge("await_approval", "run_implementation")
     graph.add_edge("run_implementation", END)
 

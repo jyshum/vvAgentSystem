@@ -18,6 +18,7 @@ from src.improvement.card_generator import (
 )
 from src.improvement.validators import validate_json_ld
 from src.improvement.card_qa import qa_card
+from src.improvement.auto_approve import compute_eligible_action_types, apply_auto_approve
 
 
 def _get_supabase():
@@ -266,6 +267,18 @@ def run_improvement_pipeline(
                 all_cards.append(reddit_card)
 
         all_cards = prioritize_cards(all_cards)
+
+        history_resp = sb.table("action_cards") \
+            .select("action_type, status, run_id, track") \
+            .eq("client_id", client_id) \
+            .execute()
+        earned = compute_eligible_action_types(history_resp.data or [])
+        configured = set(config.get("auto_approve_action_types") or [])
+        eligible = earned | configured
+        if eligible:
+            n_auto = apply_auto_approve(all_cards, eligible)
+            if n_auto:
+                print(f"  Auto-approved {n_auto} card(s) — eligible types: {sorted(eligible)}")
 
         if all_cards:
             card_rows = []
