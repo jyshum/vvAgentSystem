@@ -134,17 +134,25 @@ def run_improvement_pipeline(
         all_cards = []
         score_by_url = {s["url"]: s for s in citation_scores}
 
-        for match in matches:
-            if match["match_type"] != "matched" or not match["matched_page_url"]:
-                continue
+        gap_by_query = {g["query"]: g for g in gap_results}
 
-            page_url = match["matched_page_url"]
+        matches_by_page: dict[str, list[dict]] = {}
+        for m in matches:
+            if m["match_type"] == "matched" and m["matched_page_url"]:
+                matches_by_page.setdefault(m["matched_page_url"], []).append(m)
+
+        for page_url, page_matches in matches_by_page.items():
             score = score_by_url.get(page_url)
             if not score:
                 continue
 
-            gap_info = next((g for g in gap_results if g["query"] == match["query"]), None)
-            has_gap = gap_info and gap_info["competitive_gap"] > 0
+            def _gap_value(m: dict) -> float:
+                g = gap_by_query.get(m["query"])
+                return g["competitive_gap"] if g else 0.0
+
+            primary = max(page_matches, key=_gap_value)
+            gap_info = gap_by_query.get(primary["query"])
+            has_gap = bool(gap_info and gap_info["competitive_gap"] > 0)
 
             actions = classify_actions(score, page_url)
             page = page_by_url.get(page_url, {})
@@ -155,7 +163,7 @@ def run_improvement_pipeline(
 
                 specifics = generate_sonnet_specifics(
                     page_text,
-                    match["query"],
+                    primary["query"],
                     action["action_type"],
                     action["issue"],
                     gap_text,
@@ -172,7 +180,7 @@ def run_improvement_pipeline(
                 card = {
                     "run_id": run_id,
                     "client_id": client_id,
-                    "query_id": match.get("query_id"),
+                    "query_id": primary.get("query_id"),
                     "page_url": page_url,
                     "pillar": action["action_type"],
                     "action_type": action["action_type"],
