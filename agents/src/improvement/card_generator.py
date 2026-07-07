@@ -103,17 +103,39 @@ def build_content_brief(
     }
 
 
-def build_reddit_card(query: str, scout_data: dict) -> dict:
+def build_community_check_card(gap: dict) -> dict:
+    """Manual community-check card for a losing query (D5 — no automated
+    Reddit data; humans do the searching and engagement)."""
+    from urllib.parse import quote_plus
+
+    query = gap["query"]
+    top = gap.get("top_competitor")
+    gap_value = gap.get("competitive_gap") or 0.0
+
+    issue = f"Check community discussion for '{query}'"
+    if top:
+        issue += f" — {top} leads by {gap_value:.0%} on this query"
+
     return {
         "page_url": None,
-        "action_type": "reddit_engagement",
+        "query_id": gap.get("query_id"),
+        "action_type": "community_check",
         "track": "manual",
         "priority": 2,
-        "competitive_gap": None,
-        "issue": f"{scout_data['threads_found']} Reddit threads found for '{query}' — competitors present in {len(scout_data.get('competitors_mentioned', []))} thread(s)",
+        "competitive_gap": gap_value,
+        "issue": issue,
         "reddit_data": {
-            "threads": scout_data.get("threads", []),
-            "competitors_present": scout_data.get("competitors_mentioned", []),
+            "search_links": {
+                "reddit": f"https://www.reddit.com/search/?q={quote_plus(query)}",
+                "google": f"https://www.google.com/search?q={quote_plus('site:reddit.com ' + query)}",
+            },
+            "guidance": (
+                "Search for recent threads asking this question. Note whether "
+                "competitors are recommended and whether we appear. Engage only "
+                "where a genuinely helpful answer fits — drip pace, never mass "
+                "promotional commenting."
+            ),
+            "thread_url": None,
         },
         "status": "pending",
         "cms_action": "none",

@@ -6,12 +6,11 @@ from src.improvement.inventory import build_inventory
 from src.improvement.matcher import match_queries_to_pages
 from src.improvement.scorer import compute_structural_score, extract_body_text
 from src.improvement.gap_check import check_competitive_gaps
-from src.improvement.reddit_scout import run_reddit_scout
 from src.improvement.card_generator import (
     classify_actions,
     build_content_brief,
     build_crawlability_card,
-    build_reddit_card,
+    build_community_check_card,
     generate_sonnet_specifics,
     generate_sonnet_quality,
     prioritize_cards,
@@ -38,8 +37,6 @@ def run_improvement_pipeline(
     config = state["client_config"]
     domain = config["website_domain"]
     client_id = state["client_id"]
-    brand_name = config.get("brand_name", "")
-    competitors = config.get("competitors", [])
 
     sb = _get_supabase()
 
@@ -134,9 +131,7 @@ def run_improvement_pipeline(
         print("  Step 5: Competitive gap check...")
         gap_results = check_competitive_gaps(matches, competitive_gaps_data or [])
 
-        print("  Step 5b: Reddit scout...")
         gap_queries = [g for g in gap_results if g["competitive_gap"] > 0]
-        reddit_data = run_reddit_scout(gap_queries, brand_name, competitors) if gap_queries else []
 
         print("  Step 6: Generating action cards...")
         all_cards = []
@@ -256,21 +251,17 @@ def run_improvement_pipeline(
                 brief["validation_passed"] = True
                 all_cards.append(brief)
 
-        reddit_by_query = {r["query"]: r for r in reddit_data}
         for gap in gap_queries:
-            scout = reddit_by_query.get(gap["query"])
-            if scout and scout["threads_found"] > 0:
-                reddit_card = build_reddit_card(gap["query"], scout)
-                reddit_card["run_id"] = run_id
-                reddit_card["client_id"] = client_id
-                reddit_card["query_id"] = gap.get("query_id")
-                reddit_card["pillar"] = "reddit"
-                reddit_card["score"] = 0
-                reddit_card["before_text"] = ""
-                reddit_card["after_text"] = ""
-                reddit_card["code_block"] = ""
-                reddit_card["validation_passed"] = True
-                all_cards.append(reddit_card)
+            card = build_community_check_card(gap)
+            card["run_id"] = run_id
+            card["client_id"] = client_id
+            card["pillar"] = "community_check"
+            card["score"] = 0
+            card["before_text"] = ""
+            card["after_text"] = ""
+            card["code_block"] = ""
+            card["validation_passed"] = True
+            all_cards.append(card)
 
         all_cards = prioritize_cards(all_cards)
 
@@ -330,7 +321,6 @@ def run_improvement_pipeline(
             "query_matches": matches,
             "citation_scores": citation_scores,
             "competitive_gap_data": gap_results,
-            "reddit_scout_data": reddit_data,
             "action_cards": all_cards,
         }
 

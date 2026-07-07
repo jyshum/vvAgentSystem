@@ -18,7 +18,6 @@ class GEOState(TypedDict):
     query_matches: list[dict]
     citation_scores: list[dict]
     competitive_gap_data: list[dict]
-    reddit_scout_data: list[dict]
     action_cards: list[dict]
     approved_card_ids: list[str]
     implementation_results: list[dict]

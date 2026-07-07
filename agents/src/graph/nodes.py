@@ -153,7 +153,6 @@ def run_improvement_pipeline_node(state: GEOState) -> dict:
             "query_matches": [],
             "citation_scores": [],
             "competitive_gap_data": [],
-            "reddit_scout_data": [],
             "action_cards": [],
             "error": str(e),
         }
