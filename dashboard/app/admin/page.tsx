@@ -82,7 +82,10 @@ export default async function BoardPage() {
         clientId: client.id,
         name: client.brand_name || client.name,
         rate,
-        delta: rate != null && previous ? rate - previous.aggregate_mention_rate : null,
+        delta:
+          rate != null && previous && previous.aggregate_mention_rate != null
+            ? rate - previous.aggregate_mention_rate
+            : null,
         competitor: comp,
         rank,
         movers,
