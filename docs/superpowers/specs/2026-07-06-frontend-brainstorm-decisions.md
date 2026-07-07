@@ -85,8 +85,18 @@ Principle confirmed: **v1 frontend shows exactly what the backend stores — no 
 
 **Terminology:** "citation readiness" = the 0–100 structural score + Sonnet quality from Step 4 (diagnostic); distinct from measured "citation rate" (share of mentions that link the client's site). Both appear in the UI with these names.
 
-## Open questions (not yet decided)
-- Information architecture: what is the home page; where runs, approvals, client config live. "Unified run stream" concept explored but not accepted — felt disconnected from scheduling and unclear in purpose.
-- Run detail view layout (the sequential rail + step artifacts + cards).
-- Approvals inbox layout (must fix: per-client/run grouping, wrong-thread resume bug, rejected-card persistence, rendering of briefs/community cards/verification).
-- How outcomes (mention-rate before/after per implemented change) get displayed.
+## D12 — Crawlability blocker treatment (2026-07-07)
+Backend stays as-is: on a critical blocker the pipeline **continues** (tracker runs first and is always valid — visibility is measured from LLM answers, not the site, so uncrawlable ≠ zero visibility; diagnosis still runs and serves as the pre-fix baseline). UI: prominent red banner across the client page naming the failing critical checks (from `improvement_runs.crawlability_report`: robots_txt / cdn_blocks / js_rendering, each with status+detail), linking to the priority-0 `fix_crawlability` card. Tabs stay live; no crossed-out gating. Pipeline order documented: tracker → GSC → crawl gate → inventory → match → score → cards.
+
+## D13 — Pages tab (APPROVED 2026-07-07)
+Client drilldown gets a PAGES tab surfacing the diagnostic layer, strictly from stored data:
+- Table: page URL + title (`page_inventory`), citation-readiness score 0–100 color-coded (`page_citation_scores.structural_score`; unmatched pages show "not scored"), structure flags (schema_status, has_faq_schema, has_comparison_table), queries served with similarity (`query_page_matches`), word count.
+- Weak matches (0.3–0.5) shown as display-only flags ("weak match, not scored") — the confirm/override action is v2 (no endpoint exists).
+- Row expansion: the 9-check breakdown with points + stored `detail` strings, schema_errors, Sonnet quality (specificity/completeness/directness + summary sentence), links to the page's waiting cards.
+- Content gaps footer: gap queries with competitive context and a **VIEW BRIEF CARD →** button when a brief exists; briefs are only generated when `competitive_gap > 0`, so gaps without competitor pressure show "no brief — generated when a competitor leads" (no on-demand generation endpoint; do not fabricate one).
+
+## Final surface set (all approved)
+1. **Home — Visibility Board** (D7)
+2. **Client drilldown** — tabs OVERVIEW / QUERIES / PAGES / RUNS / CARDS / CONFIG (D8, D13)
+3. **Approvals inbox** (D10)
+4. **Run detail** (under client RUNS tab): retrospective sequential rail + six evidence tiles + funnel line; no live per-step progress in v1 (D11)
