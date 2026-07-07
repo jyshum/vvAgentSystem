@@ -88,6 +88,10 @@ export interface ActionCard {
   query_id: string | null;
   page_url: string | null;
   action_type: string;
+  /** Legacy-named base columns (migration 002), set on every card. The new UI
+   * displays action_type/structural_score instead of reading these. */
+  pillar: string;
+  score: number;
   track: "automated" | "manual";
   priority: number;
   competitive_gap: number | null;
@@ -99,6 +103,7 @@ export interface ActionCard {
   status: "pending" | "approved" | "rejected" | "implemented";
   cms_action: string;
   auto_approved: boolean;
+  validation_passed: boolean;
   verification: { verified: boolean; checks?: Record<string, unknown>; error?: string } | null;
   brief: {
     target_query: string;
