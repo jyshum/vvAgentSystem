@@ -119,7 +119,7 @@ export function BoardRow({ row, nextRunLabel }: BoardRowProps) {
                 </div>
               </div>
             )}
-            {rank && (
+            {competitor && rank && (
               <div className="font-mono text-[8px] mt-2" style={{ color: "var(--faint)" }}>
                 #{rank.rank} OF {rank.total}
                 {rank.gapToLeader === 0 ? " · LEADING" : ` · ${formatRate(rank.gapToLeader)} TO LEADER`}
