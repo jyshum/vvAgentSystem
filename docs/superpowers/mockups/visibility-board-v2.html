@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Visibility Board v2 — hierarchy pass</title>
+<style>
+  :root{--ink:#0e0e10;--panel:#151517;--line:#26262a;--white:#f2f0ea;--mute:#8a8a92;--faint:#55555c;--amber:#e9a23b;--green:#5fb570;--red:#d96a5b}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--white);font-family:ui-monospace,'SF Mono',Menlo,monospace;padding-bottom:60px}
+  .topbar{display:flex;justify-content:space-between;align-items:baseline;padding:30px 44px 22px}
+  .topbar h1{font-size:28px;font-weight:300;font-family:Georgia,serif}
+  .kicker{font-size:9px;color:var(--faint);letter-spacing:2.5px;margin-bottom:6px}
+  .agg{font-size:11px;color:var(--mute);text-align:right;line-height:1.8}
+  .agg b{color:var(--white)}
+  .board{padding:0 44px}
+  .row{display:grid;grid-template-columns:150px 1fr 260px 170px;gap:30px;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:20px 24px;margin-bottom:12px;cursor:pointer}
+  .row:hover{background:#1a1a1d}
+  .client{font-size:16px;line-height:1.4}
+  .delta{font-size:13px;margin-top:2px;display:block}
+  .up{color:var(--green)} .down{color:var(--red)} .flat{color:var(--faint)}
+
+  /* HERO: head-to-head */
+  .h2h .nums{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+  .h2h .you{font-size:34px;font-family:Georgia,serif;font-weight:300}
+  .h2h .vs{font-size:10px;color:var(--faint);letter-spacing:1px}
+  .h2h .them{font-size:22px;font-family:Georgia,serif;color:var(--mute)}
+  .h2h .them small{font-size:10px;font-family:ui-monospace,monospace;letter-spacing:1px;color:var(--faint);margin-left:6px}
+  .bars{position:relative;height:14px}
+  .bar{position:absolute;left:0;height:5px;border-radius:3px}
+  .bar.you{top:0;background:var(--white)}
+  .bar.them{top:9px;background:#3d3d44}
+  .rank{font-size:10px;color:var(--mute);margin-top:8px;letter-spacing:.5px}
+
+  .movers{font-size:11px;line-height:2}
+  .movers .lbl{font-size:8px;color:var(--faint);letter-spacing:2px;margin-bottom:2px}
+  .movers .q{color:var(--white)}
+  .movers .m{color:var(--mute)}
+
+  .side{text-align:right}
+  .spark{height:30px;display:flex;align-items:flex-end;gap:3px;justify-content:flex-end;margin-bottom:10px}
+  .spark .b{width:8px;background:#2c2c31;border-radius:1px 1px 0 0}
+  .spark .b.cur{background:var(--white)}
+  .badge{display:inline-block;padding:3px 10px;border-radius:10px;font-size:9px;letter-spacing:1px}
+  .badge.act{background:#241d10;color:var(--amber);border:1px solid #4a3d1e}
+  .badge.err{background:#241310;color:var(--red);border:1px solid #4a2c26}
+  .badge.quiet{color:var(--faint);border:1px solid var(--line)}
+  .note{padding:26px 44px;color:var(--faint);font-size:10px;letter-spacing:1.5px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="kicker">VICTORY VELOCITY — AI VISIBILITY</div>
+    <h1>Clients</h1>
+  </div>
+  <div class="agg"><b class="up">▲ 5 improving</b> · <span class="down">▼ 1 declining</span> · 2 flat &nbsp;&nbsp;|&nbsp;&nbsp; <b>9 cards</b> to review · <span style="color:var(--red)">1 error</span></div>
+</div>
+
+<div class="board">
+
+  <div class="row">
+    <div class="client">ChildSpot<span class="delta up">▲ +6 this cycle</span></div>
+    <div class="h2h">
+      <div class="nums">
+        <span class="you">42%</span>
+        <span class="vs">VS</span>
+        <span class="them">61%<small>KINDERCARE</small></span>
+      </div>
+      <div class="bars"><div class="bar you" style="width:42%"></div><div class="bar them" style="width:61%"></div></div>
+      <div class="rank">#2 of 5 mentioned brands · gap to leader −19</div>
+    </div>
+    <div class="movers">
+      <div class="lbl">BIGGEST MOVES</div>
+      <div><span class="up">▲</span> <span class="q">"daycare management software"</span> <span class="m">20→60%</span></div>
+      <div><span class="down">▼</span> <span class="q">"best daycare software"</span> <span class="m">40→20%</span></div>
+    </div>
+    <div class="side">
+      <div class="spark"><div class="b" style="height:55%"></div><div class="b" style="height:62%"></div><div class="b" style="height:57%"></div><div class="b" style="height:70%"></div><div class="b" style="height:78%"></div><div class="b cur" style="height:88%"></div></div>
+      <span class="badge act">3 CARDS WAITING</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="client">Nova Inc<span class="delta down">▼ −4 this cycle</span></div>
+    <div class="h2h">
+      <div class="nums">
+        <span class="you">18%</span>
+        <span class="vs">VS</span>
+        <span class="them">58%<small>COMPETITOR A</small></span>
+      </div>
+      <div class="bars"><div class="bar you" style="width:18%"></div><div class="bar them" style="width:58%"></div></div>
+      <div class="rank">#4 of 6 · gap to leader −40 · 3 queries have no matching page</div>
+    </div>
+    <div class="movers">
+      <div class="lbl">BIGGEST MOVES</div>
+      <div><span class="down">▼</span> <span class="q">"crm for consultants"</span> <span class="m">20%→absent</span></div>
+      <div><span class="m">7 proposed fixes unreviewed — 3 days</span></div>
+    </div>
+    <div class="side">
+      <div class="spark"><div class="b" style="height:80%"></div><div class="b" style="height:72%"></div><div class="b" style="height:60%"></div><div class="b" style="height:56%"></div><div class="b" style="height:50%"></div><div class="b cur" style="height:40%"></div></div>
+      <span class="badge act">⚠ 7 CARDS · 3 DAYS</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="client">BrandX<span class="delta up">▲ +10 this cycle</span></div>
+    <div class="h2h">
+      <div class="nums">
+        <span class="you">55%</span>
+        <span class="vs">VS</span>
+        <span class="them">45%<small>COMP A</small></span>
+      </div>
+      <div class="bars"><div class="bar you" style="width:55%"></div><div class="bar them" style="width:45%"></div></div>
+      <div class="rank">#1 of 4 — leading by +10</div>
+    </div>
+    <div class="movers">
+      <div class="lbl">BIGGEST MOVES</div>
+      <div><span class="up">▲</span> <span class="q">/pricing intro rewrite</span> <span class="m">→ +30% on target query</span></div>
+      <div><span class="m">5 changes live, re-measures Thu</span></div>
+    </div>
+    <div class="side">
+      <div class="spark"><div class="b" style="height:36%"></div><div class="b" style="height:50%"></div><div class="b" style="height:63%"></div><div class="b" style="height:72%"></div><div class="b" style="height:81%"></div><div class="b cur" style="height:100%"></div></div>
+      <span class="badge quiet">MEASURING</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="client">Zeta LLC<span class="delta flat">— flat</span></div>
+    <div class="h2h">
+      <div class="nums">
+        <span class="you">31%</span>
+        <span class="vs">VS</span>
+        <span class="them">33%<small>ACME</small></span>
+      </div>
+      <div class="bars"><div class="bar you" style="width:31%"></div><div class="bar them" style="width:33%"></div></div>
+      <div class="rank">#2 of 3 — within 2 points of the lead</div>
+    </div>
+    <div class="movers">
+      <div class="lbl">BIGGEST MOVES</div>
+      <div><span class="m">no new diagnosis — last run failed</span></div>
+    </div>
+    <div class="side">
+      <div class="spark"><div class="b" style="height:60%"></div><div class="b" style="height:64%"></div><div class="b" style="height:58%"></div><div class="b" style="height:62%"></div><div class="b" style="height:62%"></div><div class="b cur" style="height:62%"></div></div>
+      <span class="badge err">✕ RUN ERROR</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">HIERARCHY: 1) you vs top competitor + delta &nbsp;→&nbsp; 2) which queries moved &nbsp;→&nbsp; 3) trend + ops badge. Everything else lives one click deeper. Colors: green/red = metric direction only; amber = needs you; grey = everything else.</div>
+
+</body>
+</html>

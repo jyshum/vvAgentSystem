@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Approvals Inbox</title>
+<style>
+  :root{--ink:#0e0e10;--panel:#151517;--line:#26262a;--white:#f2f0ea;--mute:#8a8a92;--faint:#55555c;--amber:#e9a23b;--green:#5fb570;--red:#d96a5b;--blue:#5b9bd9}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--white);font-family:ui-monospace,'SF Mono',Menlo,monospace;padding-bottom:80px}
+  .topbar{display:flex;justify-content:space-between;align-items:baseline;padding:28px 44px 20px}
+  h1{font-size:28px;font-weight:300;font-family:Georgia,serif}
+  .kicker{font-size:9px;color:var(--faint);letter-spacing:2.5px;margin-bottom:6px}
+  .agg{font-size:11px;color:var(--mute)}
+  .wrap{padding:0 44px}
+
+  .group{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:22px;overflow:hidden}
+  .ghead{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--line);background:#18181b}
+  .ghead .who{font-size:15px}
+  .ghead .who .ctx{display:block;font-size:9px;color:var(--faint);letter-spacing:1px;margin-top:4px}
+  .ghead .gact{display:flex;gap:10px;align-items:center;font-size:9px;letter-spacing:1px}
+  .btn{padding:7px 14px;border-radius:4px;border:1px solid var(--line);color:var(--mute);cursor:pointer}
+  .btn.primary{background:var(--green);color:#0e0e10;border:none;font-weight:700}
+  .metricctx{padding:10px 22px;border-bottom:1px solid #1d1d20;font-size:10px;color:var(--mute)}
+  .metricctx b{color:var(--white)} .metricctx .down{color:var(--red)}
+
+  .card{padding:16px 22px;border-bottom:1px solid #1d1d20}
+  .card:last-child{border-bottom:none}
+  .chead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+  .ctitle{font-size:12px}
+  .prio{display:inline-block;font-size:8px;letter-spacing:1px;padding:2px 8px;border-radius:9px;margin-right:8px;vertical-align:middle}
+  .p1{background:#241d10;color:var(--amber);border:1px solid #4a3d1e}
+  .p2{background:#1a1a22;color:#a9b;border:1px solid #3a3a52}
+  .why{font-size:10px;color:var(--mute);margin-bottom:10px}
+  .why b{color:var(--red)}
+  .diff{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:10px;line-height:1.7}
+  .diff .col{background:#111113;border:1px solid #1f1f23;border-radius:5px;padding:10px 12px}
+  .diff .lbl{font-size:8px;letter-spacing:1.5px;color:var(--faint);margin-bottom:6px}
+  .diff .before{color:#a88}
+  .diff .after{color:#9c9}
+  .cacts{display:flex;gap:8px;margin-top:12px;font-size:9px;letter-spacing:1px}
+  .a-btn{padding:5px 14px;border-radius:4px;border:1px solid #2c4a2c;color:var(--green);cursor:pointer}
+  .r-btn{padding:5px 14px;border-radius:4px;border:1px solid #3a2c2a;color:var(--red);cursor:pointer}
+  .e-btn{padding:5px 14px;border-radius:4px;border:1px solid var(--line);color:var(--mute);cursor:pointer}
+  .approved-state{border:1px solid var(--green);color:var(--green);padding:5px 14px;border-radius:4px}
+  .brief{background:#111113;border:1px solid #1f1f23;border-radius:5px;padding:12px 14px;font-size:10px;line-height:1.8;color:var(--mute)}
+  .brief b{color:var(--white)}
+  .community .links a{color:var(--blue);text-decoration:underline;margin-right:14px;font-size:10px}
+  .autonote{padding:12px 22px;background:#131a13;border-top:1px solid #1e2c1e;font-size:9px;color:var(--green);letter-spacing:.5px}
+  .cms{font-size:8px;letter-spacing:1px;color:var(--faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="kicker">VICTORY VELOCITY — APPROVALS</div>
+    <h1>Inbox</h1>
+  </div>
+  <div class="agg"><b style="color:var(--white)">9 cards</b> across 2 clients · oldest waiting <span style="color:var(--red)">3 days</span></div>
+</div>
+
+<div class="wrap">
+
+  <!-- GROUP: one client, one run, one finalize -->
+  <div class="group">
+    <div class="ghead">
+      <div class="who">Nova Inc — run of Jul 3<span class="ctx">7 CARDS · WAITING 3 DAYS · CMS: WORDPRESS (CHANGES GO LIVE ON APPROVE)</span></div>
+      <div class="gact">
+        <span style="color:var(--faint)">2 approved · 1 rejected · 4 undecided</span>
+        <div class="btn">REJECT REST</div>
+        <div class="btn primary">FINALIZE THIS RUN (2)</div>
+      </div>
+    </div>
+    <div class="metricctx">why you're here: visibility <b>18%</b> <span class="down">▼ −4</span> · losing "best crm for startups" to CompetitorA by <b>40 pts</b></div>
+
+    <!-- automated card with diff -->
+    <div class="card">
+      <div class="chead">
+        <div class="ctitle"><span class="prio p1">P1 · COMPETITIVE GAP</span>Rewrite intro — /pricing</div>
+        <div class="cms">RESTRUCTURE_INTRO · QA ✓ · WORDPRESS API</div>
+      </div>
+      <div class="why">targets <b style="color:var(--white)">"best crm for startups"</b> — you 10% vs CompetitorA 50% · page opens with filler, no direct answer</div>
+      <div class="diff">
+        <div class="col"><div class="lbl">BEFORE (CURRENT PAGE)</div><span class="before">"Welcome to Nova! We're so glad you're here. For over ten years we've been helping businesses grow…"</span></div>
+        <div class="col"><div class="lbl">AFTER (PROPOSED)</div><span class="after">"Nova is a CRM built for consultancies of 2–20 people, with per-seat pricing starting at $19/month — cheaper at small scale than CompetitorA or Salesforce…"</span></div>
+      </div>
+      <div class="cacts"><div class="a-btn">✓ APPROVE</div><div class="r-btn">✕ REJECT</div><div class="e-btn">VIEW PAGE</div></div>
+    </div>
+
+    <!-- content brief card -->
+    <div class="card">
+      <div class="chead">
+        <div class="ctitle"><span class="prio p2">P2 · CONTENT GAP</span>Content brief — "crm migration checklist"</div>
+        <div class="cms">CONTENT_BRIEF · MANUAL — YOUR TEAM WRITES THIS</div>
+      </div>
+      <div class="why">no page on the site covers this query · CompetitorA at 45%, you absent</div>
+      <div class="brief">
+        <b>Recommended title:</b> CRM Migration Checklist — Complete Guide &nbsp;·&nbsp; <b>~2,000 words</b><br>
+        <b>Key sections:</b> direct answer up top · comparison table of migration paths · step-by-step checklist · FAQ<br>
+        <b>Must include:</b> industry stats w/ sources · internal links to /pricing and /features · Article schema
+      </div>
+      <div class="cacts"><div class="approved-state">✓ ACCEPTED — ASSIGNED TO TEAM</div><div class="e-btn">OPEN FULL BRIEF</div></div>
+    </div>
+
+    <!-- community check card -->
+    <div class="card community">
+      <div class="chead">
+        <div class="ctitle"><span class="prio p2">P2 · COMMUNITY</span>Community check — "best crm for startups"</div>
+        <div class="cms">MANUAL · NO AUTOMATION</div>
+      </div>
+      <div class="why">CompetitorA winning this query by 40 pts — check where the conversation happens</div>
+      <div class="links" style="margin-bottom:6px">
+        <a>reddit search: best crm for startups →</a>
+        <a>google: site:reddit.com "best crm for startups" →</a>
+      </div>
+      <div style="font-size:9px;color:var(--faint)">look for: is Nova ever mentioned? which threads rank on Google? paste engaged thread URL when done.</div>
+      <div class="cacts"><div class="a-btn">MARK DONE</div><div class="e-btn">ADD THREAD URL</div><div class="r-btn">SKIP</div></div>
+    </div>
+
+    <div class="autonote">✓ 4 schema cards auto-approved this run (add_faq_schema ×3, fix_schema ×1) — validated + earned trust · will implement on finalize · view</div>
+  </div>
+
+  <!-- second group collapsed -->
+  <div class="group">
+    <div class="ghead">
+      <div class="who">Kilo Co — run of Jul 6<span class="ctx">2 CARDS · WAITING 4 HRS · CMS: COPY_PASTE (MANUAL APPLY)</span></div>
+      <div class="gact"><span style="color:var(--faint)">undecided</span><div class="btn">EXPAND ▾</div></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

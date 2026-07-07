@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pages Tab v2 — verified against backend</title>
+<style>
+  :root{--ink:#0e0e10;--panel:#151517;--line:#26262a;--white:#f2f0ea;--mute:#8a8a92;--faint:#55555c;--amber:#e9a23b;--green:#5fb570;--red:#d96a5b;--blue:#5b9bd9}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--white);font-family:ui-monospace,'SF Mono',Menlo,monospace;padding-bottom:80px}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-end;padding:28px 44px 16px}
+  .kicker{font-size:9px;color:var(--faint);letter-spacing:2.5px;margin-bottom:8px}
+  h1{font-size:24px;font-weight:300;font-family:Georgia,serif}
+  .sub{font-size:10px;color:var(--mute);margin-top:6px}
+  .tabs{display:flex;gap:8px;font-size:9px;letter-spacing:1.5px}
+  .tab{padding:6px 14px;border:1px solid var(--line);border-radius:16px;color:var(--mute)}
+  .tab.on{border-color:var(--white);color:var(--white)}
+  .wrap{padding:0 44px}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{font-size:8px;letter-spacing:1.5px;color:var(--faint);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:400}
+  td{padding:12px 10px;border-bottom:1px solid #1c1c1f;vertical-align:middle}
+  tr.p:hover{background:#18181b;cursor:pointer}
+  .url{color:var(--white)}
+  .url .title{display:block;font-size:9px;color:var(--faint);margin-top:3px;font-family:Georgia,serif;font-style:italic}
+  .score{font-size:18px;font-family:Georgia,serif}
+  .s-low{color:var(--red)} .s-mid{color:var(--amber)} .s-hi{color:var(--green)} .s-none{color:var(--faint);font-size:11px}
+  .flag{font-size:9px;color:var(--mute)}
+  .flag .no{color:var(--faint)}
+  .serves{font-size:9px;color:var(--mute);line-height:1.7}
+  .serves .sim{color:var(--faint)}
+  .serves .weak{color:var(--amber)}
+  /* expanded */
+  .expand td{background:#121214;padding:0}
+  .detail{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;padding:18px 22px}
+  .checks .row{display:flex;justify-content:space-between;font-size:10px;padding:5px 0;border-bottom:1px dashed #202024}
+  .checks .row:last-child{border:none}
+  .pts{font-family:Georgia,serif}
+  .pass{color:var(--green)} .fail{color:var(--red)} .partial{color:var(--amber)}
+  .lbl{font-size:8px;letter-spacing:2px;color:var(--faint);margin-bottom:10px}
+  .sonnet{background:#111113;border:1px solid #1f1f23;border-radius:6px;padding:12px 14px;font-size:10px;color:var(--mute);line-height:1.8}
+  .sonnet b{color:var(--white)}
+  .schemaerr{margin-top:12px;font-size:9px;color:var(--red);line-height:1.7}
+  .gaps{margin-top:26px;background:var(--panel);border:1px solid #3a3a52;border-radius:8px;padding:14px 20px;font-size:10px;color:var(--mute)}
+  .gaps b{color:var(--white)}
+  .gaps a{color:var(--amber);text-decoration:underline}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="kicker">CLIENTS / NOVA INC — PAGES</div>
+    <h1>Pages</h1>
+    <div class="sub">14 pages inventoried · 6 scored (pages matched to queries get scored) · from run of Jul 3</div>
+  </div>
+  <div class="tabs">
+    <div class="tab">OVERVIEW</div><div class="tab">QUERIES</div><div class="tab on">PAGES</div><div class="tab">RUNS</div><div class="tab">CARDS</div><div class="tab">CONFIG</div>
+  </div>
+</div>
+
+<div class="wrap">
+<table>
+  <tr>
+    <th>PAGE</th><th>CITATION READINESS</th><th>STRUCTURE</th><th>SERVES QUERIES</th><th>WORDS</th>
+  </tr>
+
+  <tr class="p" style="background:#18181b">
+    <td class="url">▾ /pricing<span class="title">"Nova Pricing — Plans for Every Team"</span></td>
+    <td><span class="score s-low">38</span><span style="font-size:9px;color:var(--faint)"> /100</span></td>
+    <td class="flag">schema: <span class="fail">broken</span> · <span class="no">no FAQ</span> · <span class="no">no tables</span></td>
+    <td class="serves">"best crm for startups" <span class="sim">0.72</span><br>"crm pricing comparison" <span class="sim">0.64</span></td>
+    <td class="flag">640</td>
+  </tr>
+  <tr class="expand">
+    <td colspan="5">
+      <div class="detail">
+        <div class="checks">
+          <div class="lbl">STRUCTURAL CHECKS — 38/100</div>
+          <div class="row"><span>Answer-first opening</span><span class="pts fail">0 / 15 — opens with filler</span></div>
+          <div class="row"><span>FAQ schema</span><span class="pts fail">0 / 10 — none</span></div>
+          <div class="row"><span>Comparison tables</span><span class="pts fail">0 / 10 — none</span></div>
+          <div class="row"><span>Lists</span><span class="pts pass">8 / 10</span></div>
+          <div class="row"><span>Freshness</span><span class="pts partial">4 / 10 — 94 days old</span></div>
+          <div class="row"><span>Word count &amp; structure</span><span class="pts partial">5 / 10 — 640 words, 2 H2s</span></div>
+          <div class="row"><span>Source citations</span><span class="pts fail">0 / 10 — no outbound sources</span></div>
+          <div class="row"><span>Author attribution</span><span class="pts pass">8 / 10</span></div>
+          <div class="row"><span>Schema validity</span><span class="pts fail">3 / 15 — see errors</span></div>
+          <div class="schemaerr">schema errors: missing @context · FAQPage missing mainEntity</div>
+        </div>
+        <div>
+          <div class="lbl">SONNET QUALITY JUDGMENT</div>
+          <div class="sonnet">
+            specificity <b>2/5</b> · completeness <b>3/5</b> · answer-directness <b>1/5</b><br>
+            <i>"Page describes plans but never states prices or compares against alternatives — an AI answering 'best crm for startups' finds nothing quotable."</i>
+          </div>
+          <div class="lbl" style="margin-top:16px">FIXES FOR THIS PAGE</div>
+          <div class="sonnet">2 cards waiting in approvals: <span style="color:var(--amber)">intro rewrite · fix schema</span></div>
+        </div>
+      </div>
+    </td>
+  </tr>
+
+  <tr class="p">
+    <td class="url">▸ /features<span class="title">"Everything Nova Does"</span></td>
+    <td><span class="score s-mid">64</span><span style="font-size:9px;color:var(--faint)"> /100</span></td>
+    <td class="flag">schema: <span class="partial">valid, incomplete</span> · <span class="pass">FAQ ✓</span> · <span class="no">no tables</span></td>
+    <td class="serves">"crm with email automation" <span class="sim">0.68</span></td>
+    <td class="flag">1,850</td>
+  </tr>
+
+  <tr class="p">
+    <td class="url">▸ /blog/crm-guide<span class="title">"The Complete CRM Buying Guide"</span></td>
+    <td><span class="score s-hi">81</span><span style="font-size:9px;color:var(--faint)"> /100</span></td>
+    <td class="flag">schema: <span class="pass">valid ✓</span> · <span class="pass">FAQ ✓</span> · <span class="pass">tables ✓</span></td>
+    <td class="serves">"how to choose a crm" <span class="sim">0.79</span><br><span class="weak">⚠ "crm for consultants" 0.42 — weak match, not scored</span></td>
+    <td class="flag">2,400</td>
+  </tr>
+
+  <tr class="p">
+    <td class="url">▸ /about<span class="title">"Our Story"</span></td>
+    <td><span class="s-none">not scored</span></td>
+    <td class="flag">schema: <span class="no">none</span></td>
+    <td class="serves"><span class="sim">no matching queries</span></td>
+    <td class="flag">420</td>
+  </tr>
+
+</table>
+
+<div class="gaps">
+  <b>CONTENT GAPS — 3 queries have no page at all</b>
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px;border-bottom:1px dashed #26262a">
+    <span>"crm migration checklist" — CompetitorA at 45%, you absent</span>
+    <a style="border:1px solid #4a3d1e;border-radius:4px;padding:4px 12px;text-decoration:none;font-size:9px;letter-spacing:1px">VIEW BRIEF CARD →</a>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px;border-bottom:1px dashed #26262a">
+    <span>"crm for consultants" — CompetitorA at 58%, you absent</span>
+    <a style="border:1px solid #4a3d1e;border-radius:4px;padding:4px 12px;text-decoration:none;font-size:9px;letter-spacing:1px">VIEW BRIEF CARD →</a>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px">
+    <span>"crm free trial comparison" — no competitor winning yet</span>
+    <span style="color:#55555c;font-size:9px;letter-spacing:1px">NO BRIEF — GENERATED WHEN A COMPETITOR LEADS</span>
+  </div>
+</div>
+
+</div>
+
+</body>
+</html>

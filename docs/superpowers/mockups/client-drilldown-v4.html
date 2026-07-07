@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Drilldown v4 — complete page</title>
+<style>
+  :root{--ink:#0e0e10;--panel:#151517;--line:#26262a;--white:#f2f0ea;--mute:#8a8a92;--faint:#55555c;--amber:#e9a23b;--green:#5fb570;--red:#d96a5b;--blue:#5b9bd9}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--white);font-family:ui-monospace,'SF Mono',Menlo,monospace;padding-bottom:70px}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;padding:28px 44px 16px}
+  .kicker{font-size:9px;color:var(--faint);letter-spacing:2.5px;margin-bottom:10px}
+  .heroname{font-size:18px;font-family:Georgia,serif;font-weight:300;color:var(--mute);margin-bottom:4px}
+  .bignum{display:flex;align-items:baseline;gap:18px}
+  .bignum .pct{font-size:84px;font-family:Georgia,serif;font-weight:300;line-height:1}
+  .bignum .delta{font-size:22px;color:var(--green)}
+  .bignum .vs{font-size:12px;color:var(--mute);line-height:1.8;padding-bottom:8px}
+  .bignum .vs b{color:var(--white);font-size:19px;font-family:Georgia,serif}
+  .secondstat{margin-top:10px;font-size:12px;color:var(--mute)}
+  .secondstat b{color:var(--white);font-size:18px;font-family:Georgia,serif}
+  .tabs{display:flex;gap:8px;font-size:9px;letter-spacing:1.5px;padding-top:12px}
+  .tab{padding:6px 14px;border:1px solid var(--line);border-radius:16px;color:var(--mute)}
+  .tab.on{border-color:var(--white);color:var(--white)}
+  .chartwrap{padding:16px 44px 4px}
+  .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:22px 26px 10px}
+  .charthead{display:flex;justify-content:space-between;font-size:9px;letter-spacing:2px;color:var(--faint);margin-bottom:14px}
+  .legend span{margin-left:16px}
+  .dotw{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--white);margin-right:5px;vertical-align:middle}
+  .dotg{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4a4a52;margin-right:5px;vertical-align:middle}
+
+  .sechead{padding:20px 44px 12px;font-size:9px;letter-spacing:2.5px;color:var(--faint)}
+  .wrap{padding:0 44px}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{font-size:8px;letter-spacing:1.5px;color:var(--faint);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:400}
+  th.c,td.c{text-align:center}
+  td{padding:11px 10px;border-bottom:1px solid #1c1c1f;vertical-align:middle}
+  tr.q:hover{background:#18181b;cursor:pointer}
+  .qt{color:var(--white);max-width:250px}
+  .cell{display:inline-block;min-width:38px;text-align:center;padding:3px 0;border-radius:3px;font-size:10px}
+  .r0{background:#1b1b1e;color:var(--faint)} .r20{background:#20261f;color:#9fc79f} .r40{background:#22301f;color:#a9d9a0} .r60{background:#254022;color:#b7e8ac} .r80{background:#2a5024;color:#c9f5bd}
+  .now{outline:1px solid #4a4a52}
+  .stab{font-size:8px;letter-spacing:1px;padding:3px 8px;border-radius:9px;border:1px solid var(--line);color:var(--mute)}
+  .stab.dec{color:var(--red);border-color:#4a2c26} .stab.gain{color:var(--green);border-color:#2c4a2c}
+  .cit{font-size:10px;color:var(--mute)}
+  .cit b{color:var(--white)}
+  /* expanded row */
+  .expand td{background:#121214;padding:0}
+  .engines{padding:16px 22px 20px}
+  .engrow{display:grid;grid-template-columns:110px 90px 1fr;gap:16px;padding:12px 0;border-bottom:1px dashed #222226;align-items:start}
+  .engrow:last-child{border-bottom:none}
+  .engname{font-size:10px;letter-spacing:1px;color:var(--white)}
+  .engname .r{display:block;font-size:9px;color:var(--faint);margin-top:3px}
+  .flags{font-size:9px;line-height:1.9}
+  .yes{color:var(--green)} .no{color:var(--faint)}
+  .quote{font-size:11px;color:var(--mute);line-height:1.7;font-family:Georgia,serif;font-style:italic}
+  .quote mark{background:#2a5024;color:#d8f5cd;font-style:normal;padding:0 3px;border-radius:2px}
+  .quote .citelink{display:block;font-family:ui-monospace,monospace;font-style:normal;font-size:9px;color:var(--blue);margin-top:5px}
+  .quote .nomention{color:var(--faint)}
+  .quote .compmark{background:#33262a;color:#e0b9c2;font-style:normal;padding:0 3px;border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="kicker">CLIENTS / CHILDSPOT · CYCLE OF JUL 6</div>
+    <div class="heroname">ChildSpot — AI Visibility</div>
+    <div class="bignum">
+      <span class="pct">42<span style="font-size:38px">%</span></span>
+      <span class="delta">▲ +6</span>
+      <span class="vs">vs <b>61%</b> KinderCare<br>#2 of 5 mentioned brands</span>
+    </div>
+    <div class="secondstat">cited as source: <b>12%</b> of mentions <span style="color:var(--green)">▲ +4</span> &nbsp;·&nbsp; <span style="color:var(--faint)">mention = you appear in the answer · citation = your site is linked as the source</span></div>
+  </div>
+  <div class="tabs">
+    <div class="tab on">OVERVIEW</div><div class="tab">QUERIES</div><div class="tab">RUNS</div><div class="tab">CARDS</div><div class="tab">CONFIG</div>
+  </div>
+</div>
+
+<div class="chartwrap">
+  <div class="chartbox">
+    <div class="charthead">
+      <span>VISIBILITY OVER TIME — ALL QUERIES, ALL ENGINES</span>
+      <span class="legend"><span><span class="dotw"></span>CHILDSPOT</span><span><span class="dotg"></span>KINDERCARE (TOP COMPETITOR)</span></span>
+    </div>
+    <svg viewBox="0 0 900 220" width="100%" height="220">
+      <!-- gridlines -->
+      <line x1="40" y1="30" x2="880" y2="30" stroke="#222226" stroke-width="1"/>
+      <line x1="40" y1="80" x2="880" y2="80" stroke="#222226" stroke-width="1"/>
+      <line x1="40" y1="130" x2="880" y2="130" stroke="#222226" stroke-width="1"/>
+      <line x1="40" y1="180" x2="880" y2="180" stroke="#222226" stroke-width="1"/>
+      <text x="10" y="34" fill="#55555c" font-size="10">75</text>
+      <text x="10" y="84" fill="#55555c" font-size="10">50</text>
+      <text x="10" y="134" fill="#55555c" font-size="10">25</text>
+      <text x="10" y="184" fill="#55555c" font-size="10">0</text>
+      <!-- competitor line (grey) -->
+      <polyline points="80,62 240,58 400,64 560,60 720,58 860,58" fill="none" stroke="#4a4a52" stroke-width="2" stroke-dasharray="5,4"/>
+      <text x="80" y="50" fill="#8a8a92" font-size="11" text-anchor="middle">64</text>
+      <text x="400" y="52" fill="#8a8a92" font-size="11" text-anchor="middle">63</text>
+      <text x="860" y="46" fill="#8a8a92" font-size="11" text-anchor="middle">61</text>
+      <!-- client line (white) -->
+      <polyline points="80,124 240,116 400,122 560,108 720,104 860,96" fill="none" stroke="#f2f0ea" stroke-width="2.5"/>
+      <circle cx="80" cy="124" r="4" fill="#f2f0ea"/><circle cx="240" cy="116" r="4" fill="#f2f0ea"/><circle cx="400" cy="122" r="4" fill="#f2f0ea"/><circle cx="560" cy="108" r="4" fill="#f2f0ea"/><circle cx="720" cy="104" r="4" fill="#f2f0ea"/><circle cx="860" cy="96" r="6" fill="#5fb570"/>
+      <text x="80" y="146" fill="#f2f0ea" font-size="12" text-anchor="middle">28</text>
+      <text x="240" y="138" fill="#f2f0ea" font-size="12" text-anchor="middle">32</text>
+      <text x="400" y="144" fill="#f2f0ea" font-size="12" text-anchor="middle">29</text>
+      <text x="560" y="130" fill="#f2f0ea" font-size="12" text-anchor="middle">36</text>
+      <text x="720" y="126" fill="#f2f0ea" font-size="12" text-anchor="middle">38</text>
+      <text x="860" y="86" fill="#5fb570" font-size="14" font-weight="bold" text-anchor="middle">42</text>
+      <!-- x labels -->
+      <text x="80" y="210" fill="#55555c" font-size="9" text-anchor="middle">JUN 1</text>
+      <text x="240" y="210" fill="#55555c" font-size="9" text-anchor="middle">JUN 8</text>
+      <text x="400" y="210" fill="#55555c" font-size="9" text-anchor="middle">JUN 15</text>
+      <text x="560" y="210" fill="#55555c" font-size="9" text-anchor="middle">JUN 22</text>
+      <text x="720" y="210" fill="#55555c" font-size="9" text-anchor="middle">JUN 29</text>
+      <text x="860" y="210" fill="#55555c" font-size="9" text-anchor="middle">JUL 6</text>
+    </svg>
+  </div>
+</div>
+
+<div class="sechead">QUERIES — CLICK A ROW TO SEE THE ACTUAL ANSWERS</div>
+<div class="wrap">
+<table>
+  <tr>
+    <th>QUERY</th>
+    <th class="c">JUN 22</th><th class="c">JUN 29</th><th class="c">JUL 6</th>
+    <th>TREND</th>
+    <th>CITED</th>
+    <th>TOP COMPETITOR</th>
+    <th>WAITING</th>
+  </tr>
+
+  <tr class="q" style="background:#18181b">
+    <td class="qt">▾ "daycare management software"</td>
+    <td class="c"><span class="cell r40">40</span></td><td class="c"><span class="cell r40">45</span></td><td class="c"><span class="cell r60 now">60</span></td>
+    <td><span class="stab gain">GAINING</span></td>
+    <td class="cit"><b>33%</b> of mentions</td>
+    <td class="cit">KinderCare <b>55</b></td>
+    <td class="cit" style="color:var(--faint)">—</td>
+  </tr>
+  <tr class="expand">
+    <td colspan="7">
+      <div class="engines">
+        <div class="engrow">
+          <div class="engname">CHATGPT<span class="r">mentioned 4/5 · cited 2/5</span></div>
+          <div class="flags"><span class="yes">✓ MENTIONED</span><br><span class="yes">✓ CITED</span></div>
+          <div class="quote">"…For smaller centers, <mark>ChildSpot</mark> stands out for its simple billing and parent-communication tools, while KinderCare's platform suits larger franchises…"
+            <span class="citelink">source cited: childspot.com/features → shown as [1] in answer</span>
+          </div>
+        </div>
+        <div class="engrow">
+          <div class="engname">CLAUDE<span class="r">mentioned 3/5 · cited 0/5</span></div>
+          <div class="flags"><span class="yes">✓ MENTIONED</span><br><span class="no">— NOT CITED</span></div>
+          <div class="quote">"…popular options include Brightwheel, <mark>ChildSpot</mark>, and Procare, each with different strengths depending on center size…"</div>
+        </div>
+        <div class="engrow">
+          <div class="engname">GEMINI<span class="r">mentioned 0/5</span></div>
+          <div class="flags"><span class="no">— NOT MENTIONED</span></div>
+          <div class="quote"><span class="nomention">client absent — answer recommends <span class="compmark">KinderCare</span> and <span class="compmark">Brightwheel</span> only</span></div>
+        </div>
+        <div class="engrow">
+          <div class="engname">PERPLEXITY<span class="r">mentioned 5/5 · cited 3/5</span></div>
+          <div class="flags"><span class="yes">✓ MENTIONED</span><br><span class="yes">✓ CITED</span></div>
+          <div class="quote">"…<mark>ChildSpot</mark> offers the most affordable entry point for independent daycares [3]…"
+            <span class="citelink">source cited: childspot.com/pricing</span>
+          </div>
+        </div>
+      </div>
+    </td>
+  </tr>
+
+  <tr class="q">
+    <td class="qt">▸ "best daycare software"</td>
+    <td class="c"><span class="cell r40">40</span></td><td class="c"><span class="cell r40">40</span></td><td class="c"><span class="cell r20 now">20</span></td>
+    <td><span class="stab dec">DECLINING</span></td>
+    <td class="cit" style="color:var(--faint)">0%</td>
+    <td class="cit">KinderCare <b>75</b></td>
+    <td class="cit"><a style="color:var(--amber)">1 card</a></td>
+  </tr>
+
+  <tr class="q">
+    <td class="qt">▸ "childcare billing app"</td>
+    <td class="c"><span class="cell r20">20</span></td><td class="c"><span class="cell r20">30</span></td><td class="c"><span class="cell r40 now">40</span></td>
+    <td><span class="stab gain">GAINING</span></td>
+    <td class="cit"><b>25%</b></td>
+    <td class="cit">Brightwheel <b>35</b></td>
+    <td class="cit" style="color:var(--faint)">—</td>
+  </tr>
+
+</table>
+</div>
+
+</body>
+</html>
