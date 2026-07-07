@@ -80,6 +80,49 @@ class TestRunImprovementPipeline:
     @patch("src.improvement.pipeline.generate_sonnet_specifics")
     @patch("src.improvement.pipeline.validate_json_ld")
     @patch("src.improvement.pipeline.qa_card")
+    def test_improvement_run_insert_includes_thread_id(
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify, mock_reddit,
+        mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
+        mock_crawl, mock_sb,
+    ):
+        """improvement_runs insert must carry the pipeline thread_id so the
+        approvals inbox and run-detail page can join back to the originating thread."""
+        mock_qa.return_value = {"passed": True, "reason": ""}
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute.return_value = MagicMock(data=[{"id": "run-123"}])
+        mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
+        mock_sb.return_value.table.return_value = mock_table
+
+        mock_crawl.return_value = {"has_critical_blocker": False}
+        mock_inv.return_value = []
+        mock_match.return_value = []
+        mock_gaps.return_value = []
+        mock_reddit.return_value = []
+
+        state = {"client_id": "client-1",
+                 "client_config": {"website_domain": "x.com", "brand_name": "BrandX", "competitors": []},
+                 "tracker_results": [],
+                 "thread_id": "client-20260707-000000"}
+        queries = []
+
+        run_improvement_pipeline(state, queries, competitive_gaps_data=[])
+
+        insert_calls = mock_table.insert.call_args_list
+        run_insert_payload = insert_calls[0][0][0]
+        assert run_insert_payload["thread_id"] == "client-20260707-000000"
+
+    @patch("src.improvement.pipeline._get_supabase")
+    @patch("src.improvement.pipeline.run_crawlability_gate")
+    @patch("src.improvement.pipeline.build_inventory")
+    @patch("src.improvement.pipeline.match_queries_to_pages")
+    @patch("src.improvement.pipeline.compute_structural_score")
+    @patch("src.improvement.pipeline.generate_sonnet_quality")
+    @patch("src.improvement.pipeline.check_competitive_gaps")
+    @patch("src.improvement.pipeline.run_reddit_scout")
+    @patch("src.improvement.pipeline.classify_actions")
+    @patch("src.improvement.pipeline.generate_sonnet_specifics")
+    @patch("src.improvement.pipeline.validate_json_ld")
+    @patch("src.improvement.pipeline.qa_card")
     def test_cards_get_db_ids_after_insert(
         self, mock_qa, mock_validate, mock_sonnet, mock_classify, mock_reddit,
         mock_gaps, mock_quality, mock_score, mock_match, mock_inv,

@@ -46,6 +46,7 @@ def run_tracker_node(state: GEOState) -> dict:
             "per_engine_scores": scores.get("per_engine", {}),
             "competitor_scores": scores.get("competitor_scores", {}),
             "discovered_competitors": [],
+            "thread_id": state.get("thread_id"),
         }).execute()
 
         run_id = run_row.data[0]["id"]

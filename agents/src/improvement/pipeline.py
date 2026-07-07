@@ -46,6 +46,7 @@ def run_improvement_pipeline(
     run_resp = sb.table("improvement_runs").insert({
         "client_id": client_id,
         "status": "running",
+        "thread_id": state.get("thread_id"),
     }).execute()
     run_id = run_resp.data[0]["id"]
 
