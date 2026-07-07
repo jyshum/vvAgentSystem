@@ -24,9 +24,13 @@ export default async function ClientLayout({
   if (!client) notFound();
   const c = client as Pick<Client, "id" | "name" | "website_domain" | "cycle_frequency" | "cycle_day">;
   const tabs = [
-    { label: "CONFIG", href: `/admin/clients/${id}/config` },
+    { label: "OVERVIEW", href: `/admin/clients/${id}/overview` },
+    { label: "QUERIES", href: `/admin/clients/${id}/queries` },
+    { label: "PAGES", href: `/admin/clients/${id}/pages` },
     { label: "RUNS", href: `/admin/clients/${id}/runs` },
-    { label: "AUDIT", href: `/admin/clients/${id}/audit` },
+    { label: "CARDS", href: `/admin/clients/${id}/cards` },
+    { label: "CONFIG", href: `/admin/clients/${id}/config` },
+    { label: "REPORTS", href: `/admin/clients/${id}/reports` },
   ];
 
   return (
@@ -34,7 +38,7 @@ export default async function ClientLayout({
       {/* Breadcrumb */}
       <div className="flex items-center gap-2.5 mb-0 pb-3.5 border-b font-mono text-[9px] tracking-[0.14em]" style={{ borderColor: "var(--hair)" }}>
         <Link
-          href="/admin"
+          href="/admin/clients"
           className="uppercase transition-colors hover:text-[var(--white)]"
           style={{ color: "var(--faint)" }}
         >

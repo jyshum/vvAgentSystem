@@ -44,7 +44,7 @@ export default async function ApprovalsPage() {
   return (
     <div>
       <Link
-        href="/admin"
+        href="/admin/clients"
         className="inline-block font-mono text-[10px] tracking-[0.1em] uppercase mb-6 transition-colors hover:text-[var(--white)]"
         style={{ color: "var(--faint)", textDecoration: "none" }}
       >
