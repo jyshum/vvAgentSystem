@@ -60,8 +60,11 @@ export default async function BoardPage() {
       }
 
       const pending = pendingCards || [];
+      // Server component rendered per-request (force-dynamic); reading the clock
+      // to compute card age is intentional.
       const oldestPendingDays = pending.length
-        ? Math.floor((Date.now() - Math.min(...pending.map((c) => new Date(c.created_at).getTime()))) / 86400000)
+        ? // eslint-disable-next-line react-hooks/purity
+          Math.floor((Date.now() - Math.min(...pending.map((c) => new Date(c.created_at).getTime()))) / 86400000)
         : null;
 
       const badge = opsBadge({
