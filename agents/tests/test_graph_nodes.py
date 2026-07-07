@@ -195,3 +195,78 @@ def test_implementation_node_skips_verification_for_non_implemented_status(mock_
     assert "verification" not in result["implementation_results"][0]
     update_payload = mock_table.update.call_args[0][0]
     assert "verification" not in update_payload
+
+
+@patch("src.improvement.verifier.verify_implementation")
+@patch("src.implementors.router.route_card")
+@patch("src.graph.nodes._get_supabase")
+def test_implementation_persists_pr_url(mock_sb, mock_route, mock_verify):
+    mock_table = MagicMock()
+    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
+    mock_sb.return_value.table.return_value = mock_table
+
+    mock_route.return_value = {"status": "implemented", "pr_url": "https://github.com/x/y/pull/1"}
+    mock_verify.return_value = {"verified": True, "skipped": False,
+                                "checks": {}, "error": None, "checked_at": "2026-07-04T00:00:00Z"}
+
+    from src.graph.nodes import run_implementation_node
+    state = {
+        "client_config": {"cms_type": "github", "cms_config": {}},
+        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
+                          "action_type": "add_faq_schema", "code_block": "{}", "after_text": ""}],
+        "approved_card_ids": ["card-1"],
+    }
+    run_implementation_node(state)
+
+    update_payload = mock_table.update.call_args[0][0]
+    assert update_payload["preview_url"] == "https://github.com/x/y/pull/1"
+
+
+@patch("src.improvement.verifier.verify_implementation")
+@patch("src.implementors.router.route_card")
+@patch("src.graph.nodes._get_supabase")
+def test_implementation_persists_webflow_preview_url(mock_sb, mock_route, mock_verify):
+    mock_table = MagicMock()
+    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
+    mock_sb.return_value.table.return_value = mock_table
+
+    mock_route.return_value = {"status": "implemented", "preview_url": "https://site.webflow.io/page"}
+    mock_verify.return_value = {"verified": True, "skipped": False,
+                                "checks": {}, "error": None, "checked_at": "2026-07-04T00:00:00Z"}
+
+    from src.graph.nodes import run_implementation_node
+    state = {
+        "client_config": {"cms_type": "webflow", "cms_config": {}},
+        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
+                          "action_type": "add_faq_schema", "code_block": "{}", "after_text": ""}],
+        "approved_card_ids": ["card-1"],
+    }
+    run_implementation_node(state)
+
+    update_payload = mock_table.update.call_args[0][0]
+    assert update_payload["preview_url"] == "https://site.webflow.io/page"
+
+
+@patch("src.improvement.verifier.verify_implementation")
+@patch("src.implementors.router.route_card")
+@patch("src.graph.nodes._get_supabase")
+def test_no_preview_url_key_when_absent(mock_sb, mock_route, mock_verify):
+    mock_table = MagicMock()
+    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
+    mock_sb.return_value.table.return_value = mock_table
+
+    mock_route.return_value = {"status": "implemented"}
+    mock_verify.return_value = {"verified": True, "skipped": False,
+                                "checks": {}, "error": None, "checked_at": "2026-07-04T00:00:00Z"}
+
+    from src.graph.nodes import run_implementation_node
+    state = {
+        "client_config": {"cms_type": "copy_paste", "cms_config": {}},
+        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
+                          "action_type": "add_faq_schema", "code_block": "{}", "after_text": ""}],
+        "approved_card_ids": ["card-1"],
+    }
+    run_implementation_node(state)
+
+    update_payload = mock_table.update.call_args[0][0]
+    assert "preview_url" not in update_payload

@@ -202,6 +202,9 @@ def run_implementation_node(state: GEOState) -> dict:
                     print(f"    NOT verified: {verification.get('error') or verification['checks']}")
 
             update_fields = {"status": new_status}
+            preview = result.get("preview_url") or result.get("pr_url")
+            if preview:
+                update_fields["preview_url"] = preview
             if verification is not None:
                 update_fields["verification"] = verification
             sb.table("action_cards").update(update_fields).eq("id", card_id).execute()
