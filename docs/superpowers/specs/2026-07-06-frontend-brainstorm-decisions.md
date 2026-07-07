@@ -37,6 +37,29 @@ Findings from live testing + research:
 
 **Backend follow-up (small):** remove the scraper call from the improvement pipeline; generate community-check cards directly from gap data.
 
+## D6 — Metrics-first framing (the core decision)
+The system exists to improve visibility metrics; everything else is a lever. The frontend leads with metrics, ops surfaces are secondary. The current frontend fails this: metrics are buried per-client/per-run, no cross-client rollup, no deltas, no action→outcome linkage.
+
+## D7 — Home page: the Visibility Board (APPROVED 2026-07-06)
+One row per client, strict hierarchy:
+1. **Hero: head-to-head** — client mention rate in large type VS top competitor's rate (`42% VS 61% KINDERCARE`), paired comparison bars, delta since last cycle, rank + gap-to-leader line. (Share of voice = mention rate + competitor context; not a composite score.)
+2. **Biggest moves** — the 2 queries that moved most this cycle, with before→after rates.
+3. **Sparkline** (rate across last ~6 cycles) + **one ops badge** (cards waiting / measuring / error / healthy).
+Portfolio rollup in the header (N improving / declining / flat · cards to review · errors). Color discipline: green/red = metric direction only, amber = needs-you, grey = neutral. Everything else (schedules, query counts, run details) lives one click deeper. Visual aesthetics to match existing dashboard at implementation time; mockups settle hierarchy/content only.
+
+## D8 — Client drilldown page (APPROVED 2026-07-07)
+Hierarchy top to bottom:
+1. **Hero:** visibility % huge (~84px) + delta + "vs {top competitor} {rate}" + rank. Second-tier stat: **citation rate** ("cited as source: 12% of mentions"), with the mention-vs-citation definition inline. Citation rate = share of *mentions* that also linked the client's site (conditional on mention — from `prompt_scores.citation_rate`).
+2. **Timeline chart:** aggregate visibility per cycle, every point labeled with its number, top competitor as dashed comparison line. Data: `tracker_runs.aggregate_mention_rate` + `competitor_scores` per run.
+3. **Query × cycle heat table:** per-query mention rate per cycle (color-scaled cells), stability label (existing Phase-3 computation), CITED column, top competitor per query, WAITING column (pending cards/briefs/community checks via `action_cards.query_id`).
+4. **Row expansion:** per-engine sub-rows with mentioned/cited flags, counts (e.g. "mentioned 4/5 · cited 2/5"), the actual response sentence with the brand mention highlighted (extracted from `tracker_results.response_text`), cited URL when present. When client is absent: show which competitors the answer recommended instead (from `competitor_mentions`). Representative response rule: most recent mentioned response, else most recent.
+Tabs: OVERVIEW / QUERIES / RUNS / CARDS / CONFIG (setup lives in CONFIG, out of the daily path).
+
+## D9 — Deferred to v2 (2026-07-07)
+- **Effect attribution** ("this change → +20 on its query"): needs an `implemented_at` timestamp (migration) and a before/after derivation, phrased as "since change" (correlation, not causation). Not in v1.
+- The lever column in v1 shows only *what's waiting* (existing data), not measured effects.
+- Data provenance audit confirmed everything else on both approved screens maps to existing tables (`tracker_runs`, `prompt_scores`, `competitive_gaps`, `stability`, `action_cards`, `tracker_results`); the only derivations needed are: cycle delta, top-competitor pick, biggest movers, and gap-direction phrasing — one client-summary endpoint.
+
 ## Open questions (not yet decided)
 - Information architecture: what is the home page; where runs, approvals, client config live. "Unified run stream" concept explored but not accepted — felt disconnected from scheduling and unclear in purpose.
 - Run detail view layout (the sequential rail + step artifacts + cards).
