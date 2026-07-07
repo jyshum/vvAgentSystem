@@ -21,10 +21,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { threadId, approvedCardIds } = await req.json();
+  const { threadId, approvedCardIds, rejectedCardIds } = await req.json();
+  const approved: string[] = approvedCardIds || [];
+  const rejected: string[] = rejectedCardIds || [];
 
-  for (const cardId of approvedCardIds) {
+  for (const cardId of approved) {
     await admin.from("action_cards").update({ status: "approved" }).eq("id", cardId);
+  }
+  for (const cardId of rejected) {
+    await admin.from("action_cards").update({ status: "rejected" }).eq("id", cardId);
   }
 
   if (LANGGRAPH_API && LANGGRAPH_KEY && threadId) {
@@ -35,7 +40,7 @@ export async function POST(req: NextRequest) {
           "Authorization": `Bearer ${LANGGRAPH_KEY}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ thread_id: threadId, approved_card_ids: approvedCardIds }),
+        body: JSON.stringify({ thread_id: threadId, approved_card_ids: approved, rejected_card_ids: rejected }),
       });
       if (!res.ok) {
         const body = await res.json();

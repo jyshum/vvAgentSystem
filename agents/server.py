@@ -180,6 +180,7 @@ class RunRequest(BaseModel):
 class ApproveRequest(BaseModel):
     thread_id: str
     approved_card_ids: list[str]
+    rejected_card_ids: list[str] = []
 
 
 @app.get("/health")
@@ -264,6 +265,10 @@ async def approve_cards(req: ApproveRequest, authorization: str | None = Header(
     config = {"configurable": {"thread_id": req.thread_id}}
 
     sb = _get_supabase()
+
+    for card_id in req.rejected_card_ids:
+        sb.table("action_cards").update({"status": "rejected"}).eq("id", card_id).execute()
+
     sb.table("pipeline_runs").update({
         "status": "implementing",
     }).eq("thread_id", req.thread_id).execute()
