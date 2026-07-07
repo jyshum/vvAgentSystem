@@ -60,6 +60,31 @@ Tabs: OVERVIEW / QUERIES / RUNS / CARDS / CONFIG (setup lives in CONFIG, out of 
 - The lever column in v1 shows only *what's waiting* (existing data), not measured effects.
 - Data provenance audit confirmed everything else on both approved screens maps to existing tables (`tracker_runs`, `prompt_scores`, `competitive_gaps`, `stability`, `action_cards`, `tracker_results`); the only derivations needed are: cycle delta, top-competitor pick, biggest movers, and gap-direction phrasing — one client-summary endpoint.
 
+## D10 — Approvals inbox (APPROVED 2026-07-07)
+- **One group = one client's run = one finalize action**, scoped to that run's pipeline thread (fixes the wrong-thread resume bug structurally). Group header states card count, wait age, and the CMS consequence ("WORDPRESS — changes go live on approve" vs "COPY_PASTE — manual apply").
+- **Metrics context strip** per group ("why you're here: 18% ▼−4, losing X by 40pts"); every card carries a "why" line (target query + gap).
+- **Card types render distinctly:** automated → before/after diff + approve/reject/view-page; content_brief → rendered brief document, "accept & assign" (no implementation); community check → search links + mark-done/thread-URL/skip.
+- **Auto-approved cards** shown as an informational footer per group ("4 schema cards auto-approved — implement on finalize"), not review items.
+- **Rejections are recorded decisions** (approved/rejected/undecided tally per group; rejected cards persist and never reappear as pending).
+
+## D11 — Backend cross-reference audit: cuts and additions (2026-07-07)
+Principle confirmed: **v1 frontend shows exactly what the backend stores — no more, no less.**
+
+**CUT from v1 (no data behind it):**
+- "N dropped by QA" — QA loop exists but drop counts are only printed to logs, not persisted.
+- Live rail progress during execution — the improvement pipeline is one graph node; no per-step progress exists. The run rail is retrospective (derived from run statuses: running / awaiting_approval / implementing / completed / error).
+- PR-merge / staging-publish handoff items — `action_cards.preview_url` exists (migration 008) but is never written. **One tiny backend fix in scope: persist the PR/staging URL to `preview_url` in `run_implementation_node`.** Until then only copy_paste to-dos are derivable.
+- "QA ✓" badges — implicit; a surfaced card by definition passed QA.
+
+**ADD to v1 (built but previously unshown):**
+- `query_page_matches`: PAGE column in drilldown query table (matched page + similarity) and **weak matches (0.3–0.5) flagged for human review** — the spec always required this, no UI existed.
+- **PAGES tab** on client drilldown: full `page_inventory` (word count, schema types, FAQ/comparison flags, last modified) joined with `page_citation_scores` (structural score, per-check breakdown, Sonnet quality, schema status/errors) and the queries each page serves. Surfaces the entire diagnostic layer.
+- GSC panel on drilldown overview (clicks/impressions/CTR per cycle — stored on `tracker_runs`).
+- Crawlability report detail expandable in run detail (full jsonb stored on `improvement_runs`).
+- Next-run schedule line (from `/api/schedules`) restored to drilldown header/board footer.
+
+**Terminology:** "citation readiness" = the 0–100 structural score + Sonnet quality from Step 4 (diagnostic); distinct from measured "citation rate" (share of mentions that link the client's site). Both appear in the UI with these names.
+
 ## Open questions (not yet decided)
 - Information architecture: what is the home page; where runs, approvals, client config live. "Unified run stream" concept explored but not accepted — felt disconnected from scheduling and unclear in purpose.
 - Run detail view layout (the sequential rail + step artifacts + cards).
