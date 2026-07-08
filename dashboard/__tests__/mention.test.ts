@@ -15,6 +15,10 @@ describe("extractMentionSentence", () => {
     const r = extractMentionSentence("we like BRIGHT WHEEL a lot.", ["Brightwheel", "bright wheel"]);
     expect(r?.brand).toBe("bright wheel");
   });
+  it("first-listed variation wins when multiple variations match", () => {
+    const r = extractMentionSentence("we love brightwheel here.", ["brightwheel", "bright"]);
+    expect(r?.brand).toBe("brightwheel");
+  });
   it("null when absent or empty", () => {
     expect(extractMentionSentence("Nothing here.", ["Brightwheel"])).toBeNull();
     expect(extractMentionSentence("", ["Brightwheel"])).toBeNull();

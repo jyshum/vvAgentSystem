@@ -6,19 +6,12 @@ import { fetchSchedules } from "@/lib/schedules";
 import { formatRate, formatDelta } from "@/lib/utils";
 import type { PipelineRun, ImprovementRun, PageCitationScore, QueryPageMatch, ActionCard, CrawlabilityReport } from "@/lib/improvement-types";
 import type { TrackerRun, CompetitiveGap } from "@/lib/types";
-
-const STATUS_COLOR: Record<string, string> = {
-  error: "var(--neg)",
-  awaiting_approval: "#d4a017",
-  completed: "var(--faint)",
-  running: "var(--mute)",
-  implementing: "var(--mute)",
-};
+import { PIPELINE_STATUS_COLOR } from "@/lib/run-status";
 
 function formatDuration(startedAt: string, completedAt: string | null): string {
   if (!completedAt) return "running";
   const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime();
-  if (ms < 0) return "running";
+  if (ms < 0) return "—";
   const totalSeconds = Math.round(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -162,7 +155,7 @@ export default async function RunDetailPage({
   const pendingCards = actionCards.filter((c) => c.status === "pending" && !c.auto_approved).length;
 
   const duration = formatDuration(pipeline.started_at, pipeline.completed_at);
-  const statusColor = STATUS_COLOR[pipeline.status] ?? "var(--mute)";
+  const statusColor = PIPELINE_STATUS_COLOR[pipeline.status] ?? "var(--mute)";
 
   return (
     <div style={{ maxWidth: 960 }}>

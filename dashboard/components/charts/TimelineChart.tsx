@@ -25,16 +25,15 @@ export function TimelineChart({ series, competitor, height = 180 }: TimelineChar
   }
 
   const values = series.map((p) => p.value);
-  const min = 0;
   const max = Math.max(...values, ...(competitor?.series.filter((v): v is number => v !== null) ?? []), 0.0001);
-  const range = max - min || 1;
+  const range = max;
 
   const innerW = WIDTH - PAD * 2;
   const innerH = height - PAD - PAD_BOTTOM;
   const stepX = series.length > 1 ? innerW / (series.length - 1) : 0;
 
   const xAt = (i: number) => PAD + i * stepX;
-  const yAt = (v: number) => PAD + (1 - (v - min) / range) * innerH;
+  const yAt = (v: number) => PAD + (1 - v / range) * innerH;
 
   const clientCoords = series.map((p, i) => [xAt(i), yAt(p.value)] as const);
 

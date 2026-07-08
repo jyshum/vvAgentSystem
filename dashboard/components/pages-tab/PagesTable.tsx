@@ -104,6 +104,14 @@ export function PagesTable({ rows, gaps }: PagesTableProps) {
           <div key={row.url}>
             <div
               onClick={() => setExpanded(isExpanded ? null : row.url)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  if (e.key === " ") e.preventDefault();
+                  setExpanded(isExpanded ? null : row.url);
+                }
+              }}
               className="grid items-center px-4 py-3 border-b cursor-pointer transition-colors"
               style={{
                 gridTemplateColumns: gridTemplate,

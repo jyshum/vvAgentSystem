@@ -1,14 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { PipelineRun, ImprovementRun } from "@/lib/improvement-types";
-
-const STATUS_COLOR: Record<string, string> = {
-  error: "var(--neg)",
-  awaiting_approval: "#d4a017",
-  completed: "var(--faint)",
-  running: "var(--mute)",
-  implementing: "var(--mute)",
-};
+import { PIPELINE_STATUS_COLOR } from "@/lib/run-status";
 
 export default async function RunsPage({
   params,
@@ -85,8 +78,8 @@ export default async function RunsPage({
                   <span
                     className="font-mono text-[8px] tracking-[0.1em] uppercase px-2 py-1"
                     style={{
-                      color: STATUS_COLOR[run.status] ?? "var(--mute)",
-                      border: `1px solid ${STATUS_COLOR[run.status] ?? "var(--mute)"}`,
+                      color: PIPELINE_STATUS_COLOR[run.status] ?? "var(--mute)",
+                      border: `1px solid ${PIPELINE_STATUS_COLOR[run.status] ?? "var(--mute)"}`,
                     }}
                   >
                     {run.status}
