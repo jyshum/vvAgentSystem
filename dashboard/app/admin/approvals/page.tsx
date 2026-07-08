@@ -188,7 +188,14 @@ export default async function ApprovalsPage() {
       cmsType: client?.cms_type || "",
       waitDays,
       contextStrip,
-      cards: reviewCards.map((c) => ({ ...c, queryText: c.query_id ? queriesMap.get(c.query_id) ?? null : null })),
+      cards: reviewCards
+        .map((c) => ({ ...c, queryText: c.query_id ? queriesMap.get(c.query_id) ?? null : null }))
+        .sort((a, b) => {
+          const priorityA = a.priority ?? Number.MAX_SAFE_INTEGER;
+          const priorityB = b.priority ?? Number.MAX_SAFE_INTEGER;
+          if (priorityA !== priorityB) return priorityA - priorityB;
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }),
       autoApproved: (autoByRun.get(runId) || []).map((c) => ({ id: c.id, action_type: c.action_type })),
       oldestCreatedAt,
     };
