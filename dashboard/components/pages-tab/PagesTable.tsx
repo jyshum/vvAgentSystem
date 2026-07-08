@@ -3,20 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatRate } from "@/lib/utils";
+import type { CheckResult, SonnetQuality, PageCitationScore } from "@/lib/improvement-types";
 
 export interface PageRowData {
   url: string;
   title: string;
   score: number | null; // page_citation_scores.structural_score; null = not scored (unmatched page)
-  schemaStatus: string | null; // page_citation_scores.schema_status; null when not scored
+  schemaStatus: PageCitationScore["schema_status"] | null; // null when not scored
   hasFaq: boolean; // page_inventory.has_faq_schema
   hasComparison: boolean; // page_inventory.has_comparison_table
   wordCount: number;
   lastModified: string | null;
   queriesServed: { query: string; similarity: number; weak: boolean }[]; // query_page_matches by matched_page_url
-  checks: Record<string, { score: number; detail?: string }> | null; // check_results jsonb
+  checks: Record<string, CheckResult> | null; // check_results jsonb
   schemaErrors: string[];
-  sonnet: { specificity: number; completeness: number; answer_directness: number; summary: string } | null;
+  sonnet: SonnetQuality | null;
   waitingCards: { id: string; action_type: string }[]; // pending cards with page_url === url
 }
 
@@ -308,7 +309,10 @@ export function PagesTable({ rows, gaps }: PagesTableProps) {
                 <div className="font-serif text-[13px]" style={{ color: "var(--white)" }}>
                   {gap.query}
                 </div>
-                {gap.topCompetitor && gap.gap !== null && (
+                {/* content_gap classification is about match failure, not mention
+                    performance — gap can be negative; only show "leads by" when
+                    the competitor is actually ahead */}
+                {gap.topCompetitor && gap.gap !== null && gap.gap > 0 && (
                   <div className="font-serif text-[12px] mt-0.5" style={{ color: "var(--neg)" }}>
                     {gap.topCompetitor} leads by {formatRate(gap.gap)}
                   </div>
