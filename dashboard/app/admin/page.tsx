@@ -1,119 +1,175 @@
+export const dynamic = "force-dynamic";
+
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ClientRow } from "@/components/admin/ClientRow";
-import { AddClientButton } from "@/components/admin/AddClientButton";
-import { RunAllButton } from "@/components/admin/RunAllButton";
-import type { Client, TrackerRun, Report } from "@/lib/types";
+import { fetchSchedules } from "@/lib/schedules";
+import { biggestMovers, measuringCount, opsBadge, rankAndGap, topCompetitor } from "@/lib/derive";
+import { BoardRow, type BoardRowData } from "@/components/board/BoardRow";
+import type { Client, TrackerRun, PromptScore } from "@/lib/types";
 
-export default async function AdminPage() {
+export default async function BoardPage() {
   const supabase = createAdminClient();
-
   const { data: clients } = await supabase
     .from("clients")
-    .select("*")
+    .select("id, name, brand_name, created_at")
     .order("created_at", { ascending: true });
+  const allClients = (clients as Pick<Client, "id" | "name" | "brand_name" | "created_at">[]) || [];
 
-  const allClients = (clients as Client[]) || [];
-
-  const clientsWithData = await Promise.all(
+  const rows: BoardRowData[] = await Promise.all(
     allClients.map(async (client) => {
-      const { data: runs } = await supabase
-        .from("tracker_runs")
-        .select("*")
-        .eq("client_id", client.id)
-        .order("ran_at", { ascending: false })
-        .limit(2);
+      const [{ data: runs }, { data: pipeline }, { data: pendingCards }, { data: implementedCards }] =
+        await Promise.all([
+          supabase
+            .from("tracker_runs")
+            .select("id, ran_at, aggregate_mention_rate, competitor_scores")
+            .eq("client_id", client.id)
+            .order("ran_at", { ascending: false })
+            .limit(6),
+          supabase
+            .from("pipeline_runs")
+            .select("status, started_at")
+            .eq("client_id", client.id)
+            .order("started_at", { ascending: false })
+            .limit(1),
+          supabase
+            .from("action_cards")
+            .select("id, created_at")
+            .eq("client_id", client.id)
+            .eq("status", "pending"),
+          supabase
+            .from("action_cards")
+            .select("status, created_at")
+            .eq("client_id", client.id)
+            .eq("status", "implemented"),
+        ]);
 
-      const { data: reports } = await supabase
-        .from("reports")
-        .select("*")
-        .eq("client_id", client.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+      const history = ((runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "competitor_scores">[]) || []);
+      const latest = history[0] ?? null;
+      const previous = history[1] ?? null;
 
-      const allRuns = (runs as TrackerRun[]) || [];
+      let movers: ReturnType<typeof biggestMovers> = [];
+      if (latest && previous) {
+        const { data: scores } = await supabase
+          .from("prompt_scores")
+          .select("run_id, query, llm, mention_rate, citation_rate")
+          .in("run_id", [latest.id, previous.id]);
+        const all = (scores as (Pick<PromptScore, "run_id" | "query" | "llm" | "mention_rate" | "citation_rate">)[]) || [];
+        movers = biggestMovers(
+          all.filter((s) => s.run_id === latest.id),
+          all.filter((s) => s.run_id === previous.id)
+        );
+      }
+
+      const pending = pendingCards || [];
+      // Server component rendered per-request (force-dynamic); reading the clock
+      // to compute card age is intentional.
+      const oldestPendingDays = pending.length
+        ? // eslint-disable-next-line react-hooks/purity
+          Math.floor((Date.now() - Math.min(...pending.map((c) => new Date(c.created_at).getTime()))) / 86400000)
+        : null;
+
+      const badge = opsBadge({
+        latestPipelineStatus: pipeline?.[0]?.status ?? null,
+        pendingCount: pending.length,
+        oldestPendingDays,
+        measuring: measuringCount(implementedCards || [], latest?.ran_at ?? null),
+      });
+
+      const rate = latest?.aggregate_mention_rate ?? null;
+      const comp = latest ? topCompetitor(latest.competitor_scores) : null;
+      const rank = latest && rate != null ? rankAndGap(rate, latest.competitor_scores) : null;
+
       return {
-        client,
-        latestRun: allRuns[0] || null,
-        previousRun: allRuns[1] || null,
-        latestReport: ((reports as Report[]) || [])[0] || null,
+        clientId: client.id,
+        name: client.brand_name || client.name,
+        rate,
+        delta:
+          rate != null && previous && previous.aggregate_mention_rate != null
+            ? rate - previous.aggregate_mention_rate
+            : null,
+        competitor: comp,
+        rank,
+        movers,
+        sparkline: [...history].reverse().map((r) => r.aggregate_mention_rate),
+        badge,
+        pendingCount: pending.length,
+        firstRunPending: !latest,
       };
     })
   );
 
-  // Compute stats strip values
-  const avgMention = allClients.length > 0
-    ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.aggregate_mention_rate ?? 0), 0) / allClients.length
-    : 0;
-  const avgLevel = allClients.length > 0
-    ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.aggregate_avg_mention_level ?? 0), 0) / allClients.length
-    : 0;
+  rows.sort((a, b) => (a.delta ?? 0) - (b.delta ?? 0));
+
+  const improving = rows.filter((r) => (r.delta ?? 0) > 0.005).length;
+  const declining = rows.filter((r) => (r.delta ?? 0) < -0.005).length;
+  const flat = rows.length - improving - declining;
+  const totalCards = rows.reduce((s, r) => s + r.pendingCount, 0);
+  const errors = rows.filter((r) => r.badge.kind === "error").length;
+
+  const schedules = await fetchSchedules();
+  const upcoming = schedules
+    .filter((s) => s.next_run)
+    .sort((a, b) => (a.next_run! < b.next_run! ? -1 : 1))
+    .slice(0, 3);
+
+  const nextRunByClient = new Map(
+    schedules.filter((s) => s.next_run).map((s) => [s.client_id, s.next_run as string])
+  );
+
+  const formatNextRun = (iso: string) => {
+    const d = new Date(iso);
+    const weekday = d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+    const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+    return `${weekday} ${time}`;
+  };
 
   return (
     <>
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <h1 className="font-display text-[52px] font-light leading-[0.96]" style={{ color: "var(--white)" }}>
-            Clients
-          </h1>
-          <p className="font-serif italic text-base mt-2" style={{ color: "var(--mute)" }}>
-            {allClients.length} active account{allClients.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <RunAllButton />
-          <AddClientButton />
-        </div>
+      <div className="mb-10">
+        <h1 className="font-display text-[52px] font-light leading-[0.96]" style={{ color: "var(--white)" }}>
+          Board
+        </h1>
+        <p className="font-serif italic text-base mt-2" style={{ color: "var(--mute)" }}>
+          AI visibility across the portfolio
+        </p>
       </div>
 
-      {/* Stats strip */}
-      <div className="grid grid-cols-3 mb-10" style={{ gap: 1, background: "var(--hair)", border: "1px solid var(--hair)" }}>
-        <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
-          <div className="font-display font-light text-[38px] leading-none mb-1.5" style={{ color: "var(--white)" }}>
-            {allClients.length}
-          </div>
-          <div className="font-mono text-[8px] tracking-[0.14em]" style={{ color: "var(--faint)" }}>ACTIVE CLIENTS</div>
+      {rows.length > 0 && (
+        <div className="mb-8 font-mono text-[9px] tracking-[0.14em] uppercase" style={{ color: "var(--faint)" }}>
+          <span style={{ color: "var(--pos)" }}>{improving} IMPROVING</span>
+          {" · "}
+          <span style={{ color: "var(--neg)" }}>{declining} DECLINING</span>
+          {" · "}
+          <span>{flat} FLAT</span>
+          {" — "}
+          <span style={{ color: totalCards > 0 ? "#d4a017" : "var(--faint)" }}>{totalCards} CARDS TO REVIEW</span>
+          {" — "}
+          <span style={{ color: errors > 0 ? "var(--neg)" : "var(--faint)" }}>{errors} ERRORS</span>
         </div>
-        <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
-          <div className="font-display font-light text-[38px] leading-none mb-1.5" style={{ color: avgMention > 0.5 ? "var(--pos)" : avgMention > 0.2 ? "var(--white)" : "var(--neg)" }}>
-            {allClients.length > 0 ? Math.round(avgMention * 100) + "%" : "—"}
-          </div>
-          <div className="font-mono text-[8px] tracking-[0.14em]" style={{ color: "var(--faint)" }}>AVG MENTION RATE</div>
-        </div>
-        <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
-          <div className="font-display font-light text-[38px] leading-none mb-1.5" style={{ color: avgLevel >= 3 ? "var(--pos)" : avgLevel >= 2 ? "var(--white)" : "var(--faint)" }}>
-            {allClients.length > 0 ? avgLevel.toFixed(1) : "—"}
-          </div>
-          <div className="font-mono text-[8px] tracking-[0.14em]" style={{ color: "var(--faint)" }}>AVG MENTION LEVEL</div>
-        </div>
-      </div>
-
-      {/* Table header */}
-      <div className="grid px-4 pb-3 border-b" style={{
-        gridTemplateColumns: "2fr 1fr 1fr 1.4fr 80px",
-        gap: "16px",
-        borderColor: "var(--hair)"
-      }}>
-        {["CLIENT", "MENTION", "AVG LEVEL", "LAST RUN", ""].map((h) => (
-          <div key={h} className="font-mono text-[8px] tracking-[0.18em]" style={{ color: "var(--faint)" }}>
-            {h}
-          </div>
-        ))}
-      </div>
+      )}
 
       {allClients.length === 0 ? (
         <p className="font-serif italic text-base py-10" style={{ color: "var(--mute)" }}>
           No clients yet.
         </p>
       ) : (
-        clientsWithData.map(({ client, latestRun, previousRun, latestReport }) => (
-          <ClientRow
-            key={client.id}
-            client={client}
-            latestRun={latestRun}
-            previousRun={previousRun}
-            latestReport={latestReport}
-          />
-        ))
+        <div style={{ borderTop: "1px solid var(--hair)" }}>
+          {rows.map((row) => (
+            <BoardRow key={row.clientId} row={row} nextRunLabel={nextRunByClient.get(row.clientId) ? formatNextRun(nextRunByClient.get(row.clientId)!) : undefined} />
+          ))}
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <div className="mt-10 pt-6 flex items-baseline gap-6" style={{ borderTop: "1px solid var(--hair)" }}>
+          <span className="font-mono text-[8px] tracking-[0.14em] uppercase" style={{ color: "var(--faint)" }}>
+            NEXT RUNS
+          </span>
+          {upcoming.map((s) => (
+            <span key={s.client_id} className="font-mono text-[9px]" style={{ color: "var(--faint)" }}>
+              {s.client_name} {formatNextRun(s.next_run as string)}
+            </span>
+          ))}
+        </div>
       )}
     </>
   );

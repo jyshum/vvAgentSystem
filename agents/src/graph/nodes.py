@@ -46,6 +46,7 @@ def run_tracker_node(state: GEOState) -> dict:
             "per_engine_scores": scores.get("per_engine", {}),
             "competitor_scores": scores.get("competitor_scores", {}),
             "discovered_competitors": [],
+            "thread_id": state.get("thread_id"),
         }).execute()
 
         run_id = run_row.data[0]["id"]
@@ -152,7 +153,6 @@ def run_improvement_pipeline_node(state: GEOState) -> dict:
             "query_matches": [],
             "citation_scores": [],
             "competitive_gap_data": [],
-            "reddit_scout_data": [],
             "action_cards": [],
             "error": str(e),
         }
@@ -202,6 +202,9 @@ def run_implementation_node(state: GEOState) -> dict:
                     print(f"    NOT verified: {verification.get('error') or verification['checks']}")
 
             update_fields = {"status": new_status}
+            preview = result.get("preview_url") or result.get("pr_url")
+            if preview:
+                update_fields["preview_url"] = preview
             if verification is not None:
                 update_fields["verification"] = verification
             sb.table("action_cards").update(update_fields).eq("id", card_id).execute()

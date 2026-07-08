@@ -81,7 +81,6 @@ def trigger_scheduled_run(client_id: str):
                 "query_matches": [],
                 "citation_scores": [],
                 "competitive_gap_data": [],
-                "reddit_scout_data": [],
                 "action_cards": [],
                 "approved_card_ids": [],
                 "implementation_results": [],
@@ -181,6 +180,7 @@ class RunRequest(BaseModel):
 class ApproveRequest(BaseModel):
     thread_id: str
     approved_card_ids: list[str]
+    rejected_card_ids: list[str] = []
 
 
 @app.get("/health")
@@ -215,7 +215,6 @@ def _run_graph_background(client_id: str, run_type: str, thread_id: str):
                 "query_matches": [],
                 "citation_scores": [],
                 "competitive_gap_data": [],
-                "reddit_scout_data": [],
                 "action_cards": [],
                 "approved_card_ids": [],
                 "implementation_results": [],
@@ -266,6 +265,10 @@ async def approve_cards(req: ApproveRequest, authorization: str | None = Header(
     config = {"configurable": {"thread_id": req.thread_id}}
 
     sb = _get_supabase()
+
+    for card_id in req.rejected_card_ids:
+        sb.table("action_cards").update({"status": "rejected"}).eq("id", card_id).execute()
+
     sb.table("pipeline_runs").update({
         "status": "implementing",
     }).eq("thread_id", req.thread_id).execute()

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { label: "CLIENTS", href: "/admin", exact: true },
+  { label: "BOARD", href: "/admin", exact: true },
+  { label: "CLIENTS", href: "/admin/clients", exact: false },
   { label: "APPROVALS", href: "/admin/approvals", exact: false },
 ];
 
@@ -14,9 +15,7 @@ export function NavLinks() {
   return (
     <div className="flex items-center gap-8">
       {links.map(({ label, href, exact }) => {
-        const isActive = exact
-          ? pathname === href || pathname.startsWith("/admin/clients")
-          : pathname.startsWith(href);
+        const isActive = exact ? pathname === href : pathname.startsWith(href);
 
         return (
           <Link

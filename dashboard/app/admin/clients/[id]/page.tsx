@@ -6,5 +6,5 @@ export default async function ClientDetailRoot({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/admin/clients/${id}/config`);
+  redirect(`/admin/clients/${id}/overview`);
 }

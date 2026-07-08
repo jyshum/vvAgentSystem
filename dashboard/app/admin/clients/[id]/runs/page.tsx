@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { RunRow } from "@/components/admin/RunRow";
-import type { TrackerRun, Report, Client } from "@/lib/types";
+import type { PipelineRun, ImprovementRun } from "@/lib/improvement-types";
+import { PIPELINE_STATUS_COLOR } from "@/lib/run-status";
 
 export default async function RunsPage({
   params,
@@ -10,78 +11,86 @@ export default async function RunsPage({
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const [{ data: clientData }, { data: runs }, { data: reports }] = await Promise.all([
-    supabase.from("clients").select("name, target_queries").eq("id", id).single(),
+  const [{ data: pipelineRuns }, { data: improvementRuns }] = await Promise.all([
     supabase
-      .from("tracker_runs")
-      .select("*")
+      .from("pipeline_runs")
+      .select("id, client_id, thread_id, run_type, status, started_at, completed_at, error_message")
       .eq("client_id", id)
-      .order("ran_at", { ascending: false }),
+      .order("started_at", { ascending: false }),
     supabase
-      .from("reports")
-      .select("id, run_id")
+      .from("improvement_runs")
+      .select("id, thread_id, cards_generated, ran_at")
       .eq("client_id", id),
   ]);
 
-  const client = clientData as Pick<Client, "name" | "target_queries"> | null;
-  const allRuns = (runs as TrackerRun[]) || [];
-  const reportByRunId: Record<string, string> = {};
-  ((reports || []) as Pick<Report, "id" | "run_id">[]).forEach((r) => {
-    if (r.run_id) reportByRunId[r.run_id] = r.id;
-  });
-  const expectedQueries = client?.target_queries?.length ?? 8;
+  const runs = (pipelineRuns as PipelineRun[]) || [];
+  const improvements = (improvementRuns as Pick<ImprovementRun, "id" | "thread_id" | "cards_generated" | "ran_at">[]) || [];
 
-  // Fetch result counts per run for QUERIES column
-  const runResultCounts: Record<string, number> = {};
-  if (allRuns.length > 0) {
-    const { data: counts } = await supabase
-      .from("tracker_results")
-      .select("run_id")
-      .in("run_id", allRuns.map((r) => r.id));
-    if (counts) {
-      counts.forEach((row: { run_id: string }) => {
-        runResultCounts[row.run_id] = (runResultCounts[row.run_id] || 0) + 1;
-      });
-    }
+  const cardsByThreadId = new Map<string, number>();
+  for (const imp of improvements) {
+    if (imp.thread_id) cardsByThreadId.set(imp.thread_id, imp.cards_generated);
   }
 
   return (
     <div>
-      {allRuns.length === 0 ? (
+      {runs.length === 0 ? (
         <p className="font-serif italic" style={{ color: "var(--mute)" }}>
-          No runs yet. Click RUN NOW to start the first one.
+          No runs yet.
         </p>
       ) : (
         <>
-          {/* Table header */}
           <div
             className="grid pb-2.5 border-b font-mono text-[8px] tracking-[0.14em] uppercase"
             style={{
-              gridTemplateColumns: "1.5fr 0.8fr 0.8fr 0.7fr 0.7fr 80px 150px",
+              gridTemplateColumns: "1.5fr 1fr 1fr",
               gap: "16px",
               borderColor: "var(--hair)",
               color: "var(--faint)",
             }}
           >
             <span>DATE</span>
-            <span>MENTION</span>
-            <span>AVG LEVEL</span>
-            <span>GSC CLICKS</span>
-            <span>GSC POS</span>
-            <span>QUERIES</span>
-            <span>ACTIONS</span>
+            <span>STATUS</span>
+            <span>CARDS</span>
           </div>
 
-          {allRuns.map((run) => (
-            <RunRow
-              key={run.id}
-              run={run}
-              clientId={id}
-              reportId={reportByRunId[run.id] ?? null}
-              expectedQueries={expectedQueries}
-              resultCount={runResultCounts[run.id] ?? 0}
-            />
-          ))}
+          {runs.map((run) => {
+            const cards = run.thread_id ? cardsByThreadId.get(run.thread_id) : undefined;
+            return (
+              <Link
+                key={run.id}
+                href={`/admin/clients/${id}/runs/${run.id}`}
+                className="grid items-center py-[17px] border-b group transition-all duration-200"
+                style={{
+                  gridTemplateColumns: "1.5fr 1fr 1fr",
+                  gap: "16px",
+                  borderColor: "var(--hair)",
+                }}
+              >
+                <div className="transition-all duration-[200ms] group-hover:pl-3" style={{ transitionTimingFunction: "cubic-bezier(.2,.8,.2,1)" }}>
+                  <div className="font-serif text-[15px]" style={{ color: "var(--white)" }}>
+                    {new Date(run.started_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </div>
+                  <div className="font-mono text-[8px] tracking-[0.06em] mt-0.5" style={{ color: "var(--faint)" }}>
+                    {new Date(run.started_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                  </div>
+                </div>
+                <div>
+                  <span
+                    className="font-mono text-[8px] tracking-[0.1em] uppercase px-2 py-1"
+                    style={{
+                      color: PIPELINE_STATUS_COLOR[run.status] ?? "var(--mute)",
+                      border: `1px solid ${PIPELINE_STATUS_COLOR[run.status] ?? "var(--mute)"}`,
+                    }}
+                  >
+                    {run.status}
+                  </span>
+                </div>
+                <div className="font-mono text-[10px]" style={{ color: cards != null ? "var(--white)" : "var(--faint)" }}>
+                  {cards != null ? cards : "—"}
+                </div>
+              </Link>
+            );
+          })}
         </>
       )}
     </div>

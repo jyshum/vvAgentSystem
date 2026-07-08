@@ -10,13 +10,12 @@ class TestRunImprovementPipeline:
     @patch("src.improvement.pipeline.compute_structural_score")
     @patch("src.improvement.pipeline.generate_sonnet_quality")
     @patch("src.improvement.pipeline.check_competitive_gaps")
-    @patch("src.improvement.pipeline.run_reddit_scout")
     @patch("src.improvement.pipeline.classify_actions")
     @patch("src.improvement.pipeline.generate_sonnet_specifics")
     @patch("src.improvement.pipeline.validate_json_ld")
     @patch("src.improvement.pipeline.qa_card")
     def test_returns_expected_state_keys(
-        self, mock_qa, mock_validate, mock_sonnet, mock_classify, mock_reddit,
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify,
         mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
         mock_crawl, mock_sb,
     ):
@@ -40,7 +39,6 @@ class TestRunImprovementPipeline:
         mock_quality.return_value = {"specificity": 3, "completeness": 3, "answer_directness": 3, "summary": "OK"}
         mock_gaps.return_value = [{"query": "q1", "query_id": "id1", "competitive_gap": 0.2,
                                    "top_competitor": "CompA", "client_mention_rate": 0.3, "competitor_mention_rate": 0.5}]
-        mock_reddit.return_value = []
         mock_classify.return_value = [{"action_type": "generate_schema", "page_url": "https://x.com/p1", "issue": "No schema"}]
         mock_sonnet.return_value = {"before_text": "", "after_text": "", "code_block": '{"@context":"https://schema.org","@type":"Organization","name":"X"}'}
         mock_validate.return_value = {"valid": True, "errors": []}
@@ -75,13 +73,53 @@ class TestRunImprovementPipeline:
     @patch("src.improvement.pipeline.compute_structural_score")
     @patch("src.improvement.pipeline.generate_sonnet_quality")
     @patch("src.improvement.pipeline.check_competitive_gaps")
-    @patch("src.improvement.pipeline.run_reddit_scout")
+    @patch("src.improvement.pipeline.classify_actions")
+    @patch("src.improvement.pipeline.generate_sonnet_specifics")
+    @patch("src.improvement.pipeline.validate_json_ld")
+    @patch("src.improvement.pipeline.qa_card")
+    def test_improvement_run_insert_includes_thread_id(
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify,
+        mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
+        mock_crawl, mock_sb,
+    ):
+        """improvement_runs insert must carry the pipeline thread_id so the
+        approvals inbox and run-detail page can join back to the originating thread."""
+        mock_qa.return_value = {"passed": True, "reason": ""}
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute.return_value = MagicMock(data=[{"id": "run-123"}])
+        mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
+        mock_sb.return_value.table.return_value = mock_table
+
+        mock_crawl.return_value = {"has_critical_blocker": False}
+        mock_inv.return_value = []
+        mock_match.return_value = []
+        mock_gaps.return_value = []
+
+        state = {"client_id": "client-1",
+                 "client_config": {"website_domain": "x.com", "brand_name": "BrandX", "competitors": []},
+                 "tracker_results": [],
+                 "thread_id": "client-20260707-000000"}
+        queries = []
+
+        run_improvement_pipeline(state, queries, competitive_gaps_data=[])
+
+        insert_calls = mock_table.insert.call_args_list
+        run_insert_payload = insert_calls[0][0][0]
+        assert run_insert_payload["thread_id"] == "client-20260707-000000"
+
+    @patch("src.improvement.pipeline._get_supabase")
+    @patch("src.improvement.pipeline.run_crawlability_gate")
+    @patch("src.improvement.pipeline.build_inventory")
+    @patch("src.improvement.pipeline.match_queries_to_pages")
+    @patch("src.improvement.pipeline.compute_structural_score")
+    @patch("src.improvement.pipeline.generate_sonnet_quality")
+    @patch("src.improvement.pipeline.check_competitive_gaps")
     @patch("src.improvement.pipeline.classify_actions")
     @patch("src.improvement.pipeline.generate_sonnet_specifics")
     @patch("src.improvement.pipeline.validate_json_ld")
     @patch("src.improvement.pipeline.qa_card")
     def test_cards_get_db_ids_after_insert(
-        self, mock_qa, mock_validate, mock_sonnet, mock_classify, mock_reddit,
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify,
         mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
         mock_crawl, mock_sb,
     ):
@@ -113,7 +151,6 @@ class TestRunImprovementPipeline:
         mock_quality.return_value = {"specificity": 3, "completeness": 3, "answer_directness": 3, "summary": "OK"}
         mock_gaps.return_value = [{"query": "q1", "query_id": "id1", "competitive_gap": 0.0,
                                    "top_competitor": None, "client_mention_rate": 0.3, "competitor_mention_rate": 0.0}]
-        mock_reddit.return_value = []
         mock_classify.return_value = [{"action_type": "generate_schema", "page_url": "https://x.com/p1", "issue": "No schema"}]
         mock_sonnet.return_value = {"before_text": "", "after_text": "", "code_block": '{"@context":"https://schema.org","@type":"Organization","name":"X"}'}
         mock_validate.return_value = {"valid": True, "errors": []}
@@ -135,13 +172,12 @@ class TestRunImprovementPipeline:
     @patch("src.improvement.pipeline.compute_structural_score")
     @patch("src.improvement.pipeline.generate_sonnet_quality")
     @patch("src.improvement.pipeline.check_competitive_gaps")
-    @patch("src.improvement.pipeline.run_reddit_scout")
     @patch("src.improvement.pipeline.classify_actions")
     @patch("src.improvement.pipeline.generate_sonnet_specifics")
     @patch("src.improvement.pipeline.validate_json_ld")
     @patch("src.improvement.pipeline.qa_card")
     def test_multiple_queries_matching_one_page_produce_one_card_set(
-        self, mock_qa, mock_validate, mock_sonnet, mock_classify, mock_reddit,
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify,
         mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
         mock_crawl, mock_sb,
     ):
@@ -176,7 +212,6 @@ class TestRunImprovementPipeline:
             {"query": "q3", "query_id": "id3", "competitive_gap": 0.0, "top_competitor": None,
              "client_mention_rate": 0.5, "competitor_mention_rate": 0.0},
         ]
-        mock_reddit.return_value = []
         mock_classify.return_value = [{"action_type": "generate_schema", "page_url": "https://x.com/p1", "issue": "No schema"}]
         mock_sonnet.return_value = {"before_text": "", "after_text": "", "code_block": '{"@context":"https://schema.org","@type":"Organization","name":"X"}'}
         mock_validate.return_value = {"valid": True, "errors": []}
@@ -192,15 +227,19 @@ class TestRunImprovementPipeline:
 
         result = run_improvement_pipeline(state, queries, competitive_gaps_data=[])
 
-        # One card, not three — deduped by (page_url, action_type)
-        assert len(result["action_cards"]) == 1
-        card = result["action_cards"][0]
+        # One automated card, not three — deduped by (page_url, action_type) —
+        # plus one manual community-check card for the losing query (q2, gap>0).
+        assert len(result["action_cards"]) == 2
+        automated = [c for c in result["action_cards"] if c["track"] == "automated"][0]
         # The card carries the worst-gap query as its primary
-        assert card["query_id"] == "id2"
-        assert card["priority"] == 1
-        assert card["competitive_gap"] == 0.4
+        assert automated["query_id"] == "id2"
+        assert automated["priority"] == 1
+        assert automated["competitive_gap"] == 0.4
         # Sonnet specifics called once, not three times
         assert mock_sonnet.call_count == 1
+
+        community = [c for c in result["action_cards"] if c["action_type"] == "community_check"][0]
+        assert community["query_id"] == "id2"
 
     @patch("src.improvement.pipeline._get_supabase")
     @patch("src.improvement.pipeline.run_crawlability_gate")
@@ -209,13 +248,12 @@ class TestRunImprovementPipeline:
     @patch("src.improvement.pipeline.compute_structural_score")
     @patch("src.improvement.pipeline.generate_sonnet_quality")
     @patch("src.improvement.pipeline.check_competitive_gaps")
-    @patch("src.improvement.pipeline.run_reddit_scout")
     @patch("src.improvement.pipeline.classify_actions")
     @patch("src.improvement.pipeline.generate_sonnet_specifics")
     @patch("src.improvement.pipeline.validate_json_ld")
     @patch("src.improvement.pipeline.qa_card")
     def test_card_failing_qa_twice_is_dropped(
-        self, mock_qa, mock_validate, mock_sonnet, mock_classify, mock_reddit,
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify,
         mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
         mock_crawl, mock_sb,
     ):
@@ -240,7 +278,6 @@ class TestRunImprovementPipeline:
         mock_quality.return_value = {"specificity": 3, "completeness": 3, "answer_directness": 3, "summary": "OK"}
         mock_gaps.return_value = [{"query": "q1", "query_id": "id1", "competitive_gap": 0.0,
                                    "top_competitor": None, "client_mention_rate": 0.3, "competitor_mention_rate": 0.0}]
-        mock_reddit.return_value = []
         mock_classify.return_value = [{"action_type": "generate_schema", "page_url": "https://x.com/p1", "issue": "No schema"}]
         mock_sonnet.return_value = {"before_text": "", "after_text": "", "code_block": '{"@context":"https://schema.org","@type":"Organization","name":"X"}'}
         mock_validate.return_value = {"valid": True, "errors": []}
@@ -263,13 +300,12 @@ class TestRunImprovementPipeline:
     @patch("src.improvement.pipeline.compute_structural_score")
     @patch("src.improvement.pipeline.generate_sonnet_quality")
     @patch("src.improvement.pipeline.check_competitive_gaps")
-    @patch("src.improvement.pipeline.run_reddit_scout")
     @patch("src.improvement.pipeline.classify_actions")
     @patch("src.improvement.pipeline.generate_sonnet_specifics")
     @patch("src.improvement.pipeline.validate_json_ld")
     @patch("src.improvement.pipeline.qa_card")
     def test_card_passing_qa_on_retry_is_kept(
-        self, mock_qa, mock_validate, mock_sonnet, mock_classify, mock_reddit,
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify,
         mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
         mock_crawl, mock_sb,
     ):
@@ -297,7 +333,6 @@ class TestRunImprovementPipeline:
         mock_quality.return_value = {"specificity": 3, "completeness": 3, "answer_directness": 3, "summary": "OK"}
         mock_gaps.return_value = [{"query": "q1", "query_id": "id1", "competitive_gap": 0.0,
                                    "top_competitor": None, "client_mention_rate": 0.3, "competitor_mention_rate": 0.0}]
-        mock_reddit.return_value = []
         mock_classify.return_value = [{"action_type": "generate_schema", "page_url": "https://x.com/p1", "issue": "No schema"}]
         mock_sonnet.return_value = {"before_text": "", "after_text": "", "code_block": '{"@context":"https://schema.org","@type":"Organization","name":"X"}'}
         mock_validate.return_value = {"valid": True, "errors": []}
@@ -319,13 +354,12 @@ class TestRunImprovementPipeline:
     @patch("src.improvement.pipeline.compute_structural_score")
     @patch("src.improvement.pipeline.generate_sonnet_quality")
     @patch("src.improvement.pipeline.check_competitive_gaps")
-    @patch("src.improvement.pipeline.run_reddit_scout")
     @patch("src.improvement.pipeline.classify_actions")
     @patch("src.improvement.pipeline.generate_sonnet_specifics")
     @patch("src.improvement.pipeline.validate_json_ld")
     @patch("src.improvement.pipeline.qa_card")
     def test_card_auto_approved_after_three_clean_history_cycles(
-        self, mock_qa, mock_validate, mock_sonnet, mock_classify, mock_reddit,
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify,
         mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
         mock_crawl, mock_sb,
     ):
@@ -356,7 +390,6 @@ class TestRunImprovementPipeline:
         mock_quality.return_value = {"specificity": 3, "completeness": 3, "answer_directness": 3, "summary": "OK"}
         mock_gaps.return_value = [{"query": "q1", "query_id": "id1", "competitive_gap": 0.0,
                                    "top_competitor": None, "client_mention_rate": 0.3, "competitor_mention_rate": 0.0}]
-        mock_reddit.return_value = []
         mock_classify.return_value = [{"action_type": "generate_schema", "page_url": "https://x.com/p1", "issue": "No schema"}]
         mock_sonnet.return_value = {"before_text": "", "after_text": "", "code_block": '{"@context":"https://schema.org","@type":"Organization","name":"X"}'}
         mock_validate.return_value = {"valid": True, "errors": []}
@@ -381,13 +414,12 @@ class TestRunImprovementPipeline:
     @patch("src.improvement.pipeline.compute_structural_score")
     @patch("src.improvement.pipeline.generate_sonnet_quality")
     @patch("src.improvement.pipeline.check_competitive_gaps")
-    @patch("src.improvement.pipeline.run_reddit_scout")
     @patch("src.improvement.pipeline.classify_actions")
     @patch("src.improvement.pipeline.generate_sonnet_specifics")
     @patch("src.improvement.pipeline.validate_json_ld")
     @patch("src.improvement.pipeline.qa_card")
     def test_configured_allowlist_bounded_to_schema_safe_types(
-        self, mock_qa, mock_validate, mock_sonnet, mock_classify, mock_reddit,
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify,
         mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
         mock_crawl, mock_sb,
     ):
@@ -416,7 +448,6 @@ class TestRunImprovementPipeline:
         mock_quality.return_value = {"specificity": 3, "completeness": 3, "answer_directness": 3, "summary": "OK"}
         mock_gaps.return_value = [{"query": "q1", "query_id": "id1", "competitive_gap": 0.0,
                                    "top_competitor": None, "client_mention_rate": 0.3, "competitor_mention_rate": 0.0}]
-        mock_reddit.return_value = []
         mock_classify.return_value = [
             {"action_type": "add_faq_schema", "page_url": "https://x.com/p1", "issue": "No FAQ schema"},
             {"action_type": "restructure_intro", "page_url": "https://x.com/p1", "issue": "Weak intro"},
