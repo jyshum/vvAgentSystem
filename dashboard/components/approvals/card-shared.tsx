@@ -3,7 +3,34 @@
 import type { ActionCard } from "@/lib/improvement-types";
 import { formatRate } from "@/lib/utils";
 
-export type ReviewCard = ActionCard & { queryText: string | null };
+/** Exact set of action_cards columns selected by the approvals page and read by
+ * the card components. Kept as a Pick subset (not full ActionCard) so a card
+ * component can never read an un-selected column as `undefined` without TS error. */
+export type ReviewCardData = Pick<
+  ActionCard,
+  | "id"
+  | "run_id"
+  | "client_id"
+  | "query_id"
+  | "page_url"
+  | "action_type"
+  | "track"
+  | "priority"
+  | "competitive_gap"
+  | "structural_score"
+  | "issue"
+  | "before_text"
+  | "after_text"
+  | "code_block"
+  | "status"
+  | "cms_action"
+  | "auto_approved"
+  | "brief"
+  | "reddit_data"
+  | "created_at"
+>;
+
+export type ReviewCard = ReviewCardData & { queryText: string | null };
 export type Decision = "approved" | "rejected";
 
 export interface CardProps {

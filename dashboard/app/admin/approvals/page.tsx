@@ -2,34 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { InboxGroup, type InboxGroupData } from "@/components/approvals/InboxGroup";
+import type { ReviewCardData } from "@/components/approvals/card-shared";
 import { topCompetitor, rankAndGap } from "@/lib/derive";
 import { formatRate, formatDelta } from "@/lib/utils";
-import type { ActionCard } from "@/lib/improvement-types";
 import Link from "next/link";
 
-type CardRow = Pick<
-  ActionCard,
-  | "id"
-  | "run_id"
-  | "client_id"
-  | "query_id"
-  | "page_url"
-  | "action_type"
-  | "track"
-  | "priority"
-  | "competitive_gap"
-  | "structural_score"
-  | "issue"
-  | "before_text"
-  | "after_text"
-  | "code_block"
-  | "status"
-  | "cms_action"
-  | "auto_approved"
-  | "brief"
-  | "reddit_data"
-  | "created_at"
->;
+/** Rows selected below match the shared ReviewCardData shape exactly. */
+type CardRow = ReviewCardData;
 
 interface TrackerRunRow {
   aggregate_mention_rate: number;
@@ -114,44 +93,55 @@ export default async function ApprovalsPage() {
   const queriesMap = new Map<string, string>();
   for (const q of queriesRes.data || []) queriesMap.set(q.id, q.prompt_text);
 
-  // Latest-2 tracker_runs per client for context strip.
-  const trackerByClient = new Map<string, TrackerRunRow[]>();
-  await Promise.all(
-    clientIds.map(async (clientId) => {
-      const { data } = await supabase
-        .from("tracker_runs")
-        .select("aggregate_mention_rate, competitor_scores, ran_at")
-        .eq("client_id", clientId)
-        .order("ran_at", { ascending: false })
-        .limit(2);
-      trackerByClient.set(clientId, (data as TrackerRunRow[]) || []);
-    })
-  );
+  // Both maps depend only on the resolved first batch and not on each other, so
+  // build them concurrently (each helper fans out its own inner Promise.all).
+
+  // Latest-2 tracker_runs per client for the context strip.
+  const buildTrackerMap = async () => {
+    const map = new Map<string, TrackerRunRow[]>();
+    await Promise.all(
+      clientIds.map(async (clientId) => {
+        const { data } = await supabase
+          .from("tracker_runs")
+          .select("aggregate_mention_rate, competitor_scores, ran_at")
+          .eq("client_id", clientId)
+          .order("ran_at", { ascending: false })
+          .limit(2);
+        map.set(clientId, (data as TrackerRunRow[]) || []);
+      })
+    );
+    return map;
+  };
 
   // Resolve thread per run: improvement_runs.thread_id, else latest matching pipeline_runs.
-  const threadByRun = new Map<string, string | null>();
-  await Promise.all(
-    runIds.map(async (runId) => {
-      const run = runsMap.get(runId);
-      if (!run) {
-        threadByRun.set(runId, null);
-        return;
-      }
-      if (run.thread_id) {
-        threadByRun.set(runId, run.thread_id);
-        return;
-      }
-      const { data } = await supabase
-        .from("pipeline_runs")
-        .select("thread_id")
-        .eq("client_id", run.client_id)
-        .eq("status", "awaiting_approval")
-        .lte("started_at", run.ran_at)
-        .order("started_at", { ascending: false })
-        .limit(1);
-      threadByRun.set(runId, data?.[0]?.thread_id ?? null);
-    })
-  );
+  const buildThreadMap = async () => {
+    const map = new Map<string, string | null>();
+    await Promise.all(
+      runIds.map(async (runId) => {
+        const run = runsMap.get(runId);
+        if (!run) {
+          map.set(runId, null);
+          return;
+        }
+        if (run.thread_id) {
+          map.set(runId, run.thread_id);
+          return;
+        }
+        const { data } = await supabase
+          .from("pipeline_runs")
+          .select("thread_id")
+          .eq("client_id", run.client_id)
+          .eq("status", "awaiting_approval")
+          .lte("started_at", run.ran_at)
+          .order("started_at", { ascending: false })
+          .limit(1);
+        map.set(runId, data?.[0]?.thread_id ?? null);
+      })
+    );
+    return map;
+  };
+
+  const [trackerByClient, threadByRun] = await Promise.all([buildTrackerMap(), buildThreadMap()]);
 
   // Server component rendered per-request (force-dynamic); reading the clock
   // to compute card age is intentional.
@@ -198,7 +188,7 @@ export default async function ApprovalsPage() {
       cmsType: client?.cms_type || "",
       waitDays,
       contextStrip,
-      cards: reviewCards.map((c) => ({ ...c, queryText: c.query_id ? queriesMap.get(c.query_id) ?? null : null })) as InboxGroupData["cards"],
+      cards: reviewCards.map((c) => ({ ...c, queryText: c.query_id ? queriesMap.get(c.query_id) ?? null : null })),
       autoApproved: (autoByRun.get(runId) || []).map((c) => ({ id: c.id, action_type: c.action_type })),
       oldestCreatedAt,
     };

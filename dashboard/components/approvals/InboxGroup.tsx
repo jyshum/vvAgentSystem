@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActionCard } from "@/lib/improvement-types";
-import { MONO_LABEL, type Decision } from "./card-shared";
+import { MONO_LABEL, type Decision, type ReviewCard } from "./card-shared";
 import { AutomatedCard } from "./AutomatedCard";
 import { BriefCard } from "./BriefCard";
 import { CommunityCheckCard } from "./CommunityCheckCard";
@@ -15,7 +14,7 @@ export interface InboxGroupData {
   cmsType: string;
   waitDays: number;
   contextStrip: string | null;
-  cards: (ActionCard & { queryText: string | null })[]; // review items, oldest first
+  cards: ReviewCard[]; // review items, oldest first
   autoApproved: { id: string; action_type: string }[];
 }
 
