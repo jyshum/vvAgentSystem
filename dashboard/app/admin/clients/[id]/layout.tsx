@@ -198,7 +198,9 @@ export default async function ClientLayout({
             CRAWLABILITY BLOCKER — AI CRAWLERS CANNOT ACCESS THE SITE
           </div>
           <div className="font-serif text-[13px]" style={{ color: "var(--white)" }}>
-            {failing.map((f) => `${f.name}: ${f.detail}`).join(" · ")}
+            {failing.length > 0
+              ? failing.map((f) => `${f.name}: ${f.detail}`).join(" · ")
+              : "see the priority-0 card for details"}
           </div>
           <Link href="/admin/approvals" className="font-mono text-[9px] tracking-[0.1em] uppercase underline" style={{ color: "var(--neg)" }}>
             VIEW FIX-CRAWLABILITY CARD →

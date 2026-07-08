@@ -75,7 +75,12 @@ export function TimelineChart({ series, competitor, height = 180 }: TimelineChar
       {competitor && lastNonNullIdx >= 0 && (
         <text
           x={xAt(lastNonNullIdx)}
-          y={yAt(competitor.series[lastNonNullIdx] as number) - 6}
+          // Below the point (client value labels sit above theirs), clamped
+          // inside the viewBox so the two never collide at the same x.
+          y={Math.min(
+            Math.max(yAt(competitor.series[lastNonNullIdx] as number) + 12, 10),
+            height - PAD_BOTTOM + 10
+          )}
           fontSize={8}
           fontFamily="var(--mono)"
           fill="var(--faint)"
