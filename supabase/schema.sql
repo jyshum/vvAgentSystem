@@ -105,7 +105,9 @@ create table public.tracker_runs (
   gsc_ctr float default 0,
   gsc_position float default 0,
   gsc_top_queries jsonb default '[]'::jsonb,
-  thread_id text
+  thread_id text,
+  query_set_signature text,
+  query_set_changed boolean default false
 );
 
 create table public.tracker_results (
@@ -187,6 +189,7 @@ create table public.queries (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references public.clients(id) on delete cascade,
   prompt_text text not null,
+  paraphrases jsonb default '[]'::jsonb,
   slug text not null,
   bucket text not null default 'consideration'
     check (bucket in ('awareness', 'consideration', 'branded')),
