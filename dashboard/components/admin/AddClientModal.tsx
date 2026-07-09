@@ -13,7 +13,9 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
   const [brandName, setBrandName] = useState("");
   const [domain, setDomain] = useState("");
   const [brandVariations, setBrandVariations] = useState<string[]>([]);
-  const [queries, setQueries] = useState<string[]>([]);
+  const [awarenessPrompts, setAwarenessPrompts] = useState<string[]>([]);
+  const [considerationPrompts, setConsiderationPrompts] = useState<string[]>([]);
+  const [brandedPrompts, setBrandedPrompts] = useState<string[]>([]);
   const [competitors, setCompetitors] = useState<string[]>([]);
 
   // Close on Escape
@@ -42,7 +44,11 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
           brand_name: brandName.trim() || name.trim(),
           website_domain: domain.trim(),
           brand_variations: brandVariations,
-          target_queries: queries,
+          query_buckets: {
+            awareness: awarenessPrompts,
+            consideration: considerationPrompts,
+            branded: brandedPrompts,
+          },
           competitors,
         }),
       });
@@ -151,10 +157,24 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
           />
 
           <TagInput
-            label="Initial Consideration Prompts"
-            values={queries}
-            onChange={setQueries}
-            placeholder="e.g. find daycare near me Ontario"
+            label={`Awareness Prompts (${awarenessPrompts.length})`}
+            values={awarenessPrompts}
+            onChange={setAwarenessPrompts}
+            placeholder="e.g. how to budget as a medical student"
+          />
+
+          <TagInput
+            label={`Consideration Prompts (${considerationPrompts.length})`}
+            values={considerationPrompts}
+            onChange={setConsiderationPrompts}
+            placeholder="e.g. best budgeting tools for medical students"
+          />
+
+          <TagInput
+            label={`Branded Prompts (${brandedPrompts.length})`}
+            values={brandedPrompts}
+            onChange={setBrandedPrompts}
+            placeholder="e.g. Budget Your MD review"
           />
 
           <TagInput

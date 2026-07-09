@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
 
   const body = await request.json();
-  const { name, brand_name, website_domain, brand_variations, target_queries, competitors } = body;
+  const { name, brand_name, website_domain, brand_variations, target_queries, query_buckets, competitors } = body;
 
   if (!name?.trim() || !website_domain?.trim()) {
     return NextResponse.json({ error: "name and website_domain are required" }, { status: 400 });
@@ -38,17 +38,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const prompts = Array.isArray(target_queries)
+  const legacyPrompts = Array.isArray(target_queries)
     ? target_queries.map((q) => String(q).trim()).filter(Boolean)
     : [];
+  const bucketPrompts = buildBucketPrompts(query_buckets);
+  const prompts = bucketPrompts.length > 0
+    ? bucketPrompts
+    : legacyPrompts.map((prompt_text) => ({ prompt_text, bucket: "consideration" }));
 
   if (prompts.length > 0) {
     const { error: queryError } = await supabase.from("queries").insert(
-      prompts.map((prompt_text) => ({
+      prompts.map(({ prompt_text, bucket }) => ({
         client_id: data.id,
         prompt_text,
         slug: generateSlug(prompt_text),
-        bucket: "consideration",
+        bucket,
         set_type: "core",
       }))
     );
@@ -58,4 +62,17 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(data, { status: 201 });
+}
+
+function buildBucketPrompts(input: unknown): { prompt_text: string; bucket: string }[] {
+  if (!input || typeof input !== "object") return [];
+  const buckets = input as Record<string, unknown>;
+  return (["awareness", "consideration", "branded"] as const).flatMap((bucket) => {
+    const values = buckets[bucket];
+    if (!Array.isArray(values)) return [];
+    return values
+      .map((value) => String(value).trim())
+      .filter(Boolean)
+      .map((prompt_text) => ({ prompt_text, bucket }));
+  });
 }
