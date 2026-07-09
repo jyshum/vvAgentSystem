@@ -105,7 +105,7 @@ def _compute_prompt_scores(client_id: str, run_id: str, results: list[dict]) -> 
         scores.append({
             "run_id": run_id,
             "client_id": client_id,
-            "query_id": runs[0].get("query_id") or intent_key,
+            "query_id": runs[0].get("query_id"),
             "query": intent_prompt,
             "bucket": runs[0].get("bucket", "consideration"),
             "llm": engine,

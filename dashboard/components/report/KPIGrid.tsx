@@ -12,7 +12,6 @@ export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
   const prev = previousRuns.length > 0 ? previousRuns[previousRuns.length - 1] : null;
   const primaryRate = run.non_branded_mention_rate ?? run.aggregate_mention_rate;
   const previousPrimaryRate = prev ? prev.non_branded_mention_rate ?? prev.aggregate_mention_rate : null;
-  const brandedRate = run.bucket_scores?.branded?.mention_rate ?? null;
 
   const mentionHistory = previousRuns.map((r) => r.non_branded_mention_rate ?? r.aggregate_mention_rate);
   const levelHistory = previousRuns.map((r) => r.aggregate_avg_mention_level);
@@ -56,11 +55,9 @@ export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
               <span>{Math.abs(mentionDelta)}pp vs last week</span>
             </div>
           )}
-          {brandedRate !== null && (
-            <div className="font-mono text-[9px] tracking-[0.06em]" style={{ color: "var(--p-faint)" }}>
-              Branded coverage {formatRate(brandedRate)}
-            </div>
-          )}
+          <div className="font-mono text-[9px] tracking-[0.06em]" style={{ color: "var(--p-faint)" }}>
+            Branded deferred
+          </div>
           <div className="mt-auto pt-3">
             <SparklineChart
               values={[...mentionHistory, primaryRate]}

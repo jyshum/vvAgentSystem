@@ -118,6 +118,23 @@ def test_prompt_scores_keyed_by_intent():
     assert row["citation_rate"] == 1.0
 
 
+def test_prompt_scores_legacy_rows_keep_query_id_null():
+    results = [
+        {"intent_prompt": "legacy query", "query": "legacy query",
+         "bucket": "consideration", "engine": "chatgpt", "brand_mentioned": True,
+         "brand_cited": False, "mention_level": 2},
+        {"intent_prompt": "legacy query", "query": "legacy query rephrased",
+         "bucket": "consideration", "engine": "chatgpt", "brand_mentioned": False,
+         "brand_cited": False, "mention_level": 0},
+    ]
+    rows = _compute_prompt_scores("client-1", "run-1", results)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["query_id"] is None
+    assert row["query"] == "legacy query"
+    assert row["mention_rate"] == 0.5
+
+
 def test_competitive_gaps_grouped_by_intent():
     results = [
         {"query_id": "i1", "intent_prompt": "best daycare software", "query": "best daycare software",

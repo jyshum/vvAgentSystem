@@ -1,7 +1,9 @@
 -- 013_tracker_results_client_intent_fields.sql
 -- Expose intent identity to client-facing reports without exposing response_text.
 
-create or replace view public.tracker_results_client as
+drop view if exists public.tracker_results_client;
+
+create view public.tracker_results_client as
 select
   id,
   run_id,
@@ -19,3 +21,5 @@ select
   mention_level,
   mention_level_label
 from public.tracker_results;
+
+grant select on public.tracker_results_client to authenticated;
