@@ -6,7 +6,7 @@ export type OpsBadgeKind = "error" | "waiting" | "measuring" | "healthy";
 export interface OpsBadgeResult { kind: OpsBadgeKind; label: string }
 
 type CompetitorScores = Record<string, { mention_rate: number }> | null | undefined;
-interface ScoreRow { query: string; llm: string; mention_rate: number; citation_rate: number }
+interface ScoreRow { query_id?: string | null; query: string; llm: string; mention_rate: number; citation_rate: number }
 
 function round4(n: number): number {
   return Math.round(n * 10000) / 10000;
@@ -30,13 +30,14 @@ export function rankAndGap(clientRate: number, scores: CompetitorScores): RankRe
 export function engineAverageByQuery(rows: ScoreRow[]): Map<string, EngineAvg> {
   const grouped = new Map<string, ScoreRow[]>();
   for (const r of rows) {
-    const list = grouped.get(r.query) ?? [];
+    const key = r.query_id || r.query;
+    const list = grouped.get(key) ?? [];
     list.push(r);
-    grouped.set(r.query, list);
+    grouped.set(key, list);
   }
   const out = new Map<string, EngineAvg>();
-  for (const [query, list] of grouped) {
-    out.set(query, {
+  for (const [key, list] of grouped) {
+    out.set(key, {
       mention_rate: round4(list.reduce((s, x) => s + x.mention_rate, 0) / list.length),
       citation_rate: round4(list.reduce((s, x) => s + x.citation_rate, 0) / list.length),
     });
@@ -48,11 +49,12 @@ export function biggestMovers(latest: ScoreRow[], previous: ScoreRow[] | null, n
   if (!previous) return [];
   const latestAvg = engineAverageByQuery(latest);
   const prevAvg = engineAverageByQuery(previous);
+  const labelByKey = new Map(latest.map((row) => [row.query_id || row.query, row.query]));
   const moves: QueryMove[] = [];
-  for (const [query, cur] of latestAvg) {
-    const before = prevAvg.get(query)?.mention_rate ?? 0;
+  for (const [key, cur] of latestAvg) {
+    const before = prevAvg.get(key)?.mention_rate ?? 0;
     const change = round4(cur.mention_rate - before);
-    moves.push({ query, before, after: cur.mention_rate, change });
+    moves.push({ query: labelByKey.get(key) || key, before, after: cur.mention_rate, change });
   }
   moves.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
   return moves.slice(0, n).filter((m) => m.change !== 0);

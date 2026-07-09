@@ -33,7 +33,7 @@ export interface TrackerRun {
     mention_rate: number;
     avg_mention_level: number;
     citation_rate: number;
-    count: number;
+    intent_count: number;
   }>>;
   per_engine_scores: Record<
     string,
@@ -46,6 +46,8 @@ export interface TrackerRun {
   gsc_position: number;
   gsc_top_queries: { query: string; clicks: number; impressions: number; ctr: number; position: number }[];
   discovered_competitors: { name: string; prompt_count: number; total_mentions: number }[];
+  query_set_signature: string | null;
+  query_set_changed: boolean | null;
 }
 
 export interface TrackerResult {

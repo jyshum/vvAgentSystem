@@ -1,6 +1,8 @@
 export type StabilityClass = "locked_in" | "gaining" | "declining" | "volatile" | "absent";
 
 interface QueryScores {
+  query_id: string | null;
+  query: string;
   mention_rate: number;
   avg_mention_level: number;
 }
@@ -12,6 +14,7 @@ interface RunData {
 }
 
 export interface PromptStabilityResult {
+  query_id: string | null;
   query: string;
   stability_class: StabilityClass;
   current_mention_rate: number;
@@ -73,15 +76,16 @@ function classify(rates: number[], levels: number[]): StabilityClass {
 }
 
 export function aggregatePromptScores(
-  promptScores: { run_id: string; query: string; llm: string; mention_rate: number; avg_mention_level: number }[],
+  promptScores: { run_id: string; query_id?: string | null; query: string; llm: string; mention_rate: number; avg_mention_level: number }[],
   runs: { id: string; ran_at: string }[]
 ): RunData[] {
   const byRunQuery: Record<string, Record<string, typeof promptScores>> = {};
 
   for (const ps of promptScores) {
+    const key = ps.query_id || ps.query;
     if (!byRunQuery[ps.run_id]) byRunQuery[ps.run_id] = {};
-    if (!byRunQuery[ps.run_id][ps.query]) byRunQuery[ps.run_id][ps.query] = [];
-    byRunQuery[ps.run_id][ps.query].push(ps);
+    if (!byRunQuery[ps.run_id][key]) byRunQuery[ps.run_id][key] = [];
+    byRunQuery[ps.run_id][key].push(ps);
   }
 
   return runs.map((run) => {
@@ -91,6 +95,8 @@ export function aggregatePromptScores(
     for (const [query, scores] of Object.entries(runScores)) {
       const n = scores.length;
       const avgRate = scores.reduce((s, x) => s + x.mention_rate, 0) / n;
+      const label = scores[scores.length - 1]?.query || query;
+      const queryId = scores.find((x) => x.query_id)?.query_id || null;
 
       const totalWeight = scores.reduce((s, x) => s + x.mention_rate, 0);
       const avgLevel =
@@ -98,7 +104,12 @@ export function aggregatePromptScores(
           ? scores.reduce((s, x) => s + x.avg_mention_level * x.mention_rate, 0) / totalWeight
           : 0;
 
-      queries[query] = { mention_rate: avgRate, avg_mention_level: avgLevel };
+      queries[query] = {
+        query_id: queryId,
+        query: label,
+        mention_rate: avgRate,
+        avg_mention_level: avgLevel,
+      };
     }
 
     return { run_id: run.id, ran_at: run.ran_at, queries };
@@ -121,21 +132,29 @@ export function computePromptStability(runsData: RunData[]): PromptStabilityResu
     const rates: number[] = [];
     const levels: number[] = [];
     const trend: PromptStabilityResult["trend"] = [];
+    let label = query;
+    let queryId: string | null = null;
 
     for (const run of runsData) {
-      const qData = run.queries[query] || { mention_rate: 0, avg_mention_level: 0 };
-      rates.push(qData.mention_rate);
-      levels.push(qData.avg_mention_level);
+      const qData = run.queries[query];
+      if (qData) {
+        label = qData.query;
+        queryId = qData.query_id;
+      }
+      const metrics = qData || { mention_rate: 0, avg_mention_level: 0 };
+      rates.push(metrics.mention_rate);
+      levels.push(metrics.avg_mention_level);
       trend.push({
         run_id: run.run_id,
         ran_at: run.ran_at,
-        mention_rate: qData.mention_rate,
-        avg_mention_level: qData.avg_mention_level,
+        mention_rate: metrics.mention_rate,
+        avg_mention_level: metrics.avg_mention_level,
       });
     }
 
     results.push({
-      query,
+      query_id: queryId,
+      query: label,
       stability_class: classify(rates, levels),
       current_mention_rate: rates[rates.length - 1],
       current_avg_level: levels[levels.length - 1],

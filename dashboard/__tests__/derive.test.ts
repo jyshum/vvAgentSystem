@@ -47,6 +47,14 @@ describe("engineAverageByQuery", () => {
     expect(m.get("q1")).toEqual({ mention_rate: 0.6, citation_rate: 0.375 });
     expect(m.get("q2")).toEqual({ mention_rate: 0.2, citation_rate: 0 });
   });
+  it("groups by query_id when canonical text changes", () => {
+    const m = engineAverageByQuery([
+      { query_id: "intent-1", query: "best daycare software", llm: "chatgpt", mention_rate: 0.8, citation_rate: 0.5 },
+      { query_id: "intent-1", query: "top childcare management tools", llm: "claude", mention_rate: 0.4, citation_rate: 0.25 },
+    ]);
+    expect(m.get("intent-1")).toEqual({ mention_rate: 0.6, citation_rate: 0.375 });
+    expect(m.has("best daycare software")).toBe(false);
+  });
 });
 
 describe("biggestMovers", () => {
