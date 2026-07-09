@@ -60,7 +60,7 @@ export default async function PagesTabPage({ params }: { params: Promise<{ id: s
     latestTrackerRunId
       ? admin
           .from("competitive_gaps")
-          .select("query, competitor_data, client_mention_rate")
+          .select("query_id, query, competitor_data, client_mention_rate")
           .eq("run_id", latestTrackerRunId)
       : Promise.resolve({ data: null }),
     admin
@@ -93,7 +93,7 @@ export default async function PagesTabPage({ params }: { params: Promise<{ id: s
     }
   }
 
-  const gapsByQuery = new Map((competitiveGaps ?? []).map((g) => [g.query, g]));
+  const gapsByQuery = new Map((competitiveGaps ?? []).map((g) => [g.query_id || g.query, g]));
 
   const rows: PageRowData[] = (pageInventory ?? []).map((p) => {
     const score = scoresByUrl.get(p.url) ?? null;
@@ -115,8 +115,7 @@ export default async function PagesTabPage({ params }: { params: Promise<{ id: s
   });
 
   const gaps: ContentGapRow[] = contentGapMatches.map((m) => {
-    // competitive_gaps is keyed by query text (queries.prompt_text === query_page_matches.query_text)
-    const gapRow = gapsByQuery.get(m.query_text);
+    const gapRow = gapsByQuery.get(m.query_id) ?? gapsByQuery.get(m.query_text);
     const competitors = (gapRow?.competitor_data ?? []) as { name: string; mention_rate: number }[];
     let topCompetitor: string | null = null;
     let gap: number | null = null;

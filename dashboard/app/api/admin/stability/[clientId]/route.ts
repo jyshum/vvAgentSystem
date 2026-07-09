@@ -45,7 +45,7 @@ export async function GET(
 
   const { data: scores, error: scoresError } = await admin
     .from("prompt_scores")
-    .select("run_id, query, llm, mention_rate, avg_mention_level")
+    .select("run_id, query_id, query, llm, mention_rate, avg_mention_level")
     .in("run_id", runIds);
 
   if (scoresError) {

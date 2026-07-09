@@ -82,7 +82,7 @@ export default async function RunDetailPage({
       ? supabase.from("action_cards").select("id, auto_approved, status, action_type").eq("run_id", improvementRun.id)
       : Promise.resolve({ data: null }),
     trackerRun
-      ? supabase.from("competitive_gaps").select("query, bucket, client_mention_rate, competitor_data").eq("run_id", trackerRun.id)
+      ? supabase.from("competitive_gaps").select("query_id, query, bucket, client_mention_rate, competitor_data").eq("run_id", trackerRun.id)
       : Promise.resolve({ data: null }),
     (async () => {
       if (!pipeline.completed_at) return { nextTrackerRun: null, nextScheduledRun: null };
@@ -108,7 +108,7 @@ export default async function RunDetailPage({
   const citationScores = (citationScoresData as Pick<PageCitationScore, "structural_score">[]) || [];
   const queryMatches = (queryMatchesData as Pick<QueryPageMatch, "id" | "match_type">[]) || [];
   const actionCards = (actionCardsData as Pick<ActionCard, "id" | "auto_approved" | "status" | "action_type">[]) || [];
-  const competitiveGaps = (competitiveGapsData as Pick<CompetitiveGap, "query" | "bucket" | "client_mention_rate" | "competitor_data">[]) || [];
+  const competitiveGaps = (competitiveGapsData as Pick<CompetitiveGap, "query_id" | "query" | "bucket" | "client_mention_rate" | "competitor_data">[]) || [];
   const { nextTrackerRun, nextScheduledRun } = nextTrackerAndSchedules as { nextTrackerRun: { id: string; ran_at: string } | null; nextScheduledRun: string | null };
 
   // Worst competitive gap
