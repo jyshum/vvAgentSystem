@@ -75,6 +75,46 @@ def test_tracker_run_insert_includes_thread_id(mock_sb):
 
 
 @patch("src.graph.nodes._get_supabase")
+def test_run_tracker_node_writes_drift_signature(mock_sb):
+    mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = \
+        MagicMock(data=[{"query_set_signature": "previous-signature"}])
+    mock_table.insert.return_value.execute.return_value = MagicMock(data=[{"id": "run-1"}])
+    mock_sb.return_value.table.return_value = mock_table
+
+    from src.drift import compute_query_set_signature
+    from src.graph.nodes import run_tracker_node
+
+    intents = [
+        {"id": "q1", "slug": "awareness-budgeting", "version": 1,
+         "prompt_text": "how to budget in medical school", "bucket": "awareness",
+         "paraphrases": ["medical student budgeting tips"]},
+    ]
+    expected_signature = compute_query_set_signature(intents)
+
+    with patch("src.tracker.run_tracker") as mock_run_tracker, \
+         patch("src.tracker.compute_competitive_gaps") as mock_gaps, \
+         patch("src.upload._compute_prompt_scores") as mock_prompt_scores, \
+         patch("src.upload._build_competitive_gap_rows") as mock_gap_rows:
+        mock_run_tracker.return_value = ([], {"aggregate_mention_rate": 0, "aggregate_avg_mention_level": 0,
+                                              "per_engine": {}, "competitor_scores": {}})
+        mock_gaps.return_value = []
+        mock_prompt_scores.return_value = []
+        mock_gap_rows.return_value = []
+
+        state = {
+            "client_id": "c1",
+            "client_config": {"competitors": [], "target_queries": intents},
+            "thread_id": "client-20260707-000000",
+        }
+        run_tracker_node(state)
+
+    inserted = mock_table.insert.call_args_list[0][0][0]
+    assert inserted["query_set_signature"] == expected_signature
+    assert inserted["query_set_changed"] is True
+
+
+@patch("src.graph.nodes._get_supabase")
 def test_improvement_node_fetches_gaps_without_tracker_results(mock_sb):
     """improvement_only runs (no tracker_results in state) must still load stored gaps."""
     mock_table = MagicMock()

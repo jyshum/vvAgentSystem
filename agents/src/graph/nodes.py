@@ -10,7 +10,7 @@ def load_config(state: GEOState) -> dict:
 
     queries_resp = (
         sb.table("queries")
-        .select("id,prompt_text,bucket,set_type")
+        .select("id,prompt_text,paraphrases,bucket,set_type,slug,version")
         .eq("client_id", state["client_id"])
         .eq("status", "active")
         .order("bucket")
@@ -40,6 +40,7 @@ def _get_supabase():
 
 
 def run_tracker_node(state: GEOState) -> dict:
+    from src.drift import compute_query_set_signature
     from src.tracker import run_tracker, compute_competitive_gaps
     try:
         results, scores = run_tracker(state["client_config"])
@@ -47,6 +48,19 @@ def run_tracker_node(state: GEOState) -> dict:
         gaps = compute_competitive_gaps(results, competitors)
 
         sb = _get_supabase()
+        intents = state["client_config"].get("target_queries", [])
+        signature = compute_query_set_signature(intents)
+        prev = (
+            sb.table("tracker_runs")
+            .select("query_set_signature")
+            .eq("client_id", state["client_id"])
+            .order("ran_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        prev_sig = prev.data[0]["query_set_signature"] if prev.data else None
+        query_set_changed = prev_sig is not None and prev_sig != signature
+
         run_row = sb.table("tracker_runs").insert({
             "client_id": state["client_id"],
             "aggregate_mention_rate": scores.get("aggregate_mention_rate", 0),
@@ -57,6 +71,8 @@ def run_tracker_node(state: GEOState) -> dict:
             "competitor_scores": scores.get("competitor_scores", {}),
             "discovered_competitors": [],
             "thread_id": state.get("thread_id"),
+            "query_set_signature": signature,
+            "query_set_changed": query_set_changed,
         }).execute()
 
         run_id = run_row.data[0]["id"]
