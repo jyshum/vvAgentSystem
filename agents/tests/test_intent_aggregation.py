@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from src.tracker import run_tracker
+from src.tracker import compute_scores, run_tracker
 
 
 def _fake_engines():
@@ -37,3 +37,63 @@ def test_run_tracker_fires_canonical_plus_paraphrases_and_skips_branded():
     assert all(r["bucket"] == "awareness" for r in awareness)
     # branded intent is NOT fired at all
     assert [r for r in results if r["query_id"] == "i2"] == []
+
+
+def _sample(query_id, bucket, engine, mentioned, level=0, cited=False, comps=None):
+    return {
+        "query_id": query_id, "intent_prompt": query_id, "query": query_id,
+        "bucket": bucket, "engine": engine,
+        "brand_mentioned": mentioned, "brand_cited": cited, "mention_level": level,
+        "competitor_mentions": comps or [],
+    }
+
+
+def test_compute_scores_intent_level_and_non_branded():
+    engines = {"chatgpt": {}, "claude": {}}
+    results = [
+        # intent A (awareness): 4 samples, 2 mentioned (levels 2 and 4), 1 of them cited
+        _sample("A", "awareness", "chatgpt", True, level=2, cited=True),
+        _sample("A", "awareness", "chatgpt", False),
+        _sample("A", "awareness", "claude", True, level=4, cited=False),
+        _sample("A", "awareness", "claude", False),
+        # intent B (consideration): 2 samples, both mentioned (levels 1,3), none cited
+        _sample("B", "consideration", "chatgpt", True, level=1),
+        _sample("B", "consideration", "claude", True, level=3),
+        # intent C (branded): must be ignored entirely
+        _sample("C", "branded", "chatgpt", True, level=4, cited=True),
+    ]
+    s = compute_scores(results, engines, competitors=[])
+
+    # A mention_rate = 2/4 = 0.5 ; B = 2/2 = 1.0 ; headline = mean(0.5, 1.0) = 0.75
+    assert s["aggregate_mention_rate"] == 0.75
+    assert s["non_branded_mention_rate"] == 0.75
+    # avg level pooled over mentioned non-branded samples: levels [2,4,1,3] -> 2.5
+    assert s["aggregate_avg_mention_level"] == 2.5
+    # citation pooled: 1 cited of 4 mentioned = 0.25
+    assert s["aggregate_citation_rate"] == 0.25
+    # buckets
+    assert s["bucket_scores"]["awareness"]["mention_rate"] == 0.5
+    assert s["bucket_scores"]["consideration"]["mention_rate"] == 1.0
+    assert s["bucket_scores"]["awareness"]["intent_count"] == 1
+    # branded bucket present but contributes nothing to headline
+    assert s["bucket_scores"]["branded"]["intent_count"] == 1
+    # per-engine excludes branded; chatgpt sees A(1/2) and B(1/1) -> mean = 0.75
+    assert s["per_engine"]["chatgpt"]["mention_rate"] == 0.75
+
+
+def test_compute_scores_competitors_non_branded_only():
+    engines = {"chatgpt": {}}
+    results = [
+        _sample("A", "awareness", "chatgpt", False, comps=["KinderCare"]),
+        _sample("A", "awareness", "chatgpt", False, comps=[]),
+        _sample("C", "branded", "chatgpt", True, comps=["KinderCare"]),  # ignored
+    ]
+    s = compute_scores(results, engines, competitors=["KinderCare"])
+    # 1 of 2 non-branded samples mention KinderCare
+    assert s["competitor_scores"]["KinderCare"]["mention_rate"] == 0.5
+
+
+def test_compute_scores_empty():
+    s = compute_scores([], {"chatgpt": {}}, competitors=[])
+    assert s["aggregate_mention_rate"] == 0
+    assert s["bucket_scores"]["awareness"]["intent_count"] == 0

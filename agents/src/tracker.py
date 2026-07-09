@@ -134,76 +134,85 @@ def run_tracker(config: dict) -> tuple[list[dict], dict]:
     return results, scores
 
 
+def _rate_stats(samples: list[dict]) -> dict:
+    """mention_rate + avg_mention_level (over mentioned) + citation_rate (conditional)."""
+    total = len(samples)
+    if total == 0:
+        return {"mention_rate": 0.0, "avg_mention_level": 0.0, "citation_rate": 0.0, "count": 0}
+    mentioned = [s for s in samples if s.get("brand_mentioned")]
+    m = len(mentioned)
+    cited = sum(1 for s in mentioned if s.get("brand_cited"))
+    return {
+        "mention_rate": m / total,
+        "avg_mention_level": (sum(s.get("mention_level", 0) for s in mentioned) / m) if m else 0.0,
+        "citation_rate": (cited / m) if m else 0.0,
+        "count": total,
+    }
+
+
+def _mean(xs: list[float]) -> float:
+    return sum(xs) / len(xs) if xs else 0.0
+
+
 def compute_scores(results: list[dict], engines: dict, competitors: list[str] | None = None) -> dict:
-    def score_group(group_results: list[dict]) -> dict:
-        total = len(group_results)
-        if total == 0:
-            return {
-                "mention_rate": 0,
-                "avg_mention_level": 0,
-                "citation_rate": 0,
-                "count": 0,
-            }
-        mentions = [r for r in group_results if r["brand_mentioned"]]
-        mention_count = len(mentions)
-        citations = sum(1 for r in mentions if r["brand_cited"])
-        return {
-            "mention_rate": mention_count / total,
-            "avg_mention_level": (
-                sum(r["mention_level"] for r in mentions) / mention_count
-                if mention_count > 0 else 0
-            ),
-            "citation_rate": citations / mention_count if mention_count > 0 else 0,
-            "count": total,
+    engine_names = set(engines)
+    samples = [r for r in results if r["engine"] in engine_names]
+
+    intents: dict = {}
+    intent_bucket: dict = {}
+    for s in samples:
+        iid = s.get("query_id") or s.get("intent_prompt") or s["query"]
+        intents.setdefault(iid, []).append(s)
+        intent_bucket[iid] = s.get("bucket") or "consideration"
+
+    intent_rate = {iid: _rate_stats(iss)["mention_rate"] for iid, iss in intents.items()}
+    non_branded_ids = [iid for iid in intents if intent_bucket[iid] in NON_BRANDED_BUCKETS]
+    non_branded_samples = [s for iid in non_branded_ids for s in intents[iid]]
+
+    pooled = _rate_stats(non_branded_samples)
+    aggregate_mention_rate = _mean([intent_rate[iid] for iid in non_branded_ids])
+
+    bucket_scores = {}
+    for bucket in ("awareness", "consideration", "branded"):
+        ids = [iid for iid in intents if intent_bucket[iid] == bucket]
+        b = _rate_stats([s for iid in ids for s in intents[iid]])
+        bucket_scores[bucket] = {
+            "mention_rate": _mean([intent_rate[iid] for iid in ids]),
+            "avg_mention_level": b["avg_mention_level"],
+            "citation_rate": b["citation_rate"],
+            "intent_count": len(ids),
         }
 
     per_engine = {}
-    for engine_name in engines:
-        engine_results = [r for r in results if r["engine"] == engine_name]
-        if not engine_results:
-            continue
-        total = len(engine_results)
-        mentions = [r for r in engine_results if r["brand_mentioned"]]
-        mention_count = len(mentions)
-        citations = sum(1 for r in mentions if r["brand_cited"])
-
-        avg_level = (
-            sum(r["mention_level"] for r in mentions) / mention_count
-            if mention_count > 0 else 0
-        )
-        citation_rate = citations / mention_count if mention_count > 0 else 0
-
+    for engine_name in engine_names:
+        eng_intent_rates = []
+        eng_samples = []
+        for iid in non_branded_ids:
+            iss = [s for s in intents[iid] if s["engine"] == engine_name]
+            if not iss:
+                continue
+            eng_intent_rates.append(_rate_stats(iss)["mention_rate"])
+            eng_samples.extend(iss)
+        ep = _rate_stats(eng_samples)
         per_engine[engine_name] = {
-            "mention_rate": mention_count / total,
-            "avg_mention_level": avg_level,
-            "citation_rate": citation_rate,
+            "mention_rate": _mean(eng_intent_rates),
+            "avg_mention_level": ep["avg_mention_level"],
+            "citation_rate": ep["citation_rate"],
         }
-
-    all_results = [r for r in results if r["engine"] in engines]
-    scored_results = [r for r in all_results if r.get("bucket") != "branded"] or all_results
-    aggregate = score_group(scored_results)
-    all_scores = score_group(all_results)
-    bucket_scores = {
-        bucket: score_group([r for r in all_results if (r.get("bucket") or "consideration") == bucket])
-        for bucket in ("awareness", "consideration", "branded")
-    }
 
     competitor_scores = {}
     for comp in (competitors or []):
-        comp_mentions = sum(
-            1 for r in scored_results if comp in r.get("competitor_mentions", [])
-        )
+        c = sum(1 for s in non_branded_samples if comp in s.get("competitor_mentions", []))
         competitor_scores[comp] = {
-            "mention_rate": comp_mentions / len(scored_results) if scored_results else 0,
+            "mention_rate": c / len(non_branded_samples) if non_branded_samples else 0.0,
         }
 
     return {
         "per_engine": per_engine,
-        "aggregate_mention_rate": aggregate["mention_rate"],
-        "aggregate_avg_mention_level": aggregate["avg_mention_level"],
-        "aggregate_citation_rate": aggregate["citation_rate"],
-        "non_branded_mention_rate": aggregate["mention_rate"],
-        "all_prompt_mention_rate": all_scores["mention_rate"],
+        "aggregate_mention_rate": aggregate_mention_rate,
+        "non_branded_mention_rate": aggregate_mention_rate,
+        "aggregate_avg_mention_level": pooled["avg_mention_level"],
+        "aggregate_citation_rate": pooled["citation_rate"],
         "bucket_scores": bucket_scores,
         "competitor_scores": competitor_scores,
     }
