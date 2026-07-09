@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from src.upload import _compute_prompt_scores
-from src.tracker import compute_scores, run_tracker
+from src.tracker import compute_competitive_gaps, compute_scores, run_tracker
 
 
 def _fake_engines():
@@ -116,3 +116,23 @@ def test_prompt_scores_keyed_by_intent():
     assert row["llm"] == "chatgpt"
     assert row["mention_rate"] == 0.5
     assert row["citation_rate"] == 1.0
+
+
+def test_competitive_gaps_grouped_by_intent():
+    results = [
+        {"query_id": "i1", "intent_prompt": "best daycare software", "query": "best daycare software",
+         "bucket": "consideration", "engine": "chatgpt", "brand_mentioned": True, "mention_level": 2,
+         "competitor_mentions": ["KinderCare"]},
+        {"query_id": "i1", "intent_prompt": "best daycare software", "query": "top childcare apps",
+         "bucket": "consideration", "engine": "chatgpt", "brand_mentioned": False, "mention_level": 0,
+         "competitor_mentions": ["KinderCare"]},
+    ]
+    gaps = compute_competitive_gaps(results, ["KinderCare"])
+    assert len(gaps) == 1
+    g = gaps[0]
+    assert g["query"] == "best daycare software"
+    assert g["query_id"] == "i1"
+    assert g["bucket"] == "consideration"
+    assert g["client_mention_rate"] == 0.5
+    assert g["competitor_data"][0]["name"] == "KinderCare"
+    assert g["competitor_data"][0]["mention_rate"] == 1.0

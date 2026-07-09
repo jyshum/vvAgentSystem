@@ -222,19 +222,22 @@ def compute_competitive_gaps(results: list[dict], competitors: list[str]) -> lis
     if not results:
         return []
 
-    queries = []
-    seen = set()
+    intents = []
+    groups = {}
     for r in results:
-        if r["query"] not in seen:
-            queries.append(r["query"])
-            seen.add(r["query"])
+        intent_prompt = r.get("intent_prompt") or r["query"]
+        intent_key = r.get("query_id") or intent_prompt
+        if intent_key not in groups:
+            intents.append((intent_key, intent_prompt))
+            groups[intent_key] = []
+        groups[intent_key].append(r)
 
     gaps = []
-    for query in queries:
-        query_results = [r for r in results if r["query"] == query]
-        total = len(query_results)
+    for intent_key, intent_prompt in intents:
+        intent_results = groups[intent_key]
+        total = len(intent_results)
 
-        client_mentions = [r for r in query_results if r["brand_mentioned"]]
+        client_mentions = [r for r in intent_results if r["brand_mentioned"]]
         client_mention_rate = len(client_mentions) / total if total > 0 else 0
         client_avg_level = (
             sum(r["mention_level"] for r in client_mentions) / len(client_mentions)
@@ -243,7 +246,7 @@ def compute_competitive_gaps(results: list[dict], competitors: list[str]) -> lis
 
         engines = []
         engine_seen = set()
-        for r in query_results:
+        for r in intent_results:
             if r["engine"] not in engine_seen:
                 engines.append(r["engine"])
                 engine_seen.add(r["engine"])
@@ -255,7 +258,7 @@ def compute_competitive_gaps(results: list[dict], competitors: list[str]) -> lis
             per_engine = {}
 
             for engine in engines:
-                engine_results = [r for r in query_results if r["engine"] == engine]
+                engine_results = [r for r in intent_results if r["engine"] == engine]
                 engine_total = len(engine_results)
                 engine_mentioned = sum(
                     1 for r in engine_results if comp in r.get("competitor_mentions", [])
@@ -271,9 +274,9 @@ def compute_competitive_gaps(results: list[dict], competitors: list[str]) -> lis
             })
 
         gaps.append({
-            "query": query,
-            "query_id": query_results[0].get("query_id"),
-            "bucket": query_results[0].get("bucket") or "consideration",
+            "query": intent_prompt,
+            "query_id": intent_results[0].get("query_id"),
+            "bucket": intent_results[0].get("bucket") or "consideration",
             "client_mention_rate": client_mention_rate,
             "client_avg_mention_level": client_avg_level,
             "competitor_data": competitor_data,
