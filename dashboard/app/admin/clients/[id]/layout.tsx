@@ -68,7 +68,6 @@ export default async function ClientLayout({
   }
 
   const rate = latest?.non_branded_mention_rate ?? latest?.aggregate_mention_rate ?? null;
-  const brandedRate = latest?.bucket_scores?.branded?.mention_rate ?? null;
   const comp = latest ? topCompetitor(latest.competitor_scores) : null;
   const rank = latest && rate != null ? rankAndGap(rate, latest.competitor_scores) : null;
   const delta =
@@ -183,9 +182,7 @@ export default async function ClientLayout({
                 {citationRate !== null ? (
                   <>
                     cited as source: {Math.round(citationRate * 100)}% of non-branded mentions{" "}
-                    <span style={{ color: "var(--faint)" }}>
-                      · branded coverage: {brandedRate === null ? "not measured" : formatRate(brandedRate)}
-                    </span>
+                    <span style={{ color: "var(--faint)" }}> · branded deferred</span>
                   </>
                 ) : (
                   "no mentions yet this cycle"

@@ -129,7 +129,6 @@ export default async function RunDetailPage({
       )
     : null;
   const primaryRate = trackerRun ? trackerRun.non_branded_mention_rate ?? trackerRun.aggregate_mention_rate : null;
-  const brandedRate = trackerRun?.bucket_scores?.branded?.mention_rate ?? null;
 
   // Crawlability
   const crawlReport = improvementRun?.crawlability_report as CrawlabilityReport | undefined;
@@ -217,11 +216,9 @@ export default async function RunDetailPage({
               losing &ldquo;{worstGap.query}&rdquo; by {formatRate(worstGap.gap)} to {worstGap.competitorName}
             </div>
           )}
-          {brandedRate !== null && (
-            <div className="font-mono text-[8px] tracking-[0.1em] mt-1.5" style={{ color: "var(--faint)" }}>
-              BRANDED {formatRate(brandedRate)}
-            </div>
-          )}
+          <div className="font-mono text-[8px] tracking-[0.1em] mt-1.5" style={{ color: "var(--faint)" }}>
+            BRANDED DEFERRED
+          </div>
         </div>
 
         {/* CRAWLABILITY */}

@@ -7,7 +7,7 @@ import type { Query } from "@/lib/types";
 const BUCKETS: { key: Query["bucket"]; label: string; detail: string }[] = [
   { key: "awareness", label: "Awareness", detail: "Problem and education prompts" },
   { key: "consideration", label: "Consideration", detail: "Tool, template, and resource prompts" },
-  { key: "branded", label: "Branded", detail: "Reviews and direct comparison prompts" },
+  { key: "branded", label: "Branded", detail: "Deferred - not measured in current runs" },
 ];
 
 export function QueryBucketManager({
@@ -136,7 +136,7 @@ export function QueryBucketManager({
             Query Buckets
           </div>
           <p className="font-serif text-[13px]" style={{ color: "var(--mute)" }}>
-            Branded prompts are tracked separately and excluded from the primary visibility score.
+            Awareness and consideration intents are measured. Branded monitoring is deferred.
           </p>
         </div>
         <div className="font-mono text-[9px] tracking-[0.12em]" style={{ color: "var(--faint)" }}>
@@ -193,6 +193,11 @@ export function QueryBucketManager({
                   <div className="font-serif text-[13px] leading-snug" style={{ color: "var(--white)" }}>
                     {query.prompt_text}
                   </div>
+                  {query.paraphrases?.length > 0 && (
+                    <div className="font-mono text-[8px] tracking-[0.08em] mt-1" style={{ color: "var(--faint)" }}>
+                      {query.paraphrases.length + 1} WORDINGS
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mt-2">
                     <select
                       value={query.bucket}

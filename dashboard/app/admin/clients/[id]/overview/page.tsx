@@ -59,7 +59,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ id: s
         <TimelineChart series={series} competitor={competitor} />
         {history.some((r) => r.query_set_changed) && (
           <div className="font-mono text-[8px] tracking-[0.1em] mt-2" style={{ color: "#d4a017" }}>
-            * QUERY SET CHANGED — TREND POINT IS NOT DIRECTLY COMPARABLE
+            * QUERY SET CHANGED - TREND POINT IS NOT DIRECTLY COMPARABLE
           </div>
         )}
       </div>

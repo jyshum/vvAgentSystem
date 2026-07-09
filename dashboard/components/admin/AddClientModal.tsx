@@ -171,10 +171,10 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
           />
 
           <TagInput
-            label={`Branded Prompts (${brandedPrompts.length})`}
+            label={`Branded Prompts - Deferred (${brandedPrompts.length})`}
             values={brandedPrompts}
             onChange={setBrandedPrompts}
-            placeholder="e.g. Budget Your MD review"
+            placeholder="not measured in current runs"
           />
 
           <TagInput
