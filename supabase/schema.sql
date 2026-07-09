@@ -308,7 +308,7 @@ create table public.action_cards (
 -- ─────────────────────────────────────────────
 create view public.tracker_results_client as
 select
-  id, run_id, query, engine, model,
+  id, run_id, query_id, query, bucket, engine, model,
   brand_mentioned, brand_cited, citation_url,
   competitor_mentions, queried_at,
   run_number, mention_level, mention_level_label

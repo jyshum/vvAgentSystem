@@ -50,9 +50,9 @@ export default async function BoardPage() {
       if (latest && previous) {
         const { data: scores } = await supabase
           .from("prompt_scores")
-            .select("run_id, query, bucket, llm, mention_rate, citation_rate")
+            .select("run_id, query_id, query, bucket, llm, mention_rate, citation_rate")
             .in("run_id", [latest.id, previous.id]);
-        const all = ((scores as (Pick<PromptScore, "run_id" | "query" | "bucket" | "llm" | "mention_rate" | "citation_rate">)[]) || []).filter((s) => s.bucket !== "branded");
+        const all = ((scores as (Pick<PromptScore, "run_id" | "query_id" | "query" | "bucket" | "llm" | "mention_rate" | "citation_rate">)[]) || []).filter((s) => s.bucket !== "branded");
         movers = biggestMovers(
           all.filter((s) => s.run_id === latest.id),
           all.filter((s) => s.run_id === previous.id)
