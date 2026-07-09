@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from src.upload import _compute_prompt_scores
 from src.tracker import compute_scores, run_tracker
 
 
@@ -97,3 +98,21 @@ def test_compute_scores_empty():
     s = compute_scores([], {"chatgpt": {}}, competitors=[])
     assert s["aggregate_mention_rate"] == 0
     assert s["bucket_scores"]["awareness"]["intent_count"] == 0
+
+
+def test_prompt_scores_keyed_by_intent():
+    results = [
+        {"query_id": "i1", "intent_prompt": "best daycare software", "query": "best daycare software",
+         "bucket": "awareness", "engine": "chatgpt", "brand_mentioned": True, "brand_cited": True, "mention_level": 3},
+        {"query_id": "i1", "intent_prompt": "best daycare software", "query": "top childcare apps",
+         "bucket": "awareness", "engine": "chatgpt", "brand_mentioned": False, "brand_cited": False, "mention_level": 0},
+    ]
+    rows = _compute_prompt_scores("client-1", "run-1", results)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["query_id"] == "i1"
+    assert row["query"] == "best daycare software"
+    assert row["bucket"] == "awareness"
+    assert row["llm"] == "chatgpt"
+    assert row["mention_rate"] == 0.5
+    assert row["citation_rate"] == 1.0

@@ -82,10 +82,12 @@ def upload_run(
 def _compute_prompt_scores(client_id: str, run_id: str, results: list[dict]) -> list[dict]:
     groups = defaultdict(list)
     for r in results:
-        groups[(r["query"], r["engine"])].append(r)
+        query_id = r.get("query_id")
+        intent_prompt = r.get("intent_prompt") or r["query"]
+        groups[(query_id or intent_prompt, intent_prompt, r["engine"])].append(r)
 
     scores = []
-    for (query, engine), runs in groups.items():
+    for (intent_key, intent_prompt, engine), runs in groups.items():
         total = len(runs)
         mentions = [r for r in runs if r.get("brand_mentioned")]
         mention_count = len(mentions)
@@ -103,8 +105,8 @@ def _compute_prompt_scores(client_id: str, run_id: str, results: list[dict]) -> 
         scores.append({
             "run_id": run_id,
             "client_id": client_id,
-            "query_id": runs[0].get("query_id"),
-            "query": query,
+            "query_id": runs[0].get("query_id") or intent_key,
+            "query": intent_prompt,
             "bucket": runs[0].get("bucket", "consideration"),
             "llm": engine,
             "mention_rate": mention_rate,
