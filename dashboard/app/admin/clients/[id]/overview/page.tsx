@@ -6,7 +6,7 @@ import type { Client, TrackerRun } from "@/lib/types";
 
 type RunRow = Pick<
   TrackerRun,
-  "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores" | "gsc_clicks" | "gsc_impressions" | "gsc_ctr"
+  "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores" | "gsc_clicks" | "gsc_impressions" | "gsc_ctr" | "query_set_changed"
 >;
 
 export default async function OverviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +15,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ id: s
   const [{ data: runs }, { data: client }] = await Promise.all([
     supabase
       .from("tracker_runs")
-      .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores, gsc_clicks, gsc_impressions, gsc_ctr")
+      .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores, gsc_clicks, gsc_impressions, gsc_ctr, query_set_changed")
       .eq("client_id", id)
       .order("ran_at", { ascending: true }),
     supabase.from("clients").select("gsc_site_url").eq("id", id).single(),
@@ -38,6 +38,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ id: s
   const series = history.map((r) => ({
     label: new Date(r.ran_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     value: r.non_branded_mention_rate ?? r.aggregate_mention_rate,
+    querySetChanged: r.query_set_changed === true,
   }));
 
   const competitor = comp
@@ -56,6 +57,11 @@ export default async function OverviewPage({ params }: { params: Promise<{ id: s
           VISIBILITY TIMELINE
         </div>
         <TimelineChart series={series} competitor={competitor} />
+        {history.some((r) => r.query_set_changed) && (
+          <div className="font-mono text-[8px] tracking-[0.1em] mt-2" style={{ color: "#d4a017" }}>
+            * QUERY SET CHANGED — TREND POINT IS NOT DIRECTLY COMPARABLE
+          </div>
+        )}
       </div>
 
       {siteUrl && (

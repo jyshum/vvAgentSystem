@@ -40,7 +40,7 @@ export default async function ClientLayout({
   const [{ data: runs }, { data: improvementRuns }] = await Promise.all([
     supabase
       .from("tracker_runs")
-      .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores")
+      .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores, query_set_changed")
       .eq("client_id", id)
       .order("ran_at", { ascending: false })
       .limit(2),
@@ -52,7 +52,7 @@ export default async function ClientLayout({
       .limit(1),
   ]);
 
-  const history = (runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores">[]) || [];
+  const history = (runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores" | "query_set_changed">[]) || [];
   const latest = history[0] ?? null;
   const previous = history[1] ?? null;
 
@@ -171,6 +171,11 @@ export default async function ClientLayout({
                   <span className="font-mono text-[11px] leading-[1.6]" style={{ color: "var(--mute)" }}>
                     VS {comp.name.toUpperCase()} {formatRate(comp.rate)}
                     <br />#{rank.rank} OF {rank.total}
+                  </span>
+                )}
+                {latest.query_set_changed && (
+                  <span className="font-mono text-[8px] tracking-[0.1em] uppercase px-2 py-1" style={{ color: "#d4a017", border: "1px solid #d4a017" }}>
+                    query set changed
                   </span>
                 )}
               </div>

@@ -44,7 +44,7 @@ export default async function RunDetailPage({
     pipeline.thread_id
       ? supabase
           .from("tracker_runs")
-          .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores")
+          .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores, query_set_changed")
           .eq("client_id", id)
           .eq("thread_id", pipeline.thread_id)
           .maybeSingle()
@@ -52,7 +52,7 @@ export default async function RunDetailPage({
   ]);
 
   const improvementRun = improvementRunData as ImprovementRun | null;
-  const trackerRun = trackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores"> | null;
+  const trackerRun = trackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores" | "query_set_changed"> | null;
 
   const [
     { data: previousTrackerRunData },
@@ -178,6 +178,11 @@ export default async function RunDetailPage({
             >
               {pipeline.status}
             </span>
+            {trackerRun?.query_set_changed && (
+              <span className="ml-2 font-mono text-[8px] tracking-[0.1em] uppercase px-2 py-1" style={{ color: "#d4a017", border: "1px solid #d4a017" }}>
+                query set changed
+              </span>
+            )}
           </div>
         </div>
       </div>

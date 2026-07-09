@@ -3,6 +3,7 @@ import { formatRate } from "@/lib/utils";
 interface TimelinePoint {
   label: string;
   value: number;
+  querySetChanged?: boolean;
 }
 
 interface TimelineChartProps {
@@ -96,7 +97,13 @@ export function TimelineChart({ series, competitor, height = 180 }: TimelineChar
         strokeWidth={1.5}
       />
       {clientCoords.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={2.5} fill="var(--white)" />
+        <circle
+          key={i}
+          cx={x}
+          cy={y}
+          r={series[i]?.querySetChanged ? 4 : 2.5}
+          fill={series[i]?.querySetChanged ? "#d4a017" : "var(--white)"}
+        />
       ))}
       {series.map((p, i) => (
         <text
@@ -121,7 +128,7 @@ export function TimelineChart({ series, competitor, height = 180 }: TimelineChar
           fill="var(--faint)"
           textAnchor="middle"
         >
-          {p.label}
+          {p.label}{p.querySetChanged ? "*" : ""}
         </text>
       ))}
     </svg>
