@@ -14,6 +14,14 @@ function generateSlug(text: string): string {
 const BUCKETS = new Set(["awareness", "consideration", "branded"]);
 const SET_TYPES = new Set(["core", "discovery"]);
 
+function validParaphrases(p: unknown): string[] {
+  if (p === undefined || p === null) return [];
+  if (!Array.isArray(p) || p.some((x) => typeof x !== "string" || !x.trim())) {
+    throw new Error("paraphrases must be an array of non-empty strings");
+  }
+  return (p as string[]).map((x) => x.trim());
+}
+
 async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
     data: { user },
@@ -59,6 +67,37 @@ export async function POST(
   if (!user) return Response.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
+
+  if (Array.isArray(body?.intents)) {
+    const admin = createAdminClient();
+    const rows = [];
+    for (const it of body.intents) {
+      if (!it?.prompt_text || typeof it.prompt_text !== "string" || !it.prompt_text.trim()) {
+        return Response.json({ error: "each intent needs prompt_text" }, { status: 400 });
+      }
+      if (it.bucket !== undefined && !BUCKETS.has(it.bucket)) {
+        return Response.json({ error: `invalid bucket: ${it.bucket}` }, { status: 400 });
+      }
+      let paraphrases: string[];
+      try {
+        paraphrases = validParaphrases(it.paraphrases);
+      } catch (e) {
+        return Response.json({ error: (e as Error).message }, { status: 400 });
+      }
+      rows.push({
+        client_id: clientId,
+        prompt_text: it.prompt_text.trim(),
+        slug: generateSlug(it.prompt_text),
+        bucket: it.bucket || "consideration",
+        set_type: "core",
+        paraphrases,
+      });
+    }
+    const { data, error } = await admin.from("queries").insert(rows).select();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json(data, { status: 201 });
+  }
+
   const { prompt_text, bucket, set_type } = body;
 
   if (!prompt_text || typeof prompt_text !== "string" || !prompt_text.trim()) {
@@ -72,6 +111,12 @@ export async function POST(
   }
 
   const slug = generateSlug(prompt_text);
+  let paraphrases: string[];
+  try {
+    paraphrases = validParaphrases(body.paraphrases);
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 400 });
+  }
 
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -82,6 +127,7 @@ export async function POST(
       slug,
       bucket: bucket || "consideration",
       set_type: set_type || "core",
+      paraphrases,
     })
     .select()
     .single();

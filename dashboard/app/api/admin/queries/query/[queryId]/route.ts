@@ -20,6 +20,14 @@ const BUCKETS = new Set(["awareness", "consideration", "branded"]);
 const SET_TYPES = new Set(["core", "discovery"]);
 const STATUSES = new Set(["active", "retired"]);
 
+function validParaphrases(p: unknown): string[] {
+  if (p === undefined || p === null) return [];
+  if (!Array.isArray(p) || p.some((x) => typeof x !== "string" || !x.trim())) {
+    throw new Error("paraphrases must be an array of non-empty strings");
+  }
+  return (p as string[]).map((x) => x.trim());
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ queryId: string }> }
@@ -45,6 +53,13 @@ export async function PATCH(
     updates.status = body.status;
     if (body.status === "retired") {
       updates.retired_at = new Date().toISOString();
+    }
+  }
+  if (body.paraphrases !== undefined) {
+    try {
+      updates.paraphrases = validParaphrases(body.paraphrases);
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 400 });
     }
   }
 

@@ -134,6 +134,7 @@ export interface Query {
   id: string;
   client_id: string;
   prompt_text: string;
+  paraphrases: string[];
   slug: string;
   bucket: "awareness" | "consideration" | "branded";
   set_type: "core" | "discovery";
