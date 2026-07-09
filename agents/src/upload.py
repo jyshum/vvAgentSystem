@@ -30,7 +30,9 @@ def upload_run(
             "client_id": client_id,
             "ran_at": datetime.now(timezone.utc).isoformat(),
             "aggregate_mention_rate": scores.get("aggregate_mention_rate", 0),
+            "non_branded_mention_rate": scores.get("non_branded_mention_rate", scores.get("aggregate_mention_rate", 0)),
             "aggregate_avg_mention_level": scores.get("aggregate_avg_mention_level", 0),
+            "bucket_scores": scores.get("bucket_scores", {}),
             "per_engine_scores": scores.get("per_engine", {}),
             "competitor_scores": scores.get("competitor_scores", {}),
         }
@@ -43,6 +45,8 @@ def upload_run(
             result_rows.append({
                 "run_id": run_id,
                 "query": r["query"],
+                "query_id": r.get("query_id"),
+                "bucket": r.get("bucket", "consideration"),
                 "engine": r["engine"],
                 "model": r.get("model", ""),
                 "brand_mentioned": r.get("brand_mentioned", False),
@@ -99,7 +103,9 @@ def _compute_prompt_scores(client_id: str, run_id: str, results: list[dict]) -> 
         scores.append({
             "run_id": run_id,
             "client_id": client_id,
+            "query_id": runs[0].get("query_id"),
             "query": query,
+            "bucket": runs[0].get("bucket", "consideration"),
             "llm": engine,
             "mention_rate": mention_rate,
             "avg_mention_level": avg_level,
@@ -115,7 +121,9 @@ def _build_competitive_gap_rows(client_id: str, run_id: str, gaps: list[dict]) -
         rows.append({
             "run_id": run_id,
             "client_id": client_id,
+            "query_id": gap.get("query_id"),
             "query": gap["query"],
+            "bucket": gap.get("bucket", "consideration"),
             "client_mention_rate": gap["client_mention_rate"],
             "client_avg_mention_level": gap["client_avg_mention_level"],
             "competitor_data": gap["competitor_data"],

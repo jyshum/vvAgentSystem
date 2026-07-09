@@ -42,7 +42,7 @@ export default async function AdminPage() {
 
   // Compute stats strip values
   const avgMention = allClients.length > 0
-    ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.aggregate_mention_rate ?? 0), 0) / allClients.length
+    ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.non_branded_mention_rate ?? latestRun?.aggregate_mention_rate ?? 0), 0) / allClients.length
     : 0;
   const avgLevel = allClients.length > 0
     ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.aggregate_avg_mention_level ?? 0), 0) / allClients.length

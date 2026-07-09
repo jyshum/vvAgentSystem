@@ -94,7 +94,9 @@ create table public.tracker_runs (
   client_id uuid not null references public.clients(id) on delete cascade,
   ran_at timestamptz default now(),
   aggregate_mention_rate float,
+  non_branded_mention_rate numeric,
   aggregate_avg_mention_level float default 0,
+  bucket_scores jsonb default '{}'::jsonb,
   per_engine_scores jsonb default '{}'::jsonb,
   competitor_scores jsonb default '{}'::jsonb,
   discovered_competitors jsonb default '[]'::jsonb,
@@ -109,7 +111,9 @@ create table public.tracker_runs (
 create table public.tracker_results (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references public.tracker_runs(id) on delete cascade,
+  query_id uuid,
   query text not null,
+  bucket text check (bucket in ('awareness', 'consideration', 'branded')),
   engine text not null,
   model text default '',
   brand_mentioned boolean default false,
@@ -156,7 +160,9 @@ create table public.prompt_scores (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references public.tracker_runs(id) on delete cascade,
   client_id uuid not null references public.clients(id) on delete cascade,
+  query_id uuid,
   query text not null,
+  bucket text check (bucket in ('awareness', 'consideration', 'branded')),
   llm text not null,
   mention_rate numeric default 0,
   avg_mention_level numeric default 0,
@@ -168,7 +174,9 @@ create table public.competitive_gaps (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references public.tracker_runs(id) on delete cascade,
   client_id uuid not null references public.clients(id) on delete cascade,
+  query_id uuid,
   query text not null,
+  bucket text check (bucket in ('awareness', 'consideration', 'branded')),
   client_mention_rate numeric default 0,
   client_avg_mention_level numeric default 0,
   competitor_data jsonb default '[]'::jsonb,
@@ -189,6 +197,18 @@ create table public.queries (
   created_at timestamptz default now(),
   unique (client_id, slug)
 );
+
+alter table public.tracker_results
+  add constraint tracker_results_query_id_fkey
+  foreign key (query_id) references public.queries(id) on delete set null;
+
+alter table public.prompt_scores
+  add constraint prompt_scores_query_id_fkey
+  foreign key (query_id) references public.queries(id) on delete set null;
+
+alter table public.competitive_gaps
+  add constraint competitive_gaps_query_id_fkey
+  foreign key (query_id) references public.queries(id) on delete set null;
 
 -- ─────────────────────────────────────────────
 -- 2. Improvement pipeline tables
@@ -315,14 +335,20 @@ create index idx_client_users_client_id on public.client_users(client_id);
 create index idx_tracker_runs_client_id on public.tracker_runs(client_id);
 create index idx_tracker_runs_thread_id on public.tracker_runs(thread_id);
 create index idx_tracker_results_run_id on public.tracker_results(run_id);
+create index idx_tracker_results_query_id on public.tracker_results(query_id);
+create index idx_tracker_results_bucket on public.tracker_results(bucket);
 create index idx_reports_client_id on public.reports(client_id);
 create index idx_reports_status on public.reports(status);
 create index idx_pipeline_runs_client on public.pipeline_runs(client_id);
 create index idx_pipeline_runs_status on public.pipeline_runs(status);
 create index idx_prompt_scores_run_id on public.prompt_scores(run_id);
 create index idx_prompt_scores_client_id on public.prompt_scores(client_id);
+create index idx_prompt_scores_query_id on public.prompt_scores(query_id);
+create index idx_prompt_scores_bucket on public.prompt_scores(bucket);
 create index idx_competitive_gaps_run_id on public.competitive_gaps(run_id);
 create index idx_competitive_gaps_client_id on public.competitive_gaps(client_id);
+create index idx_competitive_gaps_query_id on public.competitive_gaps(query_id);
+create index idx_competitive_gaps_bucket on public.competitive_gaps(bucket);
 create index idx_queries_client_id on public.queries(client_id);
 create index idx_queries_status on public.queries(status);
 create index idx_improvement_runs_client_id on public.improvement_runs(client_id);

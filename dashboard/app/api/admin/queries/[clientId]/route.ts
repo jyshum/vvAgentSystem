@@ -11,6 +11,9 @@ function generateSlug(text: string): string {
   );
 }
 
+const BUCKETS = new Set(["awareness", "consideration", "branded"]);
+const SET_TYPES = new Set(["core", "discovery"]);
+
 async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
     data: { user },
@@ -60,6 +63,12 @@ export async function POST(
 
   if (!prompt_text || typeof prompt_text !== "string" || !prompt_text.trim()) {
     return Response.json({ error: "prompt_text is required" }, { status: 400 });
+  }
+  if (bucket !== undefined && !BUCKETS.has(bucket)) {
+    return Response.json({ error: "Invalid bucket" }, { status: 400 });
+  }
+  if (set_type !== undefined && !SET_TYPES.has(set_type)) {
+    return Response.json({ error: "Invalid set_type" }, { status: 400 });
   }
 
   const slug = generateSlug(prompt_text);

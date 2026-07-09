@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { engineAverageByQuery } from "@/lib/derive";
 import { aggregatePromptScores, computePromptStability } from "@/lib/stability";
 import { HeatTable, type HeatRow, type HeatCell } from "@/components/admin/HeatTable";
+import type { Query } from "@/lib/types";
 
 export default async function QueriesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,7 +23,7 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
         .eq("client_id", id)
         .order("ran_at", { ascending: false })
         .limit(1),
-      admin.from("queries").select("id, prompt_text").eq("client_id", id),
+      admin.from("queries").select("id, prompt_text, bucket").eq("client_id", id),
     ]);
 
   const runs = [...(runsDesc ?? [])].reverse();
@@ -40,8 +41,10 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
   const latestImprovementRunId = latestImprovementRuns?.[0]?.id ?? null;
 
   const queryIdByPromptText = new Map<string, string>();
+  const bucketByPromptText = new Map<string, Query["bucket"]>();
   for (const q of queryRows ?? []) {
     queryIdByPromptText.set(q.prompt_text, q.id);
+    bucketByPromptText.set(q.prompt_text, q.bucket as Query["bucket"]);
   }
   const queryIds = [...queryIdByPromptText.values()];
 
@@ -50,7 +53,7 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
     await Promise.all([
       admin
         .from("prompt_scores")
-        .select("run_id, query, llm, mention_rate, citation_rate, avg_mention_level")
+        .select("run_id, query, bucket, llm, mention_rate, citation_rate, avg_mention_level")
         .in("run_id", runIds),
       admin
         .from("competitive_gaps")
@@ -151,6 +154,7 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
 
     return {
       query,
+      bucket: bucketByPromptText.get(query) ?? (scores.find((s) => s.query === query)?.bucket as Query["bucket"] | undefined) ?? "consideration",
       cells: cellsByQuery.get(query) ?? [],
       stability: stabilityByQuery.get(query) ?? "absent",
       citedPct: citedAvg ? citedAvg.citation_rate : null,

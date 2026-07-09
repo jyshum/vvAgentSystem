@@ -10,7 +10,6 @@ export function ConfigForm({ client }: { client: Client }) {
   const [brandName, setBrandName] = useState(client.brand_name || "");
   const [domain, setDomain] = useState(client.website_domain || "");
   const [variations, setVariations] = useState<string[]>(client.brand_variations || []);
-  const [queries, setQueries] = useState<string[]>(client.target_queries || []);
   const [competitors, setCompetitors] = useState<string[]>(client.competitors || []);
   const [gscSiteUrl, setGscSiteUrl] = useState(client.gsc_site_url || "");
   const [cycleFrequency, setCycleFrequency] = useState(client.cycle_frequency || "weekly");
@@ -34,7 +33,6 @@ export function ConfigForm({ client }: { client: Client }) {
       brand_name: brandName,
       website_domain: domain,
       brand_variations: variations,
-      target_queries: queries,
       competitors: competitors,
       gsc_site_url: gscSiteUrl,
       cms_type: cmsType,
@@ -168,13 +166,6 @@ export function ConfigForm({ client }: { client: Client }) {
         values={variations}
         onChange={setVariations}
         placeholder="Add variation and press Enter"
-      />
-
-      <TagInput
-        label={`Target Queries (${queries.length})`}
-        values={queries}
-        onChange={setQueries}
-        placeholder="Add query and press Enter"
       />
 
       <TagInput

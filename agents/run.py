@@ -21,8 +21,16 @@ def fetch_config_from_supabase(client_id: str) -> dict:
     result = supabase.table("clients").select("*").eq("id", client_id).single().execute()
     row = result.data
 
-    queries_resp = supabase.table("queries").select("prompt_text").eq("client_id", client_id).eq("status", "active").execute()
-    target_queries = [q["prompt_text"] for q in queries_resp.data] if queries_resp.data else []
+    queries_resp = (
+        supabase.table("queries")
+        .select("id,prompt_text,bucket,set_type")
+        .eq("client_id", client_id)
+        .eq("status", "active")
+        .order("bucket")
+        .order("created_at")
+        .execute()
+    )
+    target_queries = queries_resp.data or []
 
     return {
         "client_name": row["brand_name"],
@@ -45,6 +53,8 @@ def write_results_to_supabase(client_id: str, scores: dict, results: list) -> st
         "client_id": client_id,
         "aggregate_mention_rate": scores.get("aggregate_mention_rate", 0),
         "aggregate_citation_rate": scores.get("aggregate_citation_rate", 0),
+        "non_branded_mention_rate": scores.get("non_branded_mention_rate", scores.get("aggregate_mention_rate", 0)),
+        "bucket_scores": scores.get("bucket_scores", {}),
         "per_engine_scores": scores.get("per_engine", {}),
         "competitor_scores": scores.get("competitor_scores", {}),
     }).execute()
@@ -54,6 +64,8 @@ def write_results_to_supabase(client_id: str, scores: dict, results: list) -> st
     result_rows = [{
         "run_id": run_id,
         "query": r["query"],
+        "query_id": r.get("query_id"),
+        "bucket": r.get("bucket", "consideration"),
         "engine": r["engine"],
         "model": r.get("model", ""),
         "brand_mentioned": r["brand_mentioned"],

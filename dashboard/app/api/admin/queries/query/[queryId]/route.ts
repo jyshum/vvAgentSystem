@@ -16,6 +16,10 @@ async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   return clientUser?.role === "admin" ? user : null;
 }
 
+const BUCKETS = new Set(["awareness", "consideration", "branded"]);
+const SET_TYPES = new Set(["core", "discovery"]);
+const STATUSES = new Set(["active", "retired"]);
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ queryId: string }> }
@@ -28,9 +32,16 @@ export async function PATCH(
   const body = await request.json();
   const updates: Record<string, unknown> = {};
 
-  if (body.bucket !== undefined) updates.bucket = body.bucket;
-  if (body.set_type !== undefined) updates.set_type = body.set_type;
+  if (body.bucket !== undefined) {
+    if (!BUCKETS.has(body.bucket)) return Response.json({ error: "Invalid bucket" }, { status: 400 });
+    updates.bucket = body.bucket;
+  }
+  if (body.set_type !== undefined) {
+    if (!SET_TYPES.has(body.set_type)) return Response.json({ error: "Invalid set_type" }, { status: 400 });
+    updates.set_type = body.set_type;
+  }
   if (body.status !== undefined) {
+    if (!STATUSES.has(body.status)) return Response.json({ error: "Invalid status" }, { status: 400 });
     updates.status = body.status;
     if (body.status === "retired") {
       updates.retired_at = new Date().toISOString();

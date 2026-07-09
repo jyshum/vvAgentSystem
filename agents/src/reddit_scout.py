@@ -69,7 +69,8 @@ def run_scout(config: dict) -> list[dict]:
 
     if not keywords:
         target_queries = config.get("target_queries", [])
-        keywords = list({word for q in target_queries for word in q.lower().split() if len(word) > 4})[:10]
+        query_texts = [q if isinstance(q, str) else q.get("prompt_text", "") for q in target_queries]
+        keywords = list({word for q in query_texts for word in q.lower().split() if len(word) > 4})[:10]
 
     queries = [
         brand_name,

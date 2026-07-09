@@ -11,6 +11,18 @@ from src.engines import load_engines
 RUNS_PER_PROMPT = 5
 
 
+def _query_text(query: str | dict) -> str:
+    return query if isinstance(query, str) else query["prompt_text"]
+
+
+def _query_id(query: str | dict) -> str | None:
+    return None if isinstance(query, str) else query.get("id")
+
+
+def _query_bucket(query: str | dict) -> str:
+    return "consideration" if isinstance(query, str) else query.get("bucket") or "consideration"
+
+
 def load_client_config(config_path: str) -> dict:
     return json.loads(Path(config_path).read_text())
 
@@ -22,6 +34,8 @@ async def _query_engine_once(engine_query_fn, query_text: str) -> str:
 
 async def _run_prompt_on_engine(
     query_text: str,
+    query_id: str | None,
+    bucket: str,
     engine_name: str,
     engine_info: dict,
     brand_variations: list[str],
@@ -54,6 +68,8 @@ async def _run_prompt_on_engine(
 
         results.append({
             "query": query_text,
+            "query_id": query_id,
+            "bucket": bucket,
             "engine": engine_name,
             "model": engine_info["model"],
             "response_text": response,
@@ -85,14 +101,17 @@ def run_tracker(config: dict) -> tuple[list[dict], dict]:
     total = len(queries) * len(engines)
     count = 0
 
-    for query_text in queries:
+    for query in queries:
+        query_text = _query_text(query)
+        query_id = _query_id(query)
+        bucket = _query_bucket(query)
         for engine_name, engine_info in engines.items():
             count += 1
             print(f"  [{count}/{total}] {engine_name}: {query_text[:50]}... ({runs_per_prompt} runs)")
 
             try:
                 batch = asyncio.run(_run_prompt_on_engine(
-                    query_text, engine_name, engine_info,
+                    query_text, query_id, bucket, engine_name, engine_info,
                     brand_variations, website_domain, competitors, runs_per_prompt,
                 ))
                 results.extend(batch)
@@ -109,6 +128,28 @@ def run_tracker(config: dict) -> tuple[list[dict], dict]:
 
 
 def compute_scores(results: list[dict], engines: dict, competitors: list[str] | None = None) -> dict:
+    def score_group(group_results: list[dict]) -> dict:
+        total = len(group_results)
+        if total == 0:
+            return {
+                "mention_rate": 0,
+                "avg_mention_level": 0,
+                "citation_rate": 0,
+                "count": 0,
+            }
+        mentions = [r for r in group_results if r["brand_mentioned"]]
+        mention_count = len(mentions)
+        citations = sum(1 for r in mentions if r["brand_cited"])
+        return {
+            "mention_rate": mention_count / total,
+            "avg_mention_level": (
+                sum(r["mention_level"] for r in mentions) / mention_count
+                if mention_count > 0 else 0
+            ),
+            "citation_rate": citations / mention_count if mention_count > 0 else 0,
+            "count": total,
+        }
+
     per_engine = {}
     for engine_name in engines:
         engine_results = [r for r in results if r["engine"] == engine_name]
@@ -132,28 +173,31 @@ def compute_scores(results: list[dict], engines: dict, competitors: list[str] | 
         }
 
     all_results = [r for r in results if r["engine"] in engines]
-    total_all = len(all_results) if all_results else 1
-    all_mentions = [r for r in all_results if r["brand_mentioned"]]
-    total_mentions = len(all_mentions)
-
-    aggregate_avg_level = (
-        sum(r["mention_level"] for r in all_mentions) / total_mentions
-        if total_mentions > 0 else 0
-    )
+    scored_results = [r for r in all_results if r.get("bucket") != "branded"] or all_results
+    aggregate = score_group(scored_results)
+    all_scores = score_group(all_results)
+    bucket_scores = {
+        bucket: score_group([r for r in all_results if (r.get("bucket") or "consideration") == bucket])
+        for bucket in ("awareness", "consideration", "branded")
+    }
 
     competitor_scores = {}
     for comp in (competitors or []):
         comp_mentions = sum(
-            1 for r in all_results if comp in r.get("competitor_mentions", [])
+            1 for r in scored_results if comp in r.get("competitor_mentions", [])
         )
         competitor_scores[comp] = {
-            "mention_rate": comp_mentions / total_all,
+            "mention_rate": comp_mentions / len(scored_results) if scored_results else 0,
         }
 
     return {
         "per_engine": per_engine,
-        "aggregate_mention_rate": total_mentions / total_all,
-        "aggregate_avg_mention_level": aggregate_avg_level,
+        "aggregate_mention_rate": aggregate["mention_rate"],
+        "aggregate_avg_mention_level": aggregate["avg_mention_level"],
+        "aggregate_citation_rate": aggregate["citation_rate"],
+        "non_branded_mention_rate": aggregate["mention_rate"],
+        "all_prompt_mention_rate": all_scores["mention_rate"],
+        "bucket_scores": bucket_scores,
         "competitor_scores": competitor_scores,
     }
 
@@ -212,6 +256,8 @@ def compute_competitive_gaps(results: list[dict], competitors: list[str]) -> lis
 
         gaps.append({
             "query": query,
+            "query_id": query_results[0].get("query_id"),
+            "bucket": query_results[0].get("bucket") or "consideration",
             "client_mention_rate": client_mention_rate,
             "client_avg_mention_level": client_avg_level,
             "competitor_data": competitor_data,

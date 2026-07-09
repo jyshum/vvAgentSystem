@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { formatRate } from "@/lib/utils";
 import { QueryExpansion } from "@/components/admin/QueryExpansion";
+import type { Query } from "@/lib/types";
 
 export interface HeatCell {
   runId: string;
@@ -13,6 +14,7 @@ export interface HeatCell {
 
 export interface HeatRow {
   query: string;
+  bucket?: Query["bucket"];
   cells: HeatCell[];
   stability: string;
   citedPct: number | null;
@@ -60,6 +62,11 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
     ) ?? [];
 
   const gridTemplate = `2fr repeat(${cycleCount}, 44px) 0.8fr 0.6fr 1.2fr 1fr 0.8fr`;
+  const groupedRows = [
+    { bucket: "awareness", label: "Awareness", rows: rows.filter((r) => r.bucket === "awareness") },
+    { bucket: "consideration", label: "Consideration", rows: rows.filter((r) => (r.bucket ?? "consideration") === "consideration") },
+    { bucket: "branded", label: "Branded", rows: rows.filter((r) => r.bucket === "branded") },
+  ] as const;
 
   return (
     <div>
@@ -96,102 +103,113 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
         </div>
       </div>
 
-      {rows.map((row) => {
-        const isExpanded = expanded === row.query;
-        return (
-          <div key={row.query}>
-            <div
-              onClick={() => setExpanded(isExpanded ? null : row.query)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  if (e.key === " ") e.preventDefault();
-                  setExpanded(isExpanded ? null : row.query);
-                }
-              }}
-              className="grid items-center px-4 py-3 border-b cursor-pointer transition-colors"
-              style={{
-                gridTemplateColumns: gridTemplate,
-                gap: 12,
-                borderColor: "var(--hair)",
-                background: isExpanded ? "rgba(245,244,241,0.03)" : "transparent",
-              }}
-            >
-              <div className="font-serif text-[14px]" style={{ color: "var(--white)" }}>
-                {row.query}
-              </div>
-
-              {row.cells.map((cell, i) => (
+      {groupedRows.map((group) => (
+        <div key={group.bucket}>
+          <div
+            className="px-4 py-3 font-mono text-[9px] tracking-[0.18em] uppercase"
+            style={{ color: group.bucket === "branded" ? "#d4a017" : "var(--faint)", borderBottom: "1px solid var(--hair)" }}
+          >
+            {group.label} · {group.rows.length}
+            {group.bucket === "branded" ? " · tracked separately from primary score" : ""}
+          </div>
+          {group.rows.map((row) => {
+            const isExpanded = expanded === row.query;
+            return (
+              <div key={row.query}>
                 <div
-                  key={i}
-                  className="font-mono text-[10px] text-center py-1"
+                  onClick={() => setExpanded(isExpanded ? null : row.query)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      if (e.key === " ") e.preventDefault();
+                      setExpanded(isExpanded ? null : row.query);
+                    }
+                  }}
+                  className="grid items-center px-4 py-3 border-b cursor-pointer transition-colors"
                   style={{
-                    background: heatBg(cell.rate),
-                    color: cell.rate === null ? "var(--faint)" : "var(--white)",
+                    gridTemplateColumns: gridTemplate,
+                    gap: 12,
+                    borderColor: "var(--hair)",
+                    background: isExpanded ? "rgba(245,244,241,0.03)" : "transparent",
                   }}
                 >
-                  {cell.rate === null ? "—" : formatRate(cell.rate)}
-                </div>
-              ))}
+                  <div className="font-serif text-[14px]" style={{ color: "var(--white)" }}>
+                    {row.query}
+                  </div>
 
-              <div
-                className="font-mono text-[9px] lowercase"
-                style={{ color: STABILITY_COLOR[row.stability] ?? "var(--faint)" }}
-              >
-                {row.stability}
-              </div>
+                  {row.cells.map((cell, i) => (
+                    <div
+                      key={i}
+                      className="font-mono text-[10px] text-center py-1"
+                      style={{
+                        background: heatBg(cell.rate),
+                        color: cell.rate === null ? "var(--faint)" : "var(--white)",
+                      }}
+                    >
+                      {cell.rate === null ? "—" : formatRate(cell.rate)}
+                    </div>
+                  ))}
 
-              <div className="font-mono text-[10px]" style={{ color: "var(--mute)" }}>
-                {row.citedPct === null ? "—" : formatRate(row.citedPct)}
-              </div>
+                  <div
+                    className="font-mono text-[9px] lowercase"
+                    style={{ color: STABILITY_COLOR[row.stability] ?? "var(--faint)" }}
+                  >
+                    {row.stability}
+                  </div>
 
-              <div className="font-mono text-[9px]" style={{ color: "var(--mute)" }}>
-                {row.page ? (
-                  <>
-                    {pagePathname(row.page.url)} {row.page.similarity.toFixed(2)}
-                    {row.page.weak && (
-                      <span
-                        className="font-mono text-[8px] tracking-[0.08em] ml-1.5 px-1"
+                  <div className="font-mono text-[10px]" style={{ color: "var(--mute)" }}>
+                    {row.citedPct === null ? "—" : formatRate(row.citedPct)}
+                  </div>
+
+                  <div className="font-mono text-[9px]" style={{ color: "var(--mute)" }}>
+                    {row.page ? (
+                      <>
+                        {pagePathname(row.page.url)} {row.page.similarity.toFixed(2)}
+                        {row.page.weak && (
+                          <span
+                            className="font-mono text-[8px] tracking-[0.08em] ml-1.5 px-1"
+                            style={{ color: "#d4a017", border: "1px solid #d4a017" }}
+                          >
+                            WEAK
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+
+                  <div className="font-serif text-[12px]" style={{ color: "var(--mute)" }}>
+                    {row.topCompetitor
+                      ? `${row.topCompetitor.name} ${formatRate(row.topCompetitor.rate)}`
+                      : "—"}
+                  </div>
+
+                  <div>
+                    {row.waiting > 0 ? (
+                      <Link
+                        href="/admin/approvals"
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-mono text-[8px] tracking-[0.08em] px-1.5 py-0.5"
                         style={{ color: "#d4a017", border: "1px solid #d4a017" }}
                       >
-                        WEAK
+                        {row.waiting} WAITING
+                      </Link>
+                    ) : (
+                      <span className="font-mono text-[9px]" style={{ color: "var(--faint)" }}>
+                        —
                       </span>
                     )}
-                  </>
-                ) : (
-                  "—"
-                )}
-              </div>
+                  </div>
+                </div>
 
-              <div className="font-serif text-[12px]" style={{ color: "var(--mute)" }}>
-                {row.topCompetitor
-                  ? `${row.topCompetitor.name} ${formatRate(row.topCompetitor.rate)}`
-                  : "—"}
+                {isExpanded && <QueryExpansion clientId={clientId} query={row.query} />}
               </div>
-
-              <div>
-                {row.waiting > 0 ? (
-                  <Link
-                    href="/admin/approvals"
-                    onClick={(e) => e.stopPropagation()}
-                    className="font-mono text-[8px] tracking-[0.08em] px-1.5 py-0.5"
-                    style={{ color: "#d4a017", border: "1px solid #d4a017" }}
-                  >
-                    {row.waiting} WAITING
-                  </Link>
-                ) : (
-                  <span className="font-mono text-[9px]" style={{ color: "var(--faint)" }}>
-                    —
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {isExpanded && <QueryExpansion clientId={clientId} query={row.query} />}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

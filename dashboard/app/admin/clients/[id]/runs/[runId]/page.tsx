@@ -44,7 +44,7 @@ export default async function RunDetailPage({
     pipeline.thread_id
       ? supabase
           .from("tracker_runs")
-          .select("id, ran_at, aggregate_mention_rate, competitor_scores")
+          .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores")
           .eq("client_id", id)
           .eq("thread_id", pipeline.thread_id)
           .maybeSingle()
@@ -52,7 +52,7 @@ export default async function RunDetailPage({
   ]);
 
   const improvementRun = improvementRunData as ImprovementRun | null;
-  const trackerRun = trackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "competitor_scores"> | null;
+  const trackerRun = trackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores"> | null;
 
   const [
     { data: previousTrackerRunData },
@@ -65,7 +65,7 @@ export default async function RunDetailPage({
     trackerRun
       ? supabase
           .from("tracker_runs")
-          .select("id, ran_at, aggregate_mention_rate")
+          .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate")
           .eq("client_id", id)
           .lt("ran_at", trackerRun.ran_at)
           .order("ran_at", { ascending: false })
@@ -82,7 +82,7 @@ export default async function RunDetailPage({
       ? supabase.from("action_cards").select("id, auto_approved, status, action_type").eq("run_id", improvementRun.id)
       : Promise.resolve({ data: null }),
     trackerRun
-      ? supabase.from("competitive_gaps").select("query, client_mention_rate, competitor_data").eq("run_id", trackerRun.id)
+      ? supabase.from("competitive_gaps").select("query, bucket, client_mention_rate, competitor_data").eq("run_id", trackerRun.id)
       : Promise.resolve({ data: null }),
     (async () => {
       if (!pipeline.completed_at) return { nextTrackerRun: null, nextScheduledRun: null };
@@ -104,16 +104,16 @@ export default async function RunDetailPage({
     })(),
   ]);
 
-  const previousTrackerRun = previousTrackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate"> | null;
+  const previousTrackerRun = previousTrackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate"> | null;
   const citationScores = (citationScoresData as Pick<PageCitationScore, "structural_score">[]) || [];
   const queryMatches = (queryMatchesData as Pick<QueryPageMatch, "id" | "match_type">[]) || [];
   const actionCards = (actionCardsData as Pick<ActionCard, "id" | "auto_approved" | "status" | "action_type">[]) || [];
-  const competitiveGaps = (competitiveGapsData as Pick<CompetitiveGap, "query" | "client_mention_rate" | "competitor_data">[]) || [];
+  const competitiveGaps = (competitiveGapsData as Pick<CompetitiveGap, "query" | "bucket" | "client_mention_rate" | "competitor_data">[]) || [];
   const { nextTrackerRun, nextScheduledRun } = nextTrackerAndSchedules as { nextTrackerRun: { id: string; ran_at: string } | null; nextScheduledRun: string | null };
 
   // Worst competitive gap
   let worstGap: { query: string; gap: number; competitorName: string } | null = null;
-  for (const g of competitiveGaps) {
+  for (const g of competitiveGaps.filter((gap) => gap.bucket !== "branded")) {
     if (!g.competitor_data || g.competitor_data.length === 0) continue;
     const top = g.competitor_data.reduce((a, b) => (b.mention_rate > a.mention_rate ? b : a));
     const gap = top.mention_rate - (g.client_mention_rate ?? 0);
@@ -123,8 +123,13 @@ export default async function RunDetailPage({
   }
 
   const delta = trackerRun
-    ? formatDelta(trackerRun.aggregate_mention_rate, previousTrackerRun?.aggregate_mention_rate ?? null)
+    ? formatDelta(
+        trackerRun.non_branded_mention_rate ?? trackerRun.aggregate_mention_rate,
+        previousTrackerRun ? previousTrackerRun.non_branded_mention_rate ?? previousTrackerRun.aggregate_mention_rate : null
+      )
     : null;
+  const primaryRate = trackerRun ? trackerRun.non_branded_mention_rate ?? trackerRun.aggregate_mention_rate : null;
+  const brandedRate = trackerRun?.bucket_scores?.branded?.mention_rate ?? null;
 
   // Crawlability
   const crawlReport = improvementRun?.crawlability_report as CrawlabilityReport | undefined;
@@ -191,7 +196,7 @@ export default async function RunDetailPage({
           </div>
           <div className="flex items-baseline gap-2">
             <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
-              {trackerRun ? formatRate(trackerRun.aggregate_mention_rate) : "—"}
+              {primaryRate != null ? formatRate(primaryRate) : "—"}
             </div>
             {delta && (
               <span
@@ -205,6 +210,11 @@ export default async function RunDetailPage({
           {worstGap && (
             <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--neg)" }}>
               losing &ldquo;{worstGap.query}&rdquo; by {formatRate(worstGap.gap)} to {worstGap.competitorName}
+            </div>
+          )}
+          {brandedRate !== null && (
+            <div className="font-mono text-[8px] tracking-[0.1em] mt-1.5" style={{ color: "var(--faint)" }}>
+              BRANDED {formatRate(brandedRate)}
             </div>
           )}
         </div>

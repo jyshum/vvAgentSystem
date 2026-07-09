@@ -17,8 +17,10 @@ function checkStale(ranAt: string): boolean {
 
 export function ClientRow({ client, latestRun, previousRun }: ClientRowProps) {
   const router = useRouter();
+  const latestRate = latestRun?.non_branded_mention_rate ?? latestRun?.aggregate_mention_rate ?? null;
+  const previousRate = previousRun?.non_branded_mention_rate ?? previousRun?.aggregate_mention_rate ?? null;
   const mentionDelta = latestRun && previousRun
-    ? formatDelta(latestRun.aggregate_mention_rate, previousRun.aggregate_mention_rate)
+    ? formatDelta(latestRate ?? 0, previousRate)
     : null;
 
   const isStale = latestRun ? checkStale(latestRun.ran_at) : true;
@@ -50,8 +52,8 @@ export function ClientRow({ client, latestRun, previousRun }: ClientRowProps) {
         {latestRun ? (
           <>
             <div className="font-display text-[26px] font-light leading-none"
-              style={{ color: scoreColor(latestRun.aggregate_mention_rate) }}>
-              {formatRate(latestRun.aggregate_mention_rate)}
+              style={{ color: scoreColor(latestRate ?? 0) }}>
+              {latestRate == null ? "—" : formatRate(latestRate)}
             </div>
             {mentionDelta && (
               <div className="font-mono text-[8px] mt-1" style={{

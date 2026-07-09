@@ -20,7 +20,7 @@ export default async function BoardPage() {
         await Promise.all([
           supabase
             .from("tracker_runs")
-            .select("id, ran_at, aggregate_mention_rate, competitor_scores")
+            .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, competitor_scores")
             .eq("client_id", client.id)
             .order("ran_at", { ascending: false })
             .limit(6),
@@ -42,7 +42,7 @@ export default async function BoardPage() {
             .eq("status", "implemented"),
         ]);
 
-      const history = ((runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "competitor_scores">[]) || []);
+      const history = ((runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "competitor_scores">[]) || []);
       const latest = history[0] ?? null;
       const previous = history[1] ?? null;
 
@@ -50,9 +50,9 @@ export default async function BoardPage() {
       if (latest && previous) {
         const { data: scores } = await supabase
           .from("prompt_scores")
-          .select("run_id, query, llm, mention_rate, citation_rate")
-          .in("run_id", [latest.id, previous.id]);
-        const all = (scores as (Pick<PromptScore, "run_id" | "query" | "llm" | "mention_rate" | "citation_rate">)[]) || [];
+            .select("run_id, query, bucket, llm, mention_rate, citation_rate")
+            .in("run_id", [latest.id, previous.id]);
+        const all = ((scores as (Pick<PromptScore, "run_id" | "query" | "bucket" | "llm" | "mention_rate" | "citation_rate">)[]) || []).filter((s) => s.bucket !== "branded");
         movers = biggestMovers(
           all.filter((s) => s.run_id === latest.id),
           all.filter((s) => s.run_id === previous.id)
@@ -74,7 +74,7 @@ export default async function BoardPage() {
         measuring: measuringCount(implementedCards || [], latest?.ran_at ?? null),
       });
 
-      const rate = latest?.aggregate_mention_rate ?? null;
+      const rate = latest?.non_branded_mention_rate ?? latest?.aggregate_mention_rate ?? null;
       const comp = latest ? topCompetitor(latest.competitor_scores) : null;
       const rank = latest && rate != null ? rankAndGap(rate, latest.competitor_scores) : null;
 
@@ -84,12 +84,12 @@ export default async function BoardPage() {
         rate,
         delta:
           rate != null && previous && previous.aggregate_mention_rate != null
-            ? rate - previous.aggregate_mention_rate
+            ? rate - (previous.non_branded_mention_rate ?? previous.aggregate_mention_rate)
             : null,
         competitor: comp,
         rank,
         movers,
-        sparkline: [...history].reverse().map((r) => r.aggregate_mention_rate),
+        sparkline: [...history].reverse().map((r) => r.non_branded_mention_rate ?? r.aggregate_mention_rate),
         badge,
         pendingCount: pending.length,
         firstRunPending: !latest,

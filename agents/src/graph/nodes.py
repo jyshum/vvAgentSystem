@@ -8,8 +8,16 @@ def load_config(state: GEOState) -> dict:
     result = sb.table("clients").select("*").eq("id", state["client_id"]).single().execute()
     row = result.data
 
-    queries_resp = sb.table("queries").select("prompt_text").eq("client_id", state["client_id"]).eq("status", "active").execute()
-    target_queries = [q["prompt_text"] for q in queries_resp.data] if queries_resp.data else []
+    queries_resp = (
+        sb.table("queries")
+        .select("id,prompt_text,bucket,set_type")
+        .eq("client_id", state["client_id"])
+        .eq("status", "active")
+        .order("bucket")
+        .order("created_at")
+        .execute()
+    )
+    target_queries = queries_resp.data or []
 
     config = {
         "client_name": row["brand_name"],
@@ -42,7 +50,9 @@ def run_tracker_node(state: GEOState) -> dict:
         run_row = sb.table("tracker_runs").insert({
             "client_id": state["client_id"],
             "aggregate_mention_rate": scores.get("aggregate_mention_rate", 0),
+            "non_branded_mention_rate": scores.get("non_branded_mention_rate", scores.get("aggregate_mention_rate", 0)),
             "aggregate_avg_mention_level": scores.get("aggregate_avg_mention_level", 0),
+            "bucket_scores": scores.get("bucket_scores", {}),
             "per_engine_scores": scores.get("per_engine", {}),
             "competitor_scores": scores.get("competitor_scores", {}),
             "discovered_competitors": [],
@@ -54,6 +64,8 @@ def run_tracker_node(state: GEOState) -> dict:
         result_rows = [{
             "run_id": run_id,
             "query": r["query"],
+            "query_id": r.get("query_id"),
+            "bucket": r.get("bucket", "consideration"),
             "engine": r["engine"],
             "model": r.get("model", ""),
             "brand_mentioned": r["brand_mentioned"],

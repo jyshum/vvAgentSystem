@@ -151,7 +151,7 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
           />
 
           <TagInput
-            label="Target Queries"
+            label="Initial Consideration Prompts"
             values={queries}
             onChange={setQueries}
             placeholder="e.g. find daycare near me Ontario"

@@ -10,12 +10,15 @@ interface KPIGridProps {
 export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
   const engines = Object.entries(run.per_engine_scores);
   const prev = previousRuns.length > 0 ? previousRuns[previousRuns.length - 1] : null;
+  const primaryRate = run.non_branded_mention_rate ?? run.aggregate_mention_rate;
+  const previousPrimaryRate = prev ? prev.non_branded_mention_rate ?? prev.aggregate_mention_rate : null;
+  const brandedRate = run.bucket_scores?.branded?.mention_rate ?? null;
 
-  const mentionHistory = previousRuns.map((r) => r.aggregate_mention_rate);
+  const mentionHistory = previousRuns.map((r) => r.non_branded_mention_rate ?? r.aggregate_mention_rate);
   const levelHistory = previousRuns.map((r) => r.aggregate_avg_mention_level);
 
   const mentionDelta = prev
-    ? Math.round((run.aggregate_mention_rate - prev.aggregate_mention_rate) * 100)
+    ? Math.round((primaryRate - (previousPrimaryRate ?? 0)) * 100)
     : null;
   const levelDelta = prev
     ? +(run.aggregate_avg_mention_level - prev.aggregate_avg_mention_level).toFixed(1)
@@ -40,10 +43,10 @@ export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
       >
         <div className="p-5 flex flex-col" style={{ background: "var(--paper)", minHeight: "132px" }}>
           <div className="font-mono text-[11px] tracking-[0.12em] uppercase mb-3" style={{ color: "var(--p-mute)" }}>
-            Mention Rate
+            Non-Branded Mention Rate
           </div>
-          <div className="font-serif font-light text-[48px] leading-none mb-2" style={{ color: scoreColor(run.aggregate_mention_rate, true) }}>
-            {formatRate(run.aggregate_mention_rate)}
+          <div className="font-serif font-light text-[48px] leading-none mb-2" style={{ color: scoreColor(primaryRate, true) }}>
+            {formatRate(primaryRate)}
           </div>
           {mentionDelta !== null && (
             <div className="font-mono text-[10px] tracking-[0.04em]" style={{ color: "var(--p-mute)" }}>
@@ -53,9 +56,14 @@ export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
               <span>{Math.abs(mentionDelta)}pp vs last week</span>
             </div>
           )}
+          {brandedRate !== null && (
+            <div className="font-mono text-[9px] tracking-[0.06em]" style={{ color: "var(--p-faint)" }}>
+              Branded coverage {formatRate(brandedRate)}
+            </div>
+          )}
           <div className="mt-auto pt-3">
             <SparklineChart
-              values={[...mentionHistory, run.aggregate_mention_rate]}
+              values={[...mentionHistory, primaryRate]}
               direction={mentionDelta === null ? "none" : mentionDelta > 0 ? "up" : mentionDelta < 0 ? "down" : "flat"}
               paper
             />

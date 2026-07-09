@@ -40,7 +40,7 @@ export default async function ClientLayout({
   const [{ data: runs }, { data: improvementRuns }] = await Promise.all([
     supabase
       .from("tracker_runs")
-      .select("id, ran_at, aggregate_mention_rate, competitor_scores")
+      .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores")
       .eq("client_id", id)
       .order("ran_at", { ascending: false })
       .limit(2),
@@ -52,7 +52,7 @@ export default async function ClientLayout({
       .limit(1),
   ]);
 
-  const history = (runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "competitor_scores">[]) || [];
+  const history = (runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores">[]) || [];
   const latest = history[0] ?? null;
   const previous = history[1] ?? null;
 
@@ -60,19 +60,20 @@ export default async function ClientLayout({
   if (latest) {
     const { data: scores } = await supabase
       .from("prompt_scores")
-      .select("query, llm, mention_rate, citation_rate")
+      .select("query, bucket, llm, mention_rate, citation_rate")
       .eq("run_id", latest.id);
     citationRate = aggregateCitationRate(
-      (scores as Pick<PromptScore, "query" | "llm" | "mention_rate" | "citation_rate">[]) || []
+      ((scores as Pick<PromptScore, "query" | "bucket" | "llm" | "mention_rate" | "citation_rate">[]) || []).filter((s) => s.bucket !== "branded")
     );
   }
 
-  const rate = latest?.aggregate_mention_rate ?? null;
+  const rate = latest?.non_branded_mention_rate ?? latest?.aggregate_mention_rate ?? null;
+  const brandedRate = latest?.bucket_scores?.branded?.mention_rate ?? null;
   const comp = latest ? topCompetitor(latest.competitor_scores) : null;
   const rank = latest && rate != null ? rankAndGap(rate, latest.competitor_scores) : null;
   const delta =
-    rate != null && previous?.aggregate_mention_rate != null
-      ? formatDelta(rate, previous.aggregate_mention_rate)
+    rate != null && previous
+      ? formatDelta(rate, previous.non_branded_mention_rate ?? previous.aggregate_mention_rate)
       : null;
 
   const schedules = await fetchSchedules();
@@ -176,9 +177,9 @@ export default async function ClientLayout({
               <div className="font-serif text-[13px] mt-2.5" style={{ color: "var(--mute)" }}>
                 {citationRate !== null ? (
                   <>
-                    cited as source: {Math.round(citationRate * 100)}% of mentions{" "}
+                    cited as source: {Math.round(citationRate * 100)}% of non-branded mentions{" "}
                     <span style={{ color: "var(--faint)" }}>
-                      · mention = you appear in the answer · citation = the answer links your site
+                      · branded coverage: {brandedRate === null ? "not measured" : formatRate(brandedRate)}
                     </span>
                   </>
                 ) : (

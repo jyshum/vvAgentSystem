@@ -6,7 +6,7 @@ import type { Client, TrackerRun } from "@/lib/types";
 
 type RunRow = Pick<
   TrackerRun,
-  "id" | "ran_at" | "aggregate_mention_rate" | "competitor_scores" | "gsc_clicks" | "gsc_impressions" | "gsc_ctr"
+  "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores" | "gsc_clicks" | "gsc_impressions" | "gsc_ctr"
 >;
 
 export default async function OverviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +15,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ id: s
   const [{ data: runs }, { data: client }] = await Promise.all([
     supabase
       .from("tracker_runs")
-      .select("id, ran_at, aggregate_mention_rate, competitor_scores, gsc_clicks, gsc_impressions, gsc_ctr")
+      .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores, gsc_clicks, gsc_impressions, gsc_ctr")
       .eq("client_id", id)
       .order("ran_at", { ascending: true }),
     supabase.from("clients").select("gsc_site_url").eq("id", id).single(),
@@ -31,13 +31,13 @@ export default async function OverviewPage({ params }: { params: Promise<{ id: s
     );
   }
 
-  const history = allRuns.filter((r) => r.aggregate_mention_rate !== null);
+  const history = allRuns.filter((r) => (r.non_branded_mention_rate ?? r.aggregate_mention_rate) !== null);
   const latest = allRuns[allRuns.length - 1];
   const comp = topCompetitor(latest.competitor_scores);
 
   const series = history.map((r) => ({
     label: new Date(r.ran_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    value: r.aggregate_mention_rate,
+    value: r.non_branded_mention_rate ?? r.aggregate_mention_rate,
   }));
 
   const competitor = comp

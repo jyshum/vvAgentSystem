@@ -27,7 +27,14 @@ export interface TrackerRun {
   client_id: string;
   ran_at: string;
   aggregate_mention_rate: number;
+  non_branded_mention_rate: number | null;
   aggregate_avg_mention_level: number;
+  bucket_scores: Partial<Record<Query["bucket"], {
+    mention_rate: number;
+    avg_mention_level: number;
+    citation_rate: number;
+    count: number;
+  }>>;
   per_engine_scores: Record<
     string,
     { mention_rate: number; avg_mention_level: number; citation_rate: number }
@@ -44,7 +51,9 @@ export interface TrackerRun {
 export interface TrackerResult {
   id: string;
   run_id: string;
+  query_id: string | null;
   query: string;
+  bucket: Query["bucket"] | null;
   engine: string;
   model: string;
   brand_mentioned: boolean;
@@ -61,7 +70,9 @@ export interface TrackerResult {
 export interface TrackerResultClient {
   id: string;
   run_id: string;
+  query_id: string | null;
   query: string;
+  bucket: Query["bucket"] | null;
   engine: string;
   model: string;
   brand_mentioned: boolean;
@@ -79,7 +90,9 @@ export interface PromptScore {
   id: string;
   run_id: string;
   client_id: string;
+  query_id: string | null;
   query: string;
+  bucket: Query["bucket"] | null;
   llm: string;
   mention_rate: number;
   avg_mention_level: number;
@@ -91,7 +104,9 @@ export interface CompetitiveGap {
   id: string;
   run_id: string;
   client_id: string;
+  query_id: string | null;
   query: string;
+  bucket: Query["bucket"] | null;
   client_mention_rate: number;
   client_avg_mention_level: number;
   competitor_data: {
