@@ -26,6 +26,8 @@ export function QueryBucketManager({
   });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const grouped = useMemo(() => {
     return BUCKETS.map((bucket) => ({
@@ -53,6 +55,37 @@ export function QueryBucketManager({
     const created = (await res.json()) as Query;
     setQueries((current) => [...current, created]);
     setDrafts((current) => ({ ...current, [bucket]: "" }));
+    router.refresh();
+  }
+
+  async function bulkImport() {
+    setError(null);
+    let intents: unknown;
+    try {
+      intents = JSON.parse(bulkText);
+    } catch {
+      setError("Paste must be a valid JSON array of intents");
+      return;
+    }
+    if (!Array.isArray(intents)) {
+      setError("Expected a JSON array");
+      return;
+    }
+    setBulkBusy(true);
+    const res = await fetch(`/api/admin/queries/${clientId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intents }),
+    });
+    setBulkBusy(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error || "Bulk import failed");
+      return;
+    }
+    const created = (await res.json()) as Query[];
+    setQueries((current) => [...current, ...created]);
+    setBulkText("");
     router.refresh();
   }
 
@@ -116,6 +149,28 @@ export function QueryBucketManager({
           {error}
         </div>
       )}
+
+      <details className="mb-5">
+        <summary className="font-mono text-[9px] tracking-[0.14em] uppercase cursor-pointer" style={{ color: "var(--faint)" }}>
+          Bulk import intents (paste JSON)
+        </summary>
+        <textarea
+          value={bulkText}
+          onChange={(e) => setBulkText(e.target.value)}
+          placeholder='[{"prompt_text":"best daycare software","bucket":"awareness","paraphrases":["top childcare apps"]}]'
+          className="w-full min-h-[120px] mt-3 resize-y bg-transparent font-mono text-[11px] leading-snug outline-none placeholder:opacity-40"
+          style={{ color: "var(--white)", border: "1px solid var(--hair)", padding: "10px" }}
+        />
+        <button
+          type="button"
+          disabled={bulkBusy || !bulkText.trim()}
+          onClick={bulkImport}
+          className="mt-2 font-mono text-[9px] tracking-[0.14em] uppercase py-2.5 px-5 transition-opacity disabled:opacity-40"
+          style={{ background: "var(--white)", color: "var(--ink)" }}
+        >
+          {bulkBusy ? "Importing" : "Import Intents"}
+        </button>
+      </details>
 
       <div className="grid grid-cols-1 lg:grid-cols-3" style={{ gap: 1, background: "var(--hair)", border: "1px solid var(--hair)" }}>
         {grouped.map((bucket) => (
