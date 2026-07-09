@@ -30,7 +30,7 @@ export default async function ReportViewPage({
       ? supabase
           .from("tracker_results")
           .select(
-            "id, run_id, query, engine, model, brand_mentioned, brand_cited, citation_url, competitor_mentions, response_text, queried_at"
+            "id, run_id, query_id, query, bucket, engine, model, brand_mentioned, brand_cited, citation_url, competitor_mentions, response_text, queried_at, run_number, mention_level, mention_level_label"
           )
           .eq("run_id", typedReport.run_id)
       : Promise.resolve({ data: [] }),
