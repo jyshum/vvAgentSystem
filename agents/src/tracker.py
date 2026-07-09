@@ -9,6 +9,8 @@ from src.engines import load_engines
 
 
 RUNS_PER_PROMPT = 5
+RUNS_PER_PARAPHRASE = 1
+NON_BRANDED_BUCKETS = ("awareness", "consideration")
 
 
 def _query_text(query: str | dict) -> str:
@@ -23,6 +25,12 @@ def _query_bucket(query: str | dict) -> str:
     return "consideration" if isinstance(query, str) else query.get("bucket") or "consideration"
 
 
+def _query_paraphrases(query: str | dict) -> list[str]:
+    if isinstance(query, str):
+        return []
+    return query.get("paraphrases") or []
+
+
 def load_client_config(config_path: str) -> dict:
     return json.loads(Path(config_path).read_text())
 
@@ -35,6 +43,7 @@ async def _query_engine_once(engine_query_fn, query_text: str) -> str:
 async def _run_prompt_on_engine(
     query_text: str,
     query_id: str | None,
+    intent_prompt: str,
     bucket: str,
     engine_name: str,
     engine_info: dict,
@@ -68,6 +77,7 @@ async def _run_prompt_on_engine(
 
         results.append({
             "query": query_text,
+            "intent_prompt": intent_prompt,
             "query_id": query_id,
             "bucket": bucket,
             "engine": engine_name,
@@ -96,32 +106,29 @@ def run_tracker(config: dict) -> tuple[list[dict], dict]:
     brand_variations = config["brand_variations"]
     website_domain = config["website_domain"]
     competitors = config.get("competitors", [])
-    runs_per_prompt = config.get("runs_per_prompt", RUNS_PER_PROMPT)
-
-    total = len(queries) * len(engines)
-    count = 0
+    runs_per_paraphrase = config.get(
+        "runs_per_paraphrase",
+        config.get("runs_per_prompt", RUNS_PER_PARAPHRASE),
+    )
 
     for query in queries:
-        query_text = _query_text(query)
-        query_id = _query_id(query)
         bucket = _query_bucket(query)
+        if bucket == "branded":
+            continue
+        canonical = _query_text(query)
+        query_id = _query_id(query)
+        wordings = [canonical] + _query_paraphrases(query)
         for engine_name, engine_info in engines.items():
-            count += 1
-            print(f"  [{count}/{total}] {engine_name}: {query_text[:50]}... ({runs_per_prompt} runs)")
-
-            try:
-                batch = asyncio.run(_run_prompt_on_engine(
-                    query_text, query_id, bucket, engine_name, engine_info,
-                    brand_variations, website_domain, competitors, runs_per_prompt,
-                ))
-                results.extend(batch)
-
-                mentioned = sum(1 for r in batch if r["brand_mentioned"])
-                avg_lvl = sum(r["mention_level"] for r in batch if r["brand_mentioned"])
-                avg_lvl = avg_lvl / mentioned if mentioned else 0
-                print(f"         → {mentioned}/{len(batch)} mentioned, avg level {avg_lvl:.1f}")
-            except Exception as e:
-                print(f"         → ERROR: {e}")
+            for wording in wordings:
+                print(f"  [{engine_name}] intent={canonical[:40]!r} wording={wording[:40]!r}")
+                try:
+                    batch = asyncio.run(_run_prompt_on_engine(
+                        wording, query_id, canonical, bucket, engine_name, engine_info,
+                        brand_variations, website_domain, competitors, runs_per_paraphrase,
+                    ))
+                    results.extend(batch)
+                except Exception as e:
+                    print(f"         → ERROR: {e}")
 
     scores = compute_scores(results, engines, competitors)
     return results, scores
