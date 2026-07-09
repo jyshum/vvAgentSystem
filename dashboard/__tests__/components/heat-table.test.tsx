@@ -4,7 +4,10 @@ import { render, screen } from "@testing-library/react";
 import { HeatTable } from "@/components/admin/HeatTable";
 
 const row = {
+  queryId: "query-1",
   query: "best daycare software",
+  paraphrases: ["top childcare apps"],
+  version: 2,
   cells: [
     { runId: "r1", ranAt: "2026-06-23", rate: 0.2 },
     { runId: "r2", ranAt: "2026-06-30", rate: 0.6 },

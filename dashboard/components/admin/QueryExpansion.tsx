@@ -12,11 +12,13 @@ interface EngineDetail {
   citationUrl: string | null;
   sentence: { sentence: string; brand: string } | null;
   competitorsRecommended: string[];
+  wordings: string[];
 }
 
 interface QueryExpansionProps {
   clientId: string;
   query: string;
+  queryId?: string | null;
 }
 
 type LoadState =
@@ -42,12 +44,15 @@ function HighlightedSentence({ sentence, brand }: { sentence: string; brand: str
   );
 }
 
-export function QueryExpansion({ clientId, query }: QueryExpansionProps) {
+export function QueryExpansion({ clientId, query, queryId }: QueryExpansionProps) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/admin/query-detail/${clientId}?query=${encodeURIComponent(query)}`)
+    const params = new URLSearchParams();
+    if (queryId) params.set("query_id", queryId);
+    params.set("query", query);
+    fetch(`/api/admin/query-detail/${clientId}?${params.toString()}`)
       .then((res) => {
         if (!res.ok) throw new Error("failed");
         return res.json();
@@ -61,7 +66,7 @@ export function QueryExpansion({ clientId, query }: QueryExpansionProps) {
     return () => {
       cancelled = true;
     };
-  }, [clientId, query]);
+  }, [clientId, query, queryId]);
 
   if (state.status === "loading") {
     return (
@@ -93,6 +98,11 @@ export function QueryExpansion({ clientId, query }: QueryExpansionProps) {
           <div className="font-mono text-[9px] mb-1.5" style={{ color: "var(--mute)" }}>
             mentioned {eng.mentionedCount}/{eng.total} · cited {eng.citedCount}/{eng.total}
           </div>
+          {eng.wordings.length > 1 && (
+            <div className="font-mono text-[8px] mb-1.5" style={{ color: "var(--faint)" }}>
+              {eng.wordings.length} wordings sampled
+            </div>
+          )}
           {eng.sentence && (
             <div className="font-serif text-[13px] mb-1.5" style={{ color: "var(--white)" }}>
               <HighlightedSentence sentence={eng.sentence.sentence} brand={eng.sentence.brand} />

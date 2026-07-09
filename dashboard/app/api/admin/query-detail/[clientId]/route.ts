@@ -9,6 +9,7 @@ export async function GET(
   const { clientId } = await params;
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("query");
+  const queryId = searchParams.get("query_id");
 
   const supabase = await createClient();
   const {
@@ -26,7 +27,7 @@ export async function GET(
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (!query) {
+  if (!query && !queryId) {
     return Response.json({ error: "Missing query" }, { status: 400 });
   }
 
@@ -49,13 +50,16 @@ export async function GET(
 
   const runId = runs[0].id;
 
-  const { data: results, error: resultsError } = await admin
+  let resultsQuery = admin
     .from("tracker_results")
     .select(
-      "id, engine, brand_mentioned, brand_cited, citation_url, competitor_mentions, response_text, queried_at, run_number"
+      "id, query, engine, brand_mentioned, brand_cited, citation_url, competitor_mentions, response_text, queried_at, run_number"
     )
-    .eq("run_id", runId)
-    .eq("query", query);
+    .eq("run_id", runId);
+
+  resultsQuery = queryId ? resultsQuery.eq("query_id", queryId) : resultsQuery.eq("query", query);
+
+  const { data: results, error: resultsError } = await resultsQuery;
 
   if (resultsError) {
     return Response.json({ error: resultsError.message }, { status: 500 });
@@ -110,6 +114,7 @@ export async function GET(
       citationUrl,
       sentence,
       competitorsRecommended,
+      wordings: Array.from(new Set(engineRows.map((r) => r.query))),
     };
   });
 

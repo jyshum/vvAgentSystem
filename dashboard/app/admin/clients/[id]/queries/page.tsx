@@ -13,7 +13,7 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
     await Promise.all([
       admin
         .from("tracker_runs")
-        .select("id, ran_at")
+        .select("id, ran_at, query_set_changed")
         .eq("client_id", id)
         .order("ran_at", { ascending: false })
         .limit(6),
@@ -23,7 +23,7 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
         .eq("client_id", id)
         .order("ran_at", { ascending: false })
         .limit(1),
-      admin.from("queries").select("id, prompt_text, bucket").eq("client_id", id),
+      admin.from("queries").select("id, prompt_text, bucket, paraphrases, version").eq("client_id", id),
     ]);
 
   const runs = [...(runsDesc ?? [])].reverse();
@@ -40,11 +40,11 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
   const latestRun = runs[runs.length - 1];
   const latestImprovementRunId = latestImprovementRuns?.[0]?.id ?? null;
 
+  const queryMetaById = new Map<string, Pick<Query, "id" | "prompt_text" | "bucket" | "paraphrases" | "version">>();
   const queryIdByPromptText = new Map<string, string>();
-  const bucketByPromptText = new Map<string, Query["bucket"]>();
   for (const q of queryRows ?? []) {
     queryIdByPromptText.set(q.prompt_text, q.id);
-    bucketByPromptText.set(q.prompt_text, q.bucket as Query["bucket"]);
+    queryMetaById.set(q.id, q as Pick<Query, "id" | "prompt_text" | "bucket" | "paraphrases" | "version">);
   }
   const queryIds = [...queryIdByPromptText.values()];
 
@@ -53,16 +53,16 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
     await Promise.all([
       admin
         .from("prompt_scores")
-        .select("run_id, query, bucket, llm, mention_rate, citation_rate, avg_mention_level")
+        .select("run_id, query_id, query, bucket, llm, mention_rate, citation_rate, avg_mention_level")
         .in("run_id", runIds),
       admin
         .from("competitive_gaps")
-        .select("query, competitor_data")
+        .select("query_id, query, competitor_data")
         .eq("run_id", latestRun.id),
       latestImprovementRunId
         ? admin
             .from("query_page_matches")
-            .select("query_text, match_type, matched_page_url, similarity_score")
+            .select("query_id, query_text, match_type, matched_page_url, similarity_score")
             .eq("run_id", latestImprovementRunId)
         : Promise.resolve({ data: null }),
       queryIds.length > 0
@@ -98,16 +98,23 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
     engineAvgByRun.set(run.id, engineAverageByQuery(runScores));
   }
 
-  const allQueries = new Set<string>();
-  for (const s of scores) allQueries.add(s.query);
-  const queryList = [...allQueries].sort();
+  const allQueryKeys = new Set<string>();
+  const labelByKey = new Map<string, string>();
+  const bucketByKey = new Map<string, Query["bucket"]>();
+  for (const s of scores) {
+    const key = s.query_id || s.query;
+    allQueryKeys.add(key);
+    labelByKey.set(key, queryMetaById.get(s.query_id || "")?.prompt_text || s.query);
+    bucketByKey.set(key, (queryMetaById.get(s.query_id || "")?.bucket || s.bucket || "consideration") as Query["bucket"]);
+  }
+  const queryList = [...allQueryKeys].sort((a, b) => (labelByKey.get(a) || a).localeCompare(labelByKey.get(b) || b));
 
   // cells per query, oldest -> newest
   const cellsByQuery = new Map<string, HeatCell[]>();
   for (const query of queryList) {
     const cells: HeatCell[] = runs.map((run) => {
       const avg = engineAvgByRun.get(run.id)?.get(query);
-      return { runId: run.id, ranAt: run.ran_at, rate: avg ? avg.mention_rate : null };
+      return { runId: run.id, ranAt: run.ran_at, rate: avg ? avg.mention_rate : null, querySetChanged: run.query_set_changed === true };
     });
     cellsByQuery.set(query, cells);
   }
@@ -115,7 +122,7 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
   // stability classification
   const runsDataForStability = aggregatePromptScores(scores, runs);
   const stabilityResults = computePromptStability(runsDataForStability);
-  const stabilityByQuery = new Map(stabilityResults.map((r) => [r.query, r.stability_class]));
+  const stabilityByQuery = new Map(stabilityResults.map((r) => [r.query_id || r.query, r.stability_class]));
 
   // citedPct from latest run's engine-averaged citation_rate
   const latestEngineAvg = engineAvgByRun.get(latestRun.id) ?? new Map();
@@ -124,7 +131,7 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
   const pageByQuery = new Map<string, { url: string; similarity: number; weak: boolean }>();
   for (const m of matches ?? []) {
     if (!m.matched_page_url) continue;
-    pageByQuery.set(m.query_text, {
+    pageByQuery.set(m.query_id || m.query_text, {
       url: m.matched_page_url,
       similarity: m.similarity_score ?? 0,
       weak: m.match_type === "weak",
@@ -137,7 +144,7 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
     const list = (g.competitor_data ?? []) as { name: string; mention_rate: number }[];
     if (list.length === 0) continue;
     const top = list.reduce((a, b) => (b.mention_rate > a.mention_rate ? b : a));
-    topCompetitorByQuery.set(g.query, { name: top.name, rate: top.mention_rate });
+    topCompetitorByQuery.set(g.query_id || g.query, { name: top.name, rate: top.mention_rate });
   }
 
   // waiting: pending action_cards per query, via queries table's prompt_text -> id mapping
@@ -148,13 +155,17 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
   }
 
   const rows: HeatRow[] = queryList.map((query) => {
-    const queryId = queryIdByPromptText.get(query);
+    const queryId = queryMetaById.has(query) ? query : queryIdByPromptText.get(query) || null;
+    const meta = queryId ? queryMetaById.get(queryId) : undefined;
     const waiting = queryId ? waitingByQueryId.get(queryId) ?? 0 : 0;
     const citedAvg = latestEngineAvg.get(query);
 
     return {
-      query,
-      bucket: bucketByPromptText.get(query) ?? (scores.find((s) => s.query === query)?.bucket as Query["bucket"] | undefined) ?? "consideration",
+      queryId,
+      query: meta?.prompt_text || labelByKey.get(query) || query,
+      paraphrases: meta?.paraphrases || [],
+      version: meta?.version,
+      bucket: bucketByKey.get(query) ?? "consideration",
       cells: cellsByQuery.get(query) ?? [],
       stability: stabilityByQuery.get(query) ?? "absent",
       citedPct: citedAvg ? citedAvg.citation_rate : null,
