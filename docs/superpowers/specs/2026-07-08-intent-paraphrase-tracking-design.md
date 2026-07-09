@@ -35,10 +35,11 @@ Today the tracker fires **one prompt string 5× per engine**. Three problems, co
 2. Tracker: fire an intent's paraphrases; store per-wording results; aggregate at the intent level.
 3. Measurement correctness: non-branded everywhere (per-engine included), mention-level preserved, citation conditional on mention.
 4. Drift signal: per-run query-set signature + changed flag.
-5. Generation rules doc (a markdown deliverable, not code).
+5. Generation rules doc (a markdown deliverable, not code) — **delivered**: `docs/superpowers/references/intent-generation-rules.md`.
+6. Minimal intent/paraphrase entry path so clients can be onboarded on the intent model now (bulk-import endpoint + a single paste-textarea in the Config → Queries tab). This is the one deliberate frontend touch in Spec 1; the polished per-intent management UI stays in Spec 2.
 
 **Out of scope (explicit):**
-- All frontend/dashboard changes → Spec 2.
+- All frontend/dashboard changes except the single bulk-paste affordance above → Spec 2.
 - Automated intent/paraphrase generation; embedding-based diversity selection.
 - Comparison bucket and comparison-aware (off-page) card routing.
 - Branded tracking / branded reputation monitoring (a separate product).
@@ -67,9 +68,11 @@ alter table public.tracker_runs add column if not exists query_set_signature tex
 alter table public.tracker_runs add column if not exists query_set_changed boolean default false;
 ```
 
-### Admin API
+### Admin API + minimal entry path
 
-`POST/PATCH /api/admin/queries/[clientId]` accepts an optional `paraphrases: string[]` alongside `prompt_text`, `bucket`, `set_type`, and stores it. (This is the paste target for the manual generation chat's output. Validate it's an array of non-empty strings.)
+- Existing `POST/PATCH /api/admin/queries/[clientId]` accepts an optional `paraphrases: string[]` alongside `prompt_text`, `bucket`, `set_type`, and stores it. Validate it's an array of non-empty strings.
+- **Bulk import** for onboarding: accept a JSON array of `{ prompt_text, bucket, paraphrases }` (the exact shape the generation rules doc produces) and insert all intents in one call — either as a `mode=bulk` branch on the existing route or a sibling endpoint.
+- **Minimal UI:** a single paste-textarea in Config → Queries that takes that JSON array and calls the bulk import. This is the only frontend built in Spec 1; the polished per-intent editor is Spec 2. For onboarding four clients this is the practical bridge from the ChatGPT chat into the `queries` table.
 
 ### `schema.sql`
 
@@ -135,9 +138,9 @@ signature = sha256( join sorted over active intents of:  f"{slug}:{version}:{sha
 
 ---
 
-## Generation rules doc (deliverable)
+## Generation rules doc (deliverable — DONE)
 
-Write `docs/superpowers/references/intent-generation-rules.md`: a reusable prompt the team pastes into ChatGPT/Claude, together with the client's website and GSC top queries. It must instruct the model to output:
+Delivered at `docs/superpowers/references/intent-generation-rules.md`: a reusable prompt the team pastes into ChatGPT/Claude, together with the client's website and GSC top queries. It instructs the model to output:
 
 - A set of **awareness** and **consideration** intents, **grounded in the provided GSC queries** (real human searches), the client's category, and named competitors — not invented demand.
 - Each intent tagged with its bucket and given ~8 **diverse, natural-language paraphrases** (varied surface form, same intent).
