@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { TagInput } from "./TagInput";
-import { BUCKET_LABELS } from "@/lib/intent-labels";
+import { parseIntentJson, type IntentImportItem } from "@/lib/intent-import";
 
 export function AddClientModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
@@ -14,9 +14,7 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
   const [brandName, setBrandName] = useState("");
   const [domain, setDomain] = useState("");
   const [brandVariations, setBrandVariations] = useState<string[]>([]);
-  const [awarenessPrompts, setAwarenessPrompts] = useState<string[]>([]);
-  const [considerationPrompts, setConsiderationPrompts] = useState<string[]>([]);
-  const [brandedPrompts, setBrandedPrompts] = useState<string[]>([]);
+  const [intentJson, setIntentJson] = useState("");
   const [competitors, setCompetitors] = useState<string[]>([]);
 
   // Close on Escape
@@ -37,6 +35,16 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
     setSaving(true);
     setError("");
     try {
+      let intents: IntentImportItem[] = [];
+      if (intentJson.trim()) {
+        try {
+          intents = parseIntentJson(intentJson);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Intent JSON is invalid.");
+          return;
+        }
+      }
+
       const res = await fetch("/api/admin/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -45,11 +53,7 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
           brand_name: brandName.trim() || name.trim(),
           website_domain: domain.trim(),
           brand_variations: brandVariations,
-          query_buckets: {
-            awareness: awarenessPrompts,
-            consideration: considerationPrompts,
-            branded: brandedPrompts,
-          },
+          intents,
           competitors,
         }),
       });
@@ -157,26 +161,40 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
             placeholder="e.g. Child Spot, childspotapp"
           />
 
-          <TagInput
-            label={`${BUCKET_LABELS.awareness} Prompts (${awarenessPrompts.length})`}
-            values={awarenessPrompts}
-            onChange={setAwarenessPrompts}
-            placeholder="e.g. how to budget as a medical student"
-          />
-
-          <TagInput
-            label={`${BUCKET_LABELS.consideration} Prompts (${considerationPrompts.length})`}
-            values={considerationPrompts}
-            onChange={setConsiderationPrompts}
-            placeholder="e.g. best budgeting tools for medical students"
-          />
-
-          <TagInput
-            label={`${BUCKET_LABELS.branded} Prompts (${brandedPrompts.length})`}
-            values={brandedPrompts}
-            onChange={setBrandedPrompts}
-            placeholder="not measured in current runs"
-          />
+          <div className="mb-5">
+            <label className="block font-mono text-[9px] tracking-[0.14em] uppercase mb-1.5" style={{ color: "var(--faint)" }}>
+              Generated Intent Set JSON
+            </label>
+            <textarea
+              value={intentJson}
+              onChange={(e) => setIntentJson(e.target.value)}
+              placeholder={`[
+  {
+    "prompt_text": "best daycare management software",
+    "bucket": "consideration",
+    "paraphrases": ["top childcare management apps"]
+  },
+  {
+    "prompt_text": "how to improve daycare parent communication",
+    "bucket": "awareness",
+    "paraphrases": ["daycare parent communication tips"]
+  },
+  {
+    "prompt_text": "childspot reviews",
+    "bucket": "branded",
+    "paraphrases": []
+  }
+]`}
+              rows={12}
+              className="w-full font-mono text-[11px] leading-5 bg-transparent px-3 py-2.5 outline-none transition-colors resize-y"
+              style={{ border: "1px solid var(--hair)", color: "var(--white)", minHeight: 220 }}
+              onFocus={(e) => (e.target.style.borderColor = "var(--ghost)")}
+              onBlur={(e) => (e.target.style.borderColor = "var(--hair)")}
+            />
+            <p className="font-mono text-[9px] leading-4 mt-2" style={{ color: "var(--faint)" }}>
+              Optional import. Use internal buckets: consideration for Product Visibility, awareness for Content Authority, branded for Branded - Deferred.
+            </p>
+          </div>
 
           <TagInput
             label="Competitors"
