@@ -60,6 +60,11 @@ describe("parseIntentJson", () => {
     ).toThrow("paraphrases");
   });
 
+  it("rejects an empty imported intent set", () => {
+    expect(() => parseIntentJson("[]")).toThrow("at least one intent");
+    expect(() => buildIntentImportRows("client-1", [])).toThrow("at least one intent");
+  });
+
   it("builds insert rows with slugs, defaults, and paraphrases", () => {
     expect(
       buildIntentImportRows("client-1", [

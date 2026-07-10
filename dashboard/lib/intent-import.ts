@@ -65,11 +65,18 @@ export function parseIntentJson(text: string): IntentImportItem[] {
   if (!Array.isArray(parsed)) {
     throw new Error("Expected a JSON array of intents.");
   }
+  if (parsed.length === 0) {
+    throw new Error("Import must include at least one intent.");
+  }
 
   return parsed.map(normalizeIntent);
 }
 
 export function buildIntentImportRows(clientId: string, intents: unknown[]): IntentImportRow[] {
+  if (intents.length === 0) {
+    throw new Error("Import must include at least one intent.");
+  }
+
   return intents.map((intent) => {
     const normalized = normalizeIntent(intent);
     return {

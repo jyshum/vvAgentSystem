@@ -178,11 +178,6 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
     "prompt_text": "how to improve daycare parent communication",
     "bucket": "awareness",
     "paraphrases": ["daycare parent communication tips"]
-  },
-  {
-    "prompt_text": "childspot reviews",
-    "bucket": "branded",
-    "paraphrases": []
   }
 ]`}
               rows={12}
@@ -192,7 +187,7 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
               onBlur={(e) => (e.target.style.borderColor = "var(--hair)")}
             />
             <p className="font-mono text-[9px] leading-4 mt-2" style={{ color: "var(--faint)" }}>
-              Optional import. Use internal buckets: consideration for Product Visibility, awareness for Content Authority, branded for Branded - Deferred.
+              Optional import. Use consideration for Product Visibility and awareness for Content Authority. Branded monitoring is deferred.
             </p>
           </div>
 
