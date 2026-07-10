@@ -1,5 +1,4 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import Link from "next/link";
 import { ReportRow } from "@/components/admin/ReportRow";
 import type { Report, TrackerRun } from "@/lib/types";
 
@@ -21,12 +20,12 @@ export default async function ReportsPage({
 
   // Fetch runs for reports that have a run_id
   const runIds = allReports.map((r) => r.run_id).filter(Boolean) as string[];
-  type RunSummary = Pick<TrackerRun, "id" | "aggregate_mention_rate" | "aggregate_avg_mention_level">;
+  type RunSummary = Pick<TrackerRun, "id" | "aggregate_mention_rate" | "aggregate_avg_mention_level" | "bucket_scores">;
   const runsById: Record<string, RunSummary> = {};
   if (runIds.length > 0) {
     const { data: runs } = await supabase
       .from("tracker_runs")
-      .select("id, aggregate_mention_rate, aggregate_avg_mention_level")
+      .select("id, aggregate_mention_rate, aggregate_avg_mention_level, bucket_scores")
       .in("id", runIds);
     if (runs) {
       (runs as unknown as RunSummary[]).forEach((run) => { runsById[run.id] = run; });

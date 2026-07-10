@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { TagInput } from "./TagInput";
+import { BUCKET_LABELS } from "@/lib/intent-labels";
 
 export function AddClientModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
@@ -157,21 +158,21 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
           />
 
           <TagInput
-            label={`Awareness Prompts (${awarenessPrompts.length})`}
+            label={`${BUCKET_LABELS.awareness} Prompts (${awarenessPrompts.length})`}
             values={awarenessPrompts}
             onChange={setAwarenessPrompts}
             placeholder="e.g. how to budget as a medical student"
           />
 
           <TagInput
-            label={`Consideration Prompts (${considerationPrompts.length})`}
+            label={`${BUCKET_LABELS.consideration} Prompts (${considerationPrompts.length})`}
             values={considerationPrompts}
             onChange={setConsiderationPrompts}
             placeholder="e.g. best budgeting tools for medical students"
           />
 
           <TagInput
-            label={`Branded Prompts - Deferred (${brandedPrompts.length})`}
+            label={`${BUCKET_LABELS.branded} Prompts (${brandedPrompts.length})`}
             values={brandedPrompts}
             onChange={setBrandedPrompts}
             placeholder="not measured in current runs"

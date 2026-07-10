@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ClientRow } from "@/components/admin/ClientRow";
 import { AddClientButton } from "@/components/admin/AddClientButton";
 import { RunAllButton } from "@/components/admin/RunAllButton";
+import { productVisibilityScore } from "@/lib/intent-labels";
 import type { Client, TrackerRun, Report } from "@/lib/types";
 
 export default async function AdminPage() {
@@ -41,8 +42,11 @@ export default async function AdminPage() {
   );
 
   // Compute stats strip values
-  const avgMention = allClients.length > 0
-    ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.non_branded_mention_rate ?? latestRun?.aggregate_mention_rate ?? 0), 0) / allClients.length
+  const runsWithProductVisibility = clientsWithData
+    .map(({ latestRun }) => (latestRun ? productVisibilityScore(latestRun)?.mention_rate ?? null : null))
+    .filter((rate): rate is number => rate !== null);
+  const avgMention = runsWithProductVisibility.length > 0
+    ? runsWithProductVisibility.reduce((sum, rate) => sum + rate, 0) / runsWithProductVisibility.length
     : 0;
   const avgLevel = allClients.length > 0
     ? clientsWithData.reduce((sum, { latestRun }) => sum + (latestRun?.aggregate_avg_mention_level ?? 0), 0) / allClients.length
@@ -77,7 +81,7 @@ export default async function AdminPage() {
           <div className="font-display font-light text-[38px] leading-none mb-1.5" style={{ color: avgMention > 0.5 ? "var(--pos)" : avgMention > 0.2 ? "var(--white)" : "var(--neg)" }}>
             {allClients.length > 0 ? Math.round(avgMention * 100) + "%" : "—"}
           </div>
-          <div className="font-mono text-[8px] tracking-[0.14em]" style={{ color: "var(--faint)" }}>AVG MENTION RATE</div>
+          <div className="font-mono text-[8px] tracking-[0.14em]" style={{ color: "var(--faint)" }}>AVG PRODUCT VISIBILITY</div>
         </div>
         <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
           <div className="font-display font-light text-[38px] leading-none mb-1.5" style={{ color: avgLevel >= 3 ? "var(--pos)" : avgLevel >= 2 ? "var(--white)" : "var(--faint)" }}>
@@ -93,7 +97,7 @@ export default async function AdminPage() {
         gap: "16px",
         borderColor: "var(--hair)"
       }}>
-        {["CLIENT", "MENTION", "AVG LEVEL", "LAST RUN", ""].map((h) => (
+        {["CLIENT", "PRODUCT VISIBILITY", "AVG LEVEL", "LAST RUN", ""].map((h) => (
           <div key={h} className="font-mono text-[8px] tracking-[0.18em]" style={{ color: "var(--faint)" }}>
             {h}
           </div>

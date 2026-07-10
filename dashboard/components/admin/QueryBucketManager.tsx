@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BUCKET_DETAILS, BUCKET_LABELS } from "@/lib/intent-labels";
 import type { Query } from "@/lib/types";
 
 const BUCKETS: { key: Query["bucket"]; label: string; detail: string }[] = [
-  { key: "awareness", label: "Awareness", detail: "Problem and education prompts" },
-  { key: "consideration", label: "Consideration", detail: "Tool, template, and resource prompts" },
-  { key: "branded", label: "Branded", detail: "Deferred - not measured in current runs" },
+  { key: "consideration", label: BUCKET_LABELS.consideration, detail: BUCKET_DETAILS.consideration },
+  { key: "awareness", label: BUCKET_LABELS.awareness, detail: BUCKET_DETAILS.awareness },
+  { key: "branded", label: BUCKET_LABELS.branded, detail: BUCKET_DETAILS.branded },
 ];
 
 export function QueryBucketManager({
@@ -133,10 +134,10 @@ export function QueryBucketManager({
       <div className="flex items-end justify-between gap-4 mb-5">
         <div>
           <div className="font-mono text-[9px] tracking-[0.16em] uppercase mb-2" style={{ color: "var(--faint)" }}>
-            Query Buckets
+            Intent Set
           </div>
           <p className="font-serif text-[13px]" style={{ color: "var(--mute)" }}>
-            Awareness and consideration intents are measured. Branded monitoring is deferred.
+            Product Visibility and Content Authority intents are measured separately. Branded monitoring is deferred.
           </p>
         </div>
         <div className="font-mono text-[9px] tracking-[0.12em]" style={{ color: "var(--faint)" }}>
@@ -157,7 +158,7 @@ export function QueryBucketManager({
         <textarea
           value={bulkText}
           onChange={(e) => setBulkText(e.target.value)}
-          placeholder='[{"prompt_text":"best daycare software","bucket":"awareness","paraphrases":["top childcare apps"]}]'
+          placeholder='[{"prompt_text":"best daycare software","bucket":"consideration","paraphrases":["top childcare apps"]}]'
           className="w-full min-h-[120px] mt-3 resize-y bg-transparent font-mono text-[11px] leading-snug outline-none placeholder:opacity-40"
           style={{ color: "var(--white)", border: "1px solid var(--hair)", padding: "10px" }}
         />

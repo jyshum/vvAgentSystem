@@ -5,6 +5,7 @@ import { SubTab } from "@/components/admin/SubTab";
 import { TriggerRunButton } from "@/components/admin/TriggerRunButton";
 import { fetchSchedules } from "@/lib/schedules";
 import { aggregateCitationRate, rankAndGap, topCompetitor } from "@/lib/derive";
+import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatDelta, formatRate } from "@/lib/utils";
 import type { Client, PromptScore, TrackerRun } from "@/lib/types";
 import type { CrawlabilityReport, ImprovementRun } from "@/lib/improvement-types";
@@ -67,12 +68,13 @@ export default async function ClientLayout({
     );
   }
 
-  const rate = latest?.non_branded_mention_rate ?? latest?.aggregate_mention_rate ?? null;
+  const rate = latest ? productVisibilityScore(latest)?.mention_rate ?? null : null;
+  const previousRate = previous ? productVisibilityScore(previous)?.mention_rate ?? null : null;
   const comp = latest ? topCompetitor(latest.competitor_scores) : null;
   const rank = latest && rate != null ? rankAndGap(rate, latest.competitor_scores) : null;
   const delta =
     rate != null && previous
-      ? formatDelta(rate, previous.non_branded_mention_rate ?? previous.aggregate_mention_rate)
+      ? formatDelta(rate, previousRate)
       : null;
 
   const schedules = await fetchSchedules();
@@ -178,14 +180,30 @@ export default async function ClientLayout({
                   </span>
                 )}
               </div>
+              {latest.bucket_scores && (Object.keys(latest.bucket_scores).length > 0) && (
+                <div className="flex gap-6 mt-3">
+                  {(["consideration", "awareness"] as const).map((b) => {
+                    const bs = b === "consideration" ? productVisibilityScore(latest) : contentAuthorityScore(latest);
+                    if (!bs || bs.intent_count === 0) return null;
+                    return (
+                      <div key={b} className="font-mono text-[11px]" style={{ color: "var(--mute)" }}>
+                        <span className="text-[8px] tracking-[0.14em] uppercase" style={{ color: "var(--faint)" }}>{BUCKET_LABELS[b]}</span>
+                        <br />
+                        <span style={{ color: "var(--white)" }}>{formatRate(bs.mention_rate)}</span>
+                        <span className="text-[9px]" style={{ color: "var(--faint)" }}> · {bs.intent_count} intents</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <div className="font-serif text-[13px] mt-2.5" style={{ color: "var(--mute)" }}>
                 {citationRate !== null ? (
                   <>
-                    cited as source: {Math.round(citationRate * 100)}% of non-branded mentions{" "}
+                    cited as source: {Math.round(citationRate * 100)}% of measured mentions{" "}
                     <span style={{ color: "var(--faint)" }}> · branded deferred</span>
                   </>
                 ) : (
-                  "no mentions yet this cycle"
+                  "product visibility pending"
                 )}
               </div>
             </div>

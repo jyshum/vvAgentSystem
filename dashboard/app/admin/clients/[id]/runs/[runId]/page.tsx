@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RunRail } from "@/components/runs/RunRail";
 import { fetchSchedules } from "@/lib/schedules";
+import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatRate, formatDelta } from "@/lib/utils";
 import type { PipelineRun, ImprovementRun, PageCitationScore, QueryPageMatch, ActionCard, CrawlabilityReport } from "@/lib/improvement-types";
 import type { TrackerRun, CompetitiveGap } from "@/lib/types";
@@ -65,7 +66,7 @@ export default async function RunDetailPage({
     trackerRun
       ? supabase
           .from("tracker_runs")
-          .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate")
+          .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores")
           .eq("client_id", id)
           .lt("ran_at", trackerRun.ran_at)
           .order("ran_at", { ascending: false })
@@ -104,7 +105,7 @@ export default async function RunDetailPage({
     })(),
   ]);
 
-  const previousTrackerRun = previousTrackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate"> | null;
+  const previousTrackerRun = previousTrackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores"> | null;
   const citationScores = (citationScoresData as Pick<PageCitationScore, "structural_score">[]) || [];
   const queryMatches = (queryMatchesData as Pick<QueryPageMatch, "id" | "match_type">[]) || [];
   const actionCards = (actionCardsData as Pick<ActionCard, "id" | "auto_approved" | "status" | "action_type">[]) || [];
@@ -122,13 +123,11 @@ export default async function RunDetailPage({
     }
   }
 
-  const delta = trackerRun
-    ? formatDelta(
-        trackerRun.non_branded_mention_rate ?? trackerRun.aggregate_mention_rate,
-        previousTrackerRun ? previousTrackerRun.non_branded_mention_rate ?? previousTrackerRun.aggregate_mention_rate : null
-      )
+  const primaryRate = trackerRun ? productVisibilityScore(trackerRun)?.mention_rate ?? null : null;
+  const previousPrimaryRate = previousTrackerRun ? productVisibilityScore(previousTrackerRun)?.mention_rate ?? null : null;
+  const delta = primaryRate != null
+    ? formatDelta(primaryRate, previousPrimaryRate)
     : null;
-  const primaryRate = trackerRun ? trackerRun.non_branded_mention_rate ?? trackerRun.aggregate_mention_rate : null;
 
   // Crawlability
   const crawlReport = improvementRun?.crawlability_report as CrawlabilityReport | undefined;
@@ -214,6 +213,22 @@ export default async function RunDetailPage({
           {worstGap && (
             <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--neg)" }}>
               losing &ldquo;{worstGap.query}&rdquo; by {formatRate(worstGap.gap)} to {worstGap.competitorName}
+            </div>
+          )}
+          {trackerRun?.bucket_scores && (
+            <div className="flex gap-4 mt-2">
+              {(["consideration", "awareness"] as const).map((b) => {
+                const bs = b === "consideration" ? productVisibilityScore(trackerRun) : contentAuthorityScore(trackerRun);
+                if (!bs || bs.intent_count === 0) return null;
+                return (
+                  <div key={b} className="font-mono text-[9px]" style={{ color: "var(--mute)" }}>
+                    <span className="text-[7px] tracking-[0.12em] uppercase" style={{ color: "var(--faint)" }}>{BUCKET_LABELS[b]}</span>
+                    <br />
+                    <span style={{ color: "var(--white)" }}>{formatRate(bs.mention_rate)}</span>
+                    <span style={{ color: "var(--faint)" }}> · {bs.intent_count}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
           <div className="font-mono text-[8px] tracking-[0.1em] mt-1.5" style={{ color: "var(--faint)" }}>

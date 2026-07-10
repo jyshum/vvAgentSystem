@@ -2,17 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { productVisibilityScore } from "@/lib/intent-labels";
 import { weekRangeLabel, formatRate, scoreColor } from "@/lib/utils";
 import type { Report, TrackerRun } from "@/lib/types";
 
 interface ReportRowProps {
   report: Report;
   clientId: string;
-  run: Pick<TrackerRun, "id" | "aggregate_mention_rate" | "aggregate_avg_mention_level"> | null;
+  run: Pick<TrackerRun, "id" | "aggregate_mention_rate" | "aggregate_avg_mention_level" | "bucket_scores"> | null;
 }
 
 export function ReportRow({ report, clientId, run }: ReportRowProps) {
   const router = useRouter();
+  const productVisibility = run ? productVisibilityScore(run)?.mention_rate ?? null : null;
 
   return (
     <div
@@ -38,8 +40,8 @@ export function ReportRow({ report, clientId, run }: ReportRowProps) {
       <div>
         {run ? (
           <div className="font-display font-light text-[22px] leading-none"
-            style={{ color: scoreColor(run.aggregate_mention_rate) }}>
-            {formatRate(run.aggregate_mention_rate)}
+            style={{ color: scoreColor(productVisibility ?? 0) }}>
+            {productVisibility == null ? "—" : formatRate(productVisibility)}
           </div>
         ) : (
           <span className="font-mono text-[11px]" style={{ color: "var(--faint)" }}>—</span>

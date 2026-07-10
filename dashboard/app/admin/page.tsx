@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchSchedules } from "@/lib/schedules";
 import { biggestMovers, measuringCount, opsBadge, rankAndGap, topCompetitor } from "@/lib/derive";
 import { BoardRow, type BoardRowData } from "@/components/board/BoardRow";
+import { productVisibilityScore } from "@/lib/intent-labels";
 import type { Client, TrackerRun, PromptScore } from "@/lib/types";
 
 export default async function BoardPage() {
@@ -20,7 +21,7 @@ export default async function BoardPage() {
         await Promise.all([
           supabase
             .from("tracker_runs")
-            .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, competitor_scores")
+            .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores")
             .eq("client_id", client.id)
             .order("ran_at", { ascending: false })
             .limit(6),
@@ -42,7 +43,7 @@ export default async function BoardPage() {
             .eq("status", "implemented"),
         ]);
 
-      const history = ((runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "competitor_scores">[]) || []);
+      const history = ((runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores">[]) || []);
       const latest = history[0] ?? null;
       const previous = history[1] ?? null;
 
@@ -74,7 +75,8 @@ export default async function BoardPage() {
         measuring: measuringCount(implementedCards || [], latest?.ran_at ?? null),
       });
 
-      const rate = latest?.non_branded_mention_rate ?? latest?.aggregate_mention_rate ?? null;
+      const rate = latest ? productVisibilityScore(latest)?.mention_rate ?? null : null;
+      const previousRate = previous ? productVisibilityScore(previous)?.mention_rate ?? null : null;
       const comp = latest ? topCompetitor(latest.competitor_scores) : null;
       const rank = latest && rate != null ? rankAndGap(rate, latest.competitor_scores) : null;
 
@@ -83,13 +85,13 @@ export default async function BoardPage() {
         name: client.brand_name || client.name,
         rate,
         delta:
-          rate != null && previous && previous.aggregate_mention_rate != null
-            ? rate - (previous.non_branded_mention_rate ?? previous.aggregate_mention_rate)
+          rate != null && previousRate != null
+            ? rate - previousRate
             : null,
         competitor: comp,
         rank,
         movers,
-        sparkline: [...history].reverse().map((r) => r.non_branded_mention_rate ?? r.aggregate_mention_rate),
+        sparkline: [...history].reverse().map((r) => productVisibilityScore(r)?.mention_rate ?? null),
         badge,
         pendingCount: pending.length,
         firstRunPending: !latest,
@@ -129,7 +131,7 @@ export default async function BoardPage() {
           Board
         </h1>
         <p className="font-serif italic text-base mt-2" style={{ color: "var(--mute)" }}>
-          AI visibility across the portfolio
+          Product Visibility across the portfolio
         </p>
       </div>
 

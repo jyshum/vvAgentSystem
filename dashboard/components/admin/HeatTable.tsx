@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { BUCKET_LABELS } from "@/lib/intent-labels";
 import { formatRate } from "@/lib/utils";
 import { QueryExpansion } from "@/components/admin/QueryExpansion";
 import type { Query } from "@/lib/types";
@@ -68,9 +69,9 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
 
   const gridTemplate = `2fr repeat(${cycleCount}, 44px) 0.8fr 0.6fr 1.2fr 1fr 0.8fr`;
   const groupedRows = [
-    { bucket: "awareness", label: "Awareness", rows: rows.filter((r) => r.bucket === "awareness") },
-    { bucket: "consideration", label: "Consideration", rows: rows.filter((r) => (r.bucket ?? "consideration") === "consideration") },
-    { bucket: "branded", label: "Branded", rows: rows.filter((r) => r.bucket === "branded") },
+    { bucket: "consideration", label: BUCKET_LABELS.consideration, rows: rows.filter((r) => (r.bucket ?? "consideration") === "consideration") },
+    { bucket: "awareness", label: BUCKET_LABELS.awareness, rows: rows.filter((r) => r.bucket === "awareness") },
+    { bucket: "branded", label: BUCKET_LABELS.branded, rows: rows.filter((r) => r.bucket === "branded") },
   ] as const;
 
   return (

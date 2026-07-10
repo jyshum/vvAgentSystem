@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { productVisibilityScore } from "@/lib/intent-labels";
 import { scoreColor, formatRate } from "@/lib/utils";
 import type { Client, TrackerRun, Report } from "@/lib/types";
 
@@ -15,7 +16,7 @@ export function ClientCard({
   latestRun,
   latestReport,
 }: ClientCardProps) {
-  const rate = latestRun?.aggregate_mention_rate;
+  const rate = latestRun ? productVisibilityScore(latestRun)?.mention_rate ?? null : null;
 
   return (
     <Card elevated className="p-6">
@@ -45,7 +46,7 @@ export function ClientCard({
             className="font-mono text-[9px] tracking-[0.1em] uppercase ml-2"
             style={{ color: "var(--faint)" }}
           >
-            visibility
+            product visibility
           </span>
         </div>
       )}

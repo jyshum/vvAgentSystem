@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { productVisibilityScore } from "@/lib/intent-labels";
 import { scoreColor, formatRate, formatDelta } from "@/lib/utils";
 import type { Client, TrackerRun, Report } from "@/lib/types";
 
@@ -17,10 +18,10 @@ function checkStale(ranAt: string): boolean {
 
 export function ClientRow({ client, latestRun, previousRun }: ClientRowProps) {
   const router = useRouter();
-  const latestRate = latestRun?.non_branded_mention_rate ?? latestRun?.aggregate_mention_rate ?? null;
-  const previousRate = previousRun?.non_branded_mention_rate ?? previousRun?.aggregate_mention_rate ?? null;
-  const mentionDelta = latestRun && previousRun
-    ? formatDelta(latestRate ?? 0, previousRate)
+  const latestRate = latestRun ? productVisibilityScore(latestRun)?.mention_rate ?? null : null;
+  const previousRate = previousRun ? productVisibilityScore(previousRun)?.mention_rate ?? null : null;
+  const mentionDelta = latestRate != null && previousRun
+    ? formatDelta(latestRate, previousRate)
     : null;
 
   const isStale = latestRun ? checkStale(latestRun.ran_at) : true;

@@ -1,5 +1,6 @@
 import { scoreColor, formatRate, getMentionLevelColor, formatMentionLevel, getMentionLevelLabel } from "@/lib/utils";
 import { SparklineChart } from "@/components/charts/SparklineChart";
+import { productVisibilityScore } from "@/lib/intent-labels";
 import type { TrackerRun } from "@/lib/types";
 
 interface KPIGridProps {
@@ -10,14 +11,16 @@ interface KPIGridProps {
 export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
   const engines = Object.entries(run.per_engine_scores);
   const prev = previousRuns.length > 0 ? previousRuns[previousRuns.length - 1] : null;
-  const primaryRate = run.non_branded_mention_rate ?? run.aggregate_mention_rate;
-  const previousPrimaryRate = prev ? prev.non_branded_mention_rate ?? prev.aggregate_mention_rate : null;
+  const primaryRate = productVisibilityScore(run)?.mention_rate ?? null;
+  const previousPrimaryRate = prev ? productVisibilityScore(prev)?.mention_rate ?? null : null;
 
-  const mentionHistory = previousRuns.map((r) => r.non_branded_mention_rate ?? r.aggregate_mention_rate);
+  const mentionHistory = previousRuns
+    .map((r) => productVisibilityScore(r)?.mention_rate ?? null)
+    .filter((rate): rate is number => rate !== null);
   const levelHistory = previousRuns.map((r) => r.aggregate_avg_mention_level);
 
-  const mentionDelta = prev
-    ? Math.round((primaryRate - (previousPrimaryRate ?? 0)) * 100)
+  const mentionDelta = primaryRate != null && previousPrimaryRate != null
+    ? Math.round((primaryRate - previousPrimaryRate) * 100)
     : null;
   const levelDelta = prev
     ? +(run.aggregate_avg_mention_level - prev.aggregate_avg_mention_level).toFixed(1)
@@ -32,7 +35,7 @@ export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
           borderBottom: "1px solid var(--p-hair)",
         }}
       >
-        AI Visibility Scores
+        Product Visibility Scores
       </h2>
 
       {/* Hero pair */}
@@ -42,10 +45,10 @@ export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
       >
         <div className="p-5 flex flex-col" style={{ background: "var(--paper)", minHeight: "132px" }}>
           <div className="font-mono text-[11px] tracking-[0.12em] uppercase mb-3" style={{ color: "var(--p-mute)" }}>
-            Non-Branded Mention Rate
+            Product Visibility
           </div>
-          <div className="font-serif font-light text-[48px] leading-none mb-2" style={{ color: scoreColor(primaryRate, true) }}>
-            {formatRate(primaryRate)}
+          <div className="font-serif font-light text-[48px] leading-none mb-2" style={{ color: scoreColor(primaryRate ?? 0, true) }}>
+            {primaryRate == null ? "—" : formatRate(primaryRate)}
           </div>
           {mentionDelta !== null && (
             <div className="font-mono text-[10px] tracking-[0.04em]" style={{ color: "var(--p-mute)" }}>
@@ -60,7 +63,7 @@ export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
           </div>
           <div className="mt-auto pt-3">
             <SparklineChart
-              values={[...mentionHistory, primaryRate]}
+              values={primaryRate == null ? mentionHistory : [...mentionHistory, primaryRate]}
               direction={mentionDelta === null ? "none" : mentionDelta > 0 ? "up" : mentionDelta < 0 ? "down" : "flat"}
               paper
             />
