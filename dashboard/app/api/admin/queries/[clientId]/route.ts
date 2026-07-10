@@ -70,14 +70,25 @@ export async function POST(
   const body = await request.json();
 
   if (Array.isArray(body?.intents)) {
+    const admin = createAdminClient();
+    const { data: existingQueries, error: slugError } = await admin
+      .from("queries")
+      .select("slug")
+      .eq("client_id", clientId);
+
+    if (slugError) return Response.json({ error: slugError.message }, { status: 500 });
+
     let rows;
     try {
-      rows = buildIntentImportRows(clientId, body.intents);
+      rows = buildIntentImportRows(
+        clientId,
+        body.intents,
+        new Set(((existingQueries as { slug: string | null }[]) || []).map((q) => q.slug).filter(Boolean) as string[])
+      );
     } catch (e) {
       return Response.json({ error: (e as Error).message }, { status: 400 });
     }
 
-    const admin = createAdminClient();
     const mode = body?.mode === "replace_active" ? "replace_active" : "append";
     if (mode === "replace_active") {
       const retiredAt = new Date().toISOString();

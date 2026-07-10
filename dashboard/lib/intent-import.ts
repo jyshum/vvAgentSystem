@@ -14,13 +14,13 @@ export interface IntentImportRow extends IntentImportItem {
   set_type: "core";
 }
 
-function generateSlug(text: string): string {
+function generateSlugBase(text: string): string {
   return (
     text
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_|_$/g, "")
-      .slice(0, 60) + "_v1"
+      .slice(0, 60)
   );
 }
 
@@ -72,17 +72,34 @@ export function parseIntentJson(text: string): IntentImportItem[] {
   return parsed.map(normalizeIntent);
 }
 
-export function buildIntentImportRows(clientId: string, intents: unknown[]): IntentImportRow[] {
+function nextSlug(promptText: string, usedSlugs: Set<string>): string {
+  const base = generateSlugBase(promptText) || "intent";
+  let version = 1;
+  let slug = `${base}_v${version}`;
+  while (usedSlugs.has(slug)) {
+    version += 1;
+    slug = `${base}_v${version}`;
+  }
+  usedSlugs.add(slug);
+  return slug;
+}
+
+export function buildIntentImportRows(
+  clientId: string,
+  intents: unknown[],
+  existingSlugs: Set<string> = new Set()
+): IntentImportRow[] {
   if (intents.length === 0) {
     throw new Error("Import must include at least one intent.");
   }
 
+  const usedSlugs = new Set(existingSlugs);
   return intents.map((intent) => {
     const normalized = normalizeIntent(intent);
     return {
       client_id: clientId,
       prompt_text: normalized.prompt_text,
-      slug: generateSlug(normalized.prompt_text),
+      slug: nextSlug(normalized.prompt_text, usedSlugs),
       bucket: normalized.bucket,
       set_type: "core",
       paraphrases: normalized.paraphrases,

@@ -4,10 +4,10 @@ import Link from "next/link";
 import { SubTab } from "@/components/admin/SubTab";
 import { TriggerRunButton } from "@/components/admin/TriggerRunButton";
 import { fetchSchedules } from "@/lib/schedules";
-import { aggregateCitationRate, rankAndGap, topCompetitor } from "@/lib/derive";
+import { rankAndGap, topCompetitor } from "@/lib/derive";
 import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatDelta, formatRate } from "@/lib/utils";
-import type { Client, PromptScore, TrackerRun } from "@/lib/types";
+import type { Client, TrackerRun } from "@/lib/types";
 import type { CrawlabilityReport, ImprovementRun } from "@/lib/improvement-types";
 
 const CRAWL_CHECK_KEYS = ["robots_txt", "cdn_blocks", "js_rendering"] as const;
@@ -57,18 +57,8 @@ export default async function ClientLayout({
   const latest = history[0] ?? null;
   const previous = history[1] ?? null;
 
-  let citationRate: number | null = null;
-  if (latest) {
-    const { data: scores } = await supabase
-      .from("prompt_scores")
-      .select("query, bucket, llm, mention_rate, citation_rate")
-      .eq("run_id", latest.id);
-    citationRate = aggregateCitationRate(
-      ((scores as Pick<PromptScore, "query" | "bucket" | "llm" | "mention_rate" | "citation_rate">[]) || []).filter((s) => s.bucket !== "branded")
-    );
-  }
-
   const rate = latest ? productVisibilityScore(latest)?.mention_rate ?? null : null;
+  const contentCitationRate = latest ? contentAuthorityScore(latest)?.citation_rate ?? null : null;
   const previousRate = previous ? productVisibilityScore(previous)?.mention_rate ?? null : null;
   const comp = latest ? topCompetitor(latest.competitor_scores) : null;
   const rank = latest && rate != null ? rankAndGap(rate, latest.competitor_scores) : null;
@@ -197,9 +187,9 @@ export default async function ClientLayout({
                 </div>
               )}
               <div className="font-serif text-[13px] mt-2.5" style={{ color: "var(--mute)" }}>
-                {citationRate !== null ? (
+                {contentCitationRate !== null ? (
                   <>
-                    cited as source: {Math.round(citationRate * 100)}% of measured mentions{" "}
+                    Content Authority citation: {Math.round(contentCitationRate * 100)}%{" "}
                     <span style={{ color: "var(--faint)" }}> · branded deferred</span>
                   </>
                 ) : (

@@ -97,6 +97,24 @@ describe("parseIntentJson", () => {
     ]);
   });
 
+  it("versions slugs around existing and incoming collisions", () => {
+    expect(
+      buildIntentImportRows(
+        "client-1",
+        [
+          { prompt_text: "Best Budgeting App" },
+          { prompt_text: "Best Budgeting App!" },
+          { prompt_text: "best budgeting app" },
+        ],
+        new Set(["best_budgeting_app_v1", "best_budgeting_app_v2"])
+      ).map((row) => row.slug)
+    ).toEqual([
+      "best_budgeting_app_v3",
+      "best_budgeting_app_v4",
+      "best_budgeting_app_v5",
+    ]);
+  });
+
   it("rejects an invalid intent before returning any insert rows", () => {
     expect(() =>
       buildIntentImportRows("client-1", [
