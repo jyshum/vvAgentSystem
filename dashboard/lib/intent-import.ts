@@ -8,6 +8,22 @@ export interface IntentImportItem {
   paraphrases: string[];
 }
 
+export interface IntentImportRow extends IntentImportItem {
+  client_id: string;
+  slug: string;
+  set_type: "core";
+}
+
+function generateSlug(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 60) + "_v1"
+  );
+}
+
 export function normalizeIntent(input: unknown): IntentImportItem {
   if (!input || typeof input !== "object") {
     throw new Error("each intent must be an object");
@@ -51,4 +67,18 @@ export function parseIntentJson(text: string): IntentImportItem[] {
   }
 
   return parsed.map(normalizeIntent);
+}
+
+export function buildIntentImportRows(clientId: string, intents: unknown[]): IntentImportRow[] {
+  return intents.map((intent) => {
+    const normalized = normalizeIntent(intent);
+    return {
+      client_id: clientId,
+      prompt_text: normalized.prompt_text,
+      slug: generateSlug(normalized.prompt_text),
+      bucket: normalized.bucket,
+      set_type: "core",
+      paraphrases: normalized.paraphrases,
+    };
+  });
 }

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BUCKET_DETAILS, BUCKET_LABELS } from "@/lib/intent-labels";
+import { parseIntentJson } from "@/lib/intent-import";
 import type { Query } from "@/lib/types";
 
 const BUCKETS: { key: Query["bucket"]; label: string; detail: string }[] = [
@@ -29,6 +30,7 @@ export function QueryBucketManager({
   const [error, setError] = useState<string | null>(null);
   const [bulkText, setBulkText] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [replaceActive, setReplaceActive] = useState(false);
 
   const grouped = useMemo(() => {
     return BUCKETS.map((bucket) => ({
@@ -61,22 +63,18 @@ export function QueryBucketManager({
 
   async function bulkImport() {
     setError(null);
-    let intents: unknown;
+    let intents;
     try {
-      intents = JSON.parse(bulkText);
-    } catch {
-      setError("Paste must be a valid JSON array of intents");
-      return;
-    }
-    if (!Array.isArray(intents)) {
-      setError("Expected a JSON array");
+      intents = parseIntentJson(bulkText);
+    } catch (e) {
+      setError((e as Error).message);
       return;
     }
     setBulkBusy(true);
     const res = await fetch(`/api/admin/queries/${clientId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intents }),
+      body: JSON.stringify({ intents, mode: replaceActive ? "replace_active" : "append" }),
     });
     setBulkBusy(false);
     if (!res.ok) {
@@ -85,7 +83,14 @@ export function QueryBucketManager({
       return;
     }
     const created = (await res.json()) as Query[];
-    setQueries((current) => [...current, ...created]);
+    setQueries((current) =>
+      replaceActive
+        ? [
+            ...current.map((q) => (q.status === "active" ? { ...q, status: "retired" as const } : q)),
+            ...created,
+          ]
+        : [...current, ...created]
+    );
     setBulkText("");
     router.refresh();
   }
@@ -155,6 +160,20 @@ export function QueryBucketManager({
         <summary className="font-mono text-[9px] tracking-[0.14em] uppercase cursor-pointer" style={{ color: "var(--faint)" }}>
           Bulk import intents (paste JSON)
         </summary>
+        <label className="mt-3 flex items-start gap-2 font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: "var(--mute)" }}>
+          <input
+            type="checkbox"
+            checked={replaceActive}
+            onChange={(e) => setReplaceActive(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>Replace active intent set</span>
+        </label>
+        {replaceActive && (
+          <p className="mt-2 font-mono text-[9px] tracking-[0.08em]" style={{ color: "var(--neg)" }}>
+            Current active intents will be retired before import. Branded remains deferred.
+          </p>
+        )}
         <textarea
           value={bulkText}
           onChange={(e) => setBulkText(e.target.value)}
@@ -169,7 +188,7 @@ export function QueryBucketManager({
           className="mt-2 font-mono text-[9px] tracking-[0.14em] uppercase py-2.5 px-5 transition-opacity disabled:opacity-40"
           style={{ background: "var(--white)", color: "var(--ink)" }}
         >
-          {bulkBusy ? "Importing" : "Import Intents"}
+          {bulkBusy ? "Importing" : replaceActive ? "Replace Intent Set" : "Import Intents"}
         </button>
       </details>
 

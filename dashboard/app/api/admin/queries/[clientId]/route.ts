@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { buildIntentImportRows } from "@/lib/intent-import";
 
 function generateSlug(text: string): string {
   return (
@@ -69,30 +70,26 @@ export async function POST(
   const body = await request.json();
 
   if (Array.isArray(body?.intents)) {
-    const admin = createAdminClient();
-    const rows = [];
-    for (const it of body.intents) {
-      if (!it?.prompt_text || typeof it.prompt_text !== "string" || !it.prompt_text.trim()) {
-        return Response.json({ error: "each intent needs prompt_text" }, { status: 400 });
-      }
-      if (it.bucket !== undefined && !BUCKETS.has(it.bucket)) {
-        return Response.json({ error: `invalid bucket: ${it.bucket}` }, { status: 400 });
-      }
-      let paraphrases: string[];
-      try {
-        paraphrases = validParaphrases(it.paraphrases);
-      } catch (e) {
-        return Response.json({ error: (e as Error).message }, { status: 400 });
-      }
-      rows.push({
-        client_id: clientId,
-        prompt_text: it.prompt_text.trim(),
-        slug: generateSlug(it.prompt_text),
-        bucket: it.bucket || "consideration",
-        set_type: "core",
-        paraphrases,
-      });
+    let rows;
+    try {
+      rows = buildIntentImportRows(clientId, body.intents);
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 400 });
     }
+
+    const admin = createAdminClient();
+    const mode = body?.mode === "replace_active" ? "replace_active" : "append";
+    if (mode === "replace_active") {
+      const retiredAt = new Date().toISOString();
+      const { error: retireError } = await admin
+        .from("queries")
+        .update({ status: "retired", retired_at: retiredAt })
+        .eq("client_id", clientId)
+        .eq("status", "active");
+
+      if (retireError) return Response.json({ error: retireError.message }, { status: 500 });
+    }
+
     const { data, error } = await admin.from("queries").insert(rows).select();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json(data, { status: 201 });
