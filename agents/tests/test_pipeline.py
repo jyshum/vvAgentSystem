@@ -37,6 +37,7 @@ def test_route_after_improvement_awaits_when_pending_cards_exist():
     assert route_after_improvement(state) == "await_approval"
 
 
-def test_route_after_improvement_awaits_when_no_cards():
+def test_route_after_improvement_ends_when_no_cards():
+    from langgraph.graph import END
     from src.graph.pipeline import route_after_improvement
-    assert route_after_improvement({"action_cards": []}) == "await_approval"
+    assert route_after_improvement({"action_cards": []}) == END

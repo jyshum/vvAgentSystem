@@ -90,11 +90,19 @@ def trigger_scheduled_run(client_id: str):
         )
 
         state = graph.get_state(config=config)
+        state_error = (state.values or {}).get("error")
         if state.next and "await_approval" in state.next:
             sb.table("pipeline_runs").update({
                 "status": "awaiting_approval",
             }).eq("thread_id", thread_id).execute()
             print(f"  [Scheduler] Pipeline paused at approval for {client_id}")
+        elif state_error:
+            sb.table("pipeline_runs").update({
+                "status": "error",
+                "error_message": str(state_error)[:500],
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("thread_id", thread_id).execute()
+            print(f"  [Scheduler] Pipeline finished with error for {client_id}: {state_error}")
         else:
             sb.table("pipeline_runs").update({
                 "status": "completed",
@@ -239,11 +247,19 @@ def _run_graph_background(client_id: str, run_type: str, thread_id: str):
         )
 
         state = graph.get_state(config=config)
+        state_error = (state.values or {}).get("error")
         if state.next and "await_approval" in state.next:
             sb.table("pipeline_runs").update({
                 "status": "awaiting_approval",
             }).eq("thread_id", thread_id).execute()
             print(f"  [Pipeline] Paused at approval for {client_id} (thread: {thread_id})")
+        elif state_error:
+            sb.table("pipeline_runs").update({
+                "status": "error",
+                "error_message": str(state_error)[:500],
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("thread_id", thread_id).execute()
+            print(f"  [Pipeline] Finished with error for {client_id}: {state_error}")
         else:
             sb.table("pipeline_runs").update({
                 "status": "completed",

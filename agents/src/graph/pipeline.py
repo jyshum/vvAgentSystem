@@ -25,6 +25,8 @@ def route_after_gsc(state: GEOState) -> str:
 
 def route_after_improvement(state: GEOState) -> str:
     cards = state.get("action_cards", [])
+    if not cards:
+        return END
     pending = [c for c in cards if c.get("status") == "pending"]
     auto_approved = [c for c in cards if c.get("auto_approved")]
     if auto_approved and not pending:
@@ -57,6 +59,7 @@ def build_graph(checkpointer=None):
     })
 
     graph.add_conditional_edges("run_improvement_pipeline", route_after_improvement, {
+        END: END,
         "await_approval": "await_approval",
         "run_implementation": "run_implementation",
     })

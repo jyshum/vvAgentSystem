@@ -1,8 +1,29 @@
 import json
 import httpx
 from bs4 import BeautifulSoup
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 from xml.etree import ElementTree
 from urllib.parse import urljoin, urlparse
+
+
+def normalize_timestamp(value: str | None) -> str | None:
+    """Coerce a scraped date string to ISO 8601, or None if unparseable.
+
+    Pages emit anything from RFC 2822 HTTP headers to partial dates like
+    "Oct 1" in <time> tags; Postgres timestamptz columns reject the latter.
+    """
+    if not value:
+        return None
+    value = value.strip()
+    try:
+        return parsedate_to_datetime(value).isoformat()
+    except (ValueError, TypeError):
+        pass
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).isoformat()
+    except ValueError:
+        return None
 
 
 def discover_pages_from_sitemap(xml_content: str, domain: str, max_pages: int = 20) -> list[str]:
@@ -121,7 +142,7 @@ def extract_page_data(url: str, html: str, client_domain: str,
         "first_paragraph": first_paragraph,
         "schema_types": schema_types,
         "word_count": word_count,
-        "last_modified": last_modified,
+        "last_modified": normalize_timestamp(last_modified),
         "outbound_link_count": len(outbound_links),
         "has_faq_schema": has_faq_schema,
         "has_comparison_table": has_comparison_table,
