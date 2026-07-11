@@ -73,6 +73,7 @@ export default async function BoardPage() {
         pendingCount: pending.length,
         oldestPendingDays,
         measuring: measuringCount(implementedCards || [], latest?.ran_at ?? null),
+        hasRun: !!latest,
       });
 
       const rate = latest ? productVisibilityScore(latest)?.mention_rate ?? null : null;

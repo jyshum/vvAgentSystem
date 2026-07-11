@@ -110,43 +110,58 @@ def trigger_scheduled_run(client_id: str):
         print(f"  [Scheduler] Pipeline failed for {client_id}: {e}")
 
 
+def _add_client_schedule(sb, client_id: str, frequency: str, cycle_day_num: int):
+    """Add a single client to the scheduler. Idempotent (replace_existing)."""
+    day_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
+    cycle_day = day_map.get(cycle_day_num, "tue")
+
+    existing_jobs = [j for j in scheduler.get_jobs() if j.id.startswith("cycle-")]
+    offset_minutes = len(existing_jobs) * 15
+
+    if frequency == "monthly":
+        trigger = CronTrigger(day="1", hour=2, minute=offset_minutes)
+    elif frequency == "biweekly":
+        trigger = CronTrigger(day_of_week=cycle_day, hour=2, minute=offset_minutes, week="*/2")
+    else:
+        trigger = CronTrigger(day_of_week=cycle_day, hour=2, minute=offset_minutes)
+
+    scheduler.add_job(
+        trigger_scheduled_run,
+        trigger=trigger,
+        args=[client_id],
+        id=f"cycle-{client_id}",
+        replace_existing=True,
+    )
+    label = f"{cycle_day} 02:{offset_minutes:02d}" if frequency != "monthly" else f"1st of month 02:{offset_minutes:02d}"
+    print(f"  [Scheduler] Scheduled {client_id} ({frequency}) for {label}")
+
+
 def load_schedules():
     try:
         from supabase import create_client
         sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
         result = sb.table("clients").select("id, cycle_frequency, cycle_day").execute()
 
-        day_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
+        # Only schedule clients that have completed at least one run
+        runs_resp = sb.table("pipeline_runs").select("client_id").execute()
+        clients_with_runs = {r["client_id"] for r in runs_resp.data}
 
         # Remove all existing cycle jobs before re-adding
         for job in scheduler.get_jobs():
             if job.id.startswith("cycle-"):
                 scheduler.remove_job(job.id)
 
-        offset_minutes = 0
-
         for client in result.data:
             client_id = client["id"]
-            frequency = client.get("cycle_frequency", "weekly")
-            cycle_day = day_map.get(client.get("cycle_day", 1), "tue")
-
-            if frequency == "monthly":
-                trigger = CronTrigger(day="1", hour=2, minute=offset_minutes)
-            elif frequency == "biweekly":
-                trigger = CronTrigger(day_of_week=cycle_day, hour=2, minute=offset_minutes, week="*/2")
-            else:
-                trigger = CronTrigger(day_of_week=cycle_day, hour=2, minute=offset_minutes)
-
-            scheduler.add_job(
-                trigger_scheduled_run,
-                trigger=trigger,
-                args=[client_id],
-                id=f"cycle-{client_id}",
-                replace_existing=True,
+            if client_id not in clients_with_runs:
+                print(f"  [Scheduler] Skipping {client_id} — no runs yet")
+                continue
+            _add_client_schedule(
+                sb,
+                client_id,
+                client.get("cycle_frequency", "weekly"),
+                client.get("cycle_day", 1),
             )
-            label = f"{cycle_day} 02:{offset_minutes:02d}" if frequency != "monthly" else f"1st of month 02:{offset_minutes:02d}"
-            print(f"  [Scheduler] Scheduled {client_id} ({frequency}) for {label}")
-            offset_minutes += 15
 
     except Exception as e:
         print(f"  [Scheduler] Failed to load schedules: {e}")
@@ -235,6 +250,18 @@ def _run_graph_background(client_id: str, run_type: str, thread_id: str):
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             }).eq("thread_id", thread_id).execute()
             print(f"  [Pipeline] Completed {run_type} for {client_id} (thread: {thread_id})")
+
+        # After first successful run, ensure recurring schedule exists
+        if not any(j.id == f"cycle-{client_id}" for j in scheduler.get_jobs()):
+            client_resp = sb.table("clients").select("cycle_frequency, cycle_day").eq("id", client_id).single().execute()
+            if client_resp.data:
+                _add_client_schedule(
+                    sb,
+                    client_id,
+                    client_resp.data.get("cycle_frequency", "weekly"),
+                    client_resp.data.get("cycle_day", 1),
+                )
+                print(f"  [Scheduler] Activated recurring schedule for {client_id} after first run")
     except Exception as e:
         sb.table("pipeline_runs").update({
             "status": "error",

@@ -22,6 +22,7 @@ const BADGE_COLOR: Record<string, string> = {
   waiting: "#d4a017",
   measuring: "var(--mute)",
   healthy: "var(--faint)",
+  not_run: "var(--mute)",
 };
 
 interface BoardRowProps {

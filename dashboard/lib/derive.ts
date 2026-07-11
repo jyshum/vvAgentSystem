@@ -2,7 +2,7 @@ export interface CompetitorPick { name: string; rate: number }
 export interface RankResult { rank: number; total: number; gapToLeader: number }
 export interface QueryMove { query: string; before: number; after: number; change: number }
 export interface EngineAvg { mention_rate: number; citation_rate: number }
-export type OpsBadgeKind = "error" | "waiting" | "measuring" | "healthy";
+export type OpsBadgeKind = "error" | "waiting" | "measuring" | "healthy" | "not_run";
 export interface OpsBadgeResult { kind: OpsBadgeKind; label: string }
 
 type CompetitorScores = Record<string, { mention_rate: number }> | null | undefined;
@@ -65,7 +65,9 @@ export function opsBadge(input: {
   pendingCount: number;
   oldestPendingDays: number | null;
   measuring: number;
+  hasRun: boolean;
 }): OpsBadgeResult {
+  if (!input.hasRun) return { kind: "not_run", label: "NOT RUN YET" };
   if (input.latestPipelineStatus === "error") return { kind: "error", label: "RUN ERROR" };
   if (input.pendingCount > 0) {
     const age = input.oldestPendingDays != null ? ` · ${input.oldestPendingDays}D` : "";

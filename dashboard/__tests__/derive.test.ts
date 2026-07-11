@@ -76,20 +76,23 @@ describe("biggestMovers", () => {
 });
 
 describe("opsBadge", () => {
+  it("not_run when client has never run", () => {
+    expect(opsBadge({ latestPipelineStatus: null, pendingCount: 0, oldestPendingDays: null, measuring: 0, hasRun: false }).kind).toBe("not_run");
+  });
   it("error wins over everything", () => {
-    expect(opsBadge({ latestPipelineStatus: "error", pendingCount: 3, oldestPendingDays: 2, measuring: 1 }).kind).toBe("error");
+    expect(opsBadge({ latestPipelineStatus: "error", pendingCount: 3, oldestPendingDays: 2, measuring: 1, hasRun: true }).kind).toBe("error");
   });
   it("waiting with age beats measuring", () => {
-    const b = opsBadge({ latestPipelineStatus: "completed", pendingCount: 3, oldestPendingDays: 2, measuring: 1 });
+    const b = opsBadge({ latestPipelineStatus: "completed", pendingCount: 3, oldestPendingDays: 2, measuring: 1, hasRun: true });
     expect(b.kind).toBe("waiting");
     expect(b.label).toBe("3 CARDS · 2D");
   });
   it("measuring when implemented cards await next run", () => {
-    const b = opsBadge({ latestPipelineStatus: "completed", pendingCount: 0, oldestPendingDays: null, measuring: 4 });
+    const b = opsBadge({ latestPipelineStatus: "completed", pendingCount: 0, oldestPendingDays: null, measuring: 4, hasRun: true });
     expect(b.kind).toBe("measuring");
   });
   it("healthy otherwise", () => {
-    expect(opsBadge({ latestPipelineStatus: "completed", pendingCount: 0, oldestPendingDays: null, measuring: 0 }).kind).toBe("healthy");
+    expect(opsBadge({ latestPipelineStatus: "completed", pendingCount: 0, oldestPendingDays: null, measuring: 0, hasRun: true }).kind).toBe("healthy");
   });
 });
 
