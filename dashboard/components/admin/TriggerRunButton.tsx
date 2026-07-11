@@ -1,63 +1,106 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+
+type RunStatus = "idle" | "loading" | "running" | "awaiting_approval" | "implementing" | "completed" | "error";
+
+const ACTIVE_STATUSES = ["running", "awaiting_approval", "implementing"];
+const POLL_INTERVAL = 10_000;
+const STALE_THRESHOLD = 30 * 60_000;
 
 export function TriggerRunButton({ clientId }: { clientId: string }) {
-  const [state, setState] = useState<"idle" | "loading" | "triggered" | "error">("idle");
+  const [status, setStatus] = useState<RunStatus>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState<string | null>(null);
   const router = useRouter();
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  function startPolling() {
-    if (timerRef.current) clearTimeout(timerRef.current);
+  const clearTimers = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
+  }, []);
 
-    async function poll() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("pipeline_runs")
-        .select("id")
-        .eq("client_id", clientId)
-        .in("status", ["running", "awaiting_approval", "implementing"])
-        .limit(1);
+  const formatElapsed = useCallback((start: string) => {
+    const sec = Math.floor((Date.now() - new Date(start).getTime()) / 1000);
+    if (sec < 60) return `${sec}s`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ${sec % 60}s`;
+    return `${Math.floor(min / 60)}h ${min % 60}m`;
+  }, []);
 
-      if (!data || data.length === 0) {
-        setState("idle");
-        router.refresh();
-        timerRef.current = null;
-      } else {
-        timerRef.current = setTimeout(poll, 10000);
+  const startElapsedTimer = useCallback((start: string) => {
+    setStartedAt(start);
+    setElapsed(formatElapsed(start));
+    if (elapsedRef.current) clearInterval(elapsedRef.current);
+    elapsedRef.current = setInterval(() => setElapsed(formatElapsed(start)), 1000);
+  }, [formatElapsed]);
+
+  const checkStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/runs/status?clientId=${clientId}`);
+      if (!res.ok) return;
+      const { run } = await res.json();
+
+      if (!run) {
+        setStatus("idle");
+        clearTimers();
+        return;
       }
-    }
 
-    timerRef.current = setTimeout(poll, 10000);
-  }
+      if (ACTIVE_STATUSES.includes(run.status)) {
+        const age = Date.now() - new Date(run.started_at).getTime();
+        if (age > STALE_THRESHOLD) {
+          setStatus("error");
+          setErrorMsg(`Run appears stale (started ${formatElapsed(run.started_at)} ago)`);
+          clearTimers();
+          return;
+        }
+        setStatus(run.status as RunStatus);
+        startElapsedTimer(run.started_at);
+      } else if (run.status === "completed") {
+        setStatus("completed");
+        clearTimers();
+        router.refresh();
+        setTimeout(() => setStatus("idle"), 6000);
+      } else if (run.status === "error") {
+        setStatus("error");
+        setErrorMsg(run.error_message || "Pipeline failed");
+        clearTimers();
+        setTimeout(() => setStatus("idle"), 10000);
+      } else {
+        setStatus("idle");
+        clearTimers();
+      }
+    } catch {
+      // Network error during poll — keep current state
+    }
+  }, [clientId, clearTimers, formatElapsed, startElapsedTimer, router]);
+
+  const startPolling = useCallback(() => {
+    clearTimers();
+    checkStatus();
+    timerRef.current = setInterval(checkStatus, POLL_INTERVAL);
+  }, [checkStatus, clearTimers]);
 
   useEffect(() => {
-    const supabase = createClient();
-    let cancelled = false;
+    checkStatus().then(() => {
+      // Only start polling if we found an active run
+    });
 
-    async function checkActive() {
-      const { data } = await supabase
-        .from("pipeline_runs")
-        .select("id")
-        .eq("client_id", clientId)
-        .in("status", ["running", "awaiting_approval", "implementing"])
-        .limit(1);
+    return clearTimers;
+  }, [clientId, checkStatus, clearTimers]);
 
-      if (!cancelled && data && data.length > 0) {
-        setState("triggered");
-        startPolling();
-      }
+  useEffect(() => {
+    if (ACTIVE_STATUSES.includes(status) && !timerRef.current) {
+      timerRef.current = setInterval(checkStatus, POLL_INTERVAL);
     }
-
-    checkActive();
-    return () => { cancelled = true; };
-  }, [clientId]);
+  }, [status, checkStatus]);
 
   async function trigger() {
-    setState("loading");
+    setStatus("loading");
     setErrorMsg(null);
     try {
       const res = await fetch("/api/runs/trigger", {
@@ -75,28 +118,46 @@ export function TriggerRunButton({ clientId }: { clientId: string }) {
         }
         throw new Error(msg);
       }
-      setState("triggered");
+      setStatus("running");
       startPolling();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       setErrorMsg(msg);
-      setState("error");
-      setTimeout(() => setState("idle"), 8000);
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 8000);
     }
   }
 
-  const labels = {
+  const isActive = status === "loading" || ACTIVE_STATUSES.includes(status);
+
+  const labels: Record<RunStatus, string> = {
     idle: "RUN NOW",
     loading: "STARTING...",
-    triggered: "RUNNING...",
-    error: "ERROR — RETRY",
+    running: "RUNNING",
+    awaiting_approval: "AWAITING APPROVAL",
+    implementing: "IMPLEMENTING",
+    completed: "COMPLETED ✓",
+    error: "ERROR",
   };
 
-  const styles: Record<string, React.CSSProperties> = {
-    idle: { background: "transparent", color: "var(--white)", border: "1px solid var(--ghost)" },
-    loading: { background: "transparent", color: "var(--pos)", border: "1px solid var(--pos)", opacity: 0.6 },
-    triggered: { background: "transparent", color: "var(--pos)", border: "1px solid var(--pos)", animation: "vv-pulse 1.2s ease-in-out infinite" },
-    error: { background: "rgba(232,154,160,0.08)", color: "var(--neg)", border: "1px solid rgba(232,154,160,0.2)" },
+  const colors: Record<RunStatus, string> = {
+    idle: "var(--white)",
+    loading: "var(--pos)",
+    running: "var(--pos)",
+    awaiting_approval: "#d4a017",
+    implementing: "var(--pos)",
+    completed: "var(--pos)",
+    error: "var(--neg)",
+  };
+
+  const color = colors[status];
+
+  const buttonStyle: React.CSSProperties = {
+    background: status === "completed" ? "rgba(108,195,161,0.08)" : status === "error" ? "rgba(232,154,160,0.08)" : "transparent",
+    color,
+    border: `1px solid ${color}`,
+    ...(isActive ? { animation: "vv-pulse 1.2s ease-in-out infinite" } : {}),
+    ...(isActive ? { opacity: 0.9 } : {}),
   };
 
   return (
@@ -104,18 +165,23 @@ export function TriggerRunButton({ clientId }: { clientId: string }) {
       <style>{`@keyframes vv-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}`}</style>
       <button
         onClick={trigger}
-        disabled={state === "loading" || state === "triggered"}
-        className="font-mono text-[10px] tracking-[0.14em] uppercase py-3 px-7 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:bg-[var(--white)] hover:text-[var(--ink)] hover:border-[var(--white)] flex-shrink-0 disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:bg-transparent disabled:hover:text-[var(--pos)] disabled:hover:border-[var(--pos)]"
-        style={styles[state]}
+        disabled={isActive}
+        className="font-mono text-[10px] tracking-[0.14em] uppercase py-3 px-7 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:bg-[var(--white)] hover:text-[var(--ink)] hover:border-[var(--white)] flex-shrink-0 disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:bg-transparent disabled:hover:text-current disabled:hover:border-current"
+        style={buttonStyle}
       >
-        {labels[state]}
+        {labels[status]}
       </button>
-      {state === "triggered" && (
+      {isActive && (
         <div className="font-mono text-[8px] tracking-[0.04em] text-right" style={{ color: "var(--mute)" }}>
-          Agent running · checking every 15s
+          {elapsed ? `${elapsed} elapsed` : "starting..."} · checking every 10s
         </div>
       )}
-      {state === "error" && errorMsg && (
+      {status === "completed" && (
+        <div className="font-mono text-[8px] tracking-[0.04em] text-right" style={{ color: "var(--pos)" }}>
+          Run finished successfully
+        </div>
+      )}
+      {status === "error" && errorMsg && (
         <div
           className="font-mono text-[8px] tracking-[0.04em] max-w-[280px] text-right leading-relaxed"
           style={{ color: "var(--neg)" }}
