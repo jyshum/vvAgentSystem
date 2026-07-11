@@ -1,10 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-const ALLOWED_EMAILS = (process.env.ADMIN_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+import { isConfiguredAdmin } from "@/lib/auth/admin";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -38,14 +34,14 @@ export async function updateSession(request: NextRequest) {
 
   // Public routes
   if (path === "/login" || path.startsWith("/login/")) {
-    if (user && isAdmin(user.email)) {
+    if (user && isConfiguredAdmin(user.email)) {
       return NextResponse.redirect(new URL("/admin", request.url));
     }
     return supabaseResponse;
   }
 
   // Must be logged in and in the allowlist
-  if (!user || !isAdmin(user.email)) {
+  if (!user || !isConfiguredAdmin(user.email)) {
     await supabase.auth.signOut();
     return NextResponse.redirect(new URL("/login", request.url));
   }
@@ -56,10 +52,4 @@ export async function updateSession(request: NextRequest) {
   }
 
   return supabaseResponse;
-}
-
-function isAdmin(email: string | undefined): boolean {
-  if (!email) return false;
-  if (ALLOWED_EMAILS.length === 0) return false;
-  return ALLOWED_EMAILS.includes(email.toLowerCase());
 }

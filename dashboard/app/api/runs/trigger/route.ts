@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isConfiguredAdmin } from "@/lib/auth/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 const LANGGRAPH_API = process.env.LANGGRAPH_API_URL;
@@ -17,24 +18,16 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { data: clientUser, error: roleError } = await admin
-    .from("client_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
+  if (!isConfiguredAdmin(user.email)) {
+    const { data: clientUser } = await admin
+      .from("client_users")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-  if (roleError || !clientUser) {
-    return NextResponse.json({
-      error: "Forbidden",
-      detail: `client_users lookup: ${roleError?.message ?? "no row found"} | user_id=${user.id}`,
-    }, { status: 403 });
-  }
-
-  if (clientUser.role !== "admin") {
-    return NextResponse.json({
-      error: "Forbidden",
-      detail: `role='${clientUser.role}', need 'admin'`,
-    }, { status: 403 });
+    if (clientUser?.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   if (!LANGGRAPH_API || !LANGGRAPH_KEY) {
