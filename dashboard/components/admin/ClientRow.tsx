@@ -28,7 +28,7 @@ export function ClientRow({ client, latestRun, previousRun }: ClientRowProps) {
 
   return (
     <div
-      onClick={() => router.push(`/admin/clients/${client.id}/runs`)}
+      onClick={() => router.push(`/admin/clients/${client.id}/overview`)}
       className="grid items-center py-5 px-4 border-b transition-all duration-[200ms] group cursor-pointer"
       style={{
         gridTemplateColumns: "2fr 1fr 1fr 1.4fr 80px",
