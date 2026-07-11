@@ -40,8 +40,30 @@ def _get_supabase():
 
 
 def run_tracker_node(state: GEOState) -> dict:
+    from datetime import datetime, timezone, timedelta
     from src.drift import compute_query_set_signature
     from src.tracker import run_tracker, compute_competitive_gaps
+
+    sb = _get_supabase()
+    one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    recent = sb.table("tracker_runs") \
+        .select("id, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores") \
+        .eq("client_id", state["client_id"]) \
+        .gte("ran_at", one_hour_ago) \
+        .order("ran_at", desc=True) \
+        .limit(1) \
+        .execute()
+
+    if recent.data:
+        run_id = recent.data[0]["id"]
+        print(f"  Tracker: recent run {run_id} found (< 1h old), skipping")
+        results_resp = sb.table("tracker_results").select("*").eq("run_id", run_id).execute()
+        results = results_resp.data or []
+        competitors = state["client_config"].get("competitors", [])
+        gaps_resp = sb.table("competitive_gaps").select("*").eq("run_id", run_id).execute()
+        gaps = gaps_resp.data or []
+        return {"tracker_results": results, "tracker_scores": recent.data[0], "competitive_gaps": gaps}
+
     try:
         results, scores = run_tracker(state["client_config"])
         competitors = state["client_config"].get("competitors", [])

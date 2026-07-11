@@ -1,4 +1,4 @@
-# AI Visibility Improvement Pipeline — Design Spec
+yup # AI Visibility Improvement Pipeline — Design Spec
 
 ## Goal
 
@@ -50,7 +50,7 @@ Verify AI bots can access the client's website. All checks are deterministic HTT
 
 2. **JavaScript rendering** — Fetch 3 key pages (homepage + 2 highest-traffic from sitemap) with a plain HTTP client (no JS). Compare word count of raw HTML vs what the page title/meta suggests. If raw HTML body contains < 200 words but page clearly has content → JS-dependent, GPTBot can't read it.
 
-3. **CDN/hosting blocks** — Fetch homepage with `User-Agent: GPTBot/1.0` header. If response is 403/401/503 → CDN is blocking AI bots.
+3. /— Fetch homepage with `User-Agent: GPTBot/1.0` header. If response is 403/401/503 → CDN is blocking AI bots.
 
 4. **XML sitemap** — Check `{domain}/sitemap.xml` exists, returns 200, contains `<loc>` entries. Check if referenced in robots.txt.
 
