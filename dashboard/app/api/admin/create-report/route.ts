@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isAdminUser } from "@/lib/auth/admin";
 import { redirect } from "next/navigation";
 
 export async function GET(request: Request) {
@@ -17,13 +18,7 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  const { data: clientUser } = await supabase
-    .from("client_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (clientUser?.role !== "admin") {
+  if (!(await isAdminUser(user))) {
     return new Response("Forbidden", { status: 403 });
   }
 

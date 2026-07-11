@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isAdminUser } from "@/lib/auth/admin";
 import { aggregatePromptScores, computePromptStability } from "@/lib/stability";
 
 export async function GET(
@@ -14,13 +15,7 @@ export async function GET(
   } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: clientUser } = await supabase
-    .from("client_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (clientUser?.role !== "admin") {
+  if (!(await isAdminUser(user))) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 

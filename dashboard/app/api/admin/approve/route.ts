@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isAdminUser } from "@/lib/auth/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 const LANGGRAPH_API = process.env.LANGGRAPH_API_URL;
@@ -11,13 +12,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const admin = createAdminClient();
-  const { data: clientUser } = await admin
-    .from("client_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!clientUser || clientUser.role !== "admin") {
+  if (!(await isAdminUser(user))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

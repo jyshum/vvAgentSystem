@@ -52,7 +52,7 @@ export function TriggerRunButton({ clientId }: { clientId: string }) {
 
       if (ACTIVE_STATUSES.includes(run.status)) {
         const age = Date.now() - new Date(run.started_at).getTime();
-        if (age > STALE_THRESHOLD) {
+        if (run.status !== "awaiting_approval" && age > STALE_THRESHOLD) {
           setStatus("error");
           setErrorMsg(`Run appears stale (started ${formatElapsed(run.started_at)} ago)`);
           clearTimers();

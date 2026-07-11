@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isAdminUser } from "@/lib/auth/admin";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -12,13 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: clientUser } = await supabase
-    .from("client_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (clientUser?.role !== "admin") {
+  if (!(await isAdminUser(user))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

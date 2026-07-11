@@ -63,7 +63,7 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
   const cycleCount = rows[0]?.cells.length ?? 0;
   const cycleLabels =
     rows[0]?.cells.map((c) => ({
-      label: new Date(c.ranAt).toLocaleDateString("en-US", { month: "numeric", day: "numeric" }),
+      label: new Date(c.ranAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       changed: c.querySetChanged === true,
     })) ?? [];
 
@@ -71,8 +71,7 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
   const groupedRows = [
     { bucket: "consideration", label: BUCKET_LABELS.consideration, rows: rows.filter((r) => (r.bucket ?? "consideration") === "consideration") },
     { bucket: "awareness", label: BUCKET_LABELS.awareness, rows: rows.filter((r) => r.bucket === "awareness") },
-    { bucket: "branded", label: BUCKET_LABELS.branded, rows: rows.filter((r) => r.bucket === "branded") },
-  ] as const;
+  ].filter((g) => g.rows.length > 0);
 
   return (
     <div>
@@ -114,10 +113,9 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
         <div key={group.bucket}>
           <div
             className="px-4 py-3 font-mono text-[9px] tracking-[0.18em] uppercase"
-            style={{ color: group.bucket === "branded" ? "#d4a017" : "var(--faint)", borderBottom: "1px solid var(--hair)" }}
+            style={{ color: "var(--faint)", borderBottom: "1px solid var(--hair)" }}
           >
             {group.label} · {group.rows.length}
-            {group.bucket === "branded" ? " · deferred / not measured" : ""}
           </div>
           {group.rows.map((row) => {
             const rowKey = row.queryId || row.query;

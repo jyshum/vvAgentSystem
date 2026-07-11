@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isAdminUser } from "@/lib/auth/admin";
 import { buildIntentImportRows } from "@/lib/intent-import";
 
 function generateSlug(text: string): string {
@@ -29,13 +30,7 @@ async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: clientUser } = await supabase
-    .from("client_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
-
-  return clientUser?.role === "admin" ? user : null;
+  return (await isAdminUser(user)) ? user : null;
 }
 
 export async function GET(

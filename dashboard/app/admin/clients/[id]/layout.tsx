@@ -188,10 +188,7 @@ export default async function ClientLayout({
               )}
               <div className="font-serif text-[13px] mt-2.5" style={{ color: "var(--mute)" }}>
                 {contentCitationRate !== null ? (
-                  <>
-                    Content Authority citation: {Math.round(contentCitationRate * 100)}%{" "}
-                    <span style={{ color: "var(--faint)" }}> · branded deferred</span>
-                  </>
+                  <>Content Authority citation: {Math.round(contentCitationRate * 100)}%</>
                 ) : (
                   "product visibility pending"
                 )}

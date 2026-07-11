@@ -58,9 +58,6 @@ export function KPIGrid({ run, previousRuns = [] }: KPIGridProps) {
               <span>{Math.abs(mentionDelta)}pp vs last week</span>
             </div>
           )}
-          <div className="font-mono text-[9px] tracking-[0.06em]" style={{ color: "var(--p-faint)" }}>
-            Branded deferred
-          </div>
           <div className="mt-auto pt-3">
             <SparklineChart
               values={primaryRate == null ? mentionHistory : [...mentionHistory, primaryRate]}
