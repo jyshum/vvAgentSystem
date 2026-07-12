@@ -35,7 +35,10 @@ export async function PATCH(
   const body = await request.json();
   const update: Record<string, unknown> = {};
   for (const field of UPDATABLE_FIELDS) {
-    if (field in body) update[field] = body[field];
+    if (field in body) {
+      const value = body[field];
+      update[field] = typeof value === "string" ? value.trim() : value;
+    }
   }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "No updatable fields provided" }, { status: 400 });

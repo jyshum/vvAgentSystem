@@ -36,3 +36,39 @@ def test_fetch_gsc_metrics_no_credentials():
 
     assert result["queries"] == []
     assert result["error"] == "no creds"
+
+
+def test_get_service_uses_env_json_when_no_file(monkeypatch, tmp_path):
+    """Railway has no gsc-credentials.json file — creds must load from
+    GOOGLE_SERVICE_ACCOUNT_JSON env var."""
+    import src.gsc as gsc
+
+    gsc._service = None
+    monkeypatch.chdir(tmp_path)  # no credentials file here
+    monkeypatch.setenv("GOOGLE_SERVICE_ACCOUNT_JSON", '{"client_email": "svc@x.iam"}')
+
+    with patch("google.oauth2.service_account.Credentials") as mock_creds, \
+         patch("googleapiclient.discovery.build"):
+        gsc._get_service()
+        mock_creds.from_service_account_info.assert_called_once()
+        info = mock_creds.from_service_account_info.call_args.args[0]
+        assert info == {"client_email": "svc@x.iam"}
+
+    gsc._service = None
+
+
+def test_get_service_prefers_file_when_present(monkeypatch, tmp_path):
+    import src.gsc as gsc
+
+    gsc._service = None
+    creds_file = tmp_path / "gsc-credentials.json"
+    creds_file.write_text('{"client_email": "file@x.iam"}')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GOOGLE_SERVICE_ACCOUNT_JSON", '{"client_email": "env@x.iam"}')
+
+    with patch("google.oauth2.service_account.Credentials") as mock_creds, \
+         patch("googleapiclient.discovery.build"):
+        gsc._get_service()
+        mock_creds.from_service_account_file.assert_called_once()
+
+    gsc._service = None

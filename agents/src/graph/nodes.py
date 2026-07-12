@@ -133,7 +133,9 @@ def run_tracker_node(state: GEOState) -> dict:
 
 
 def run_gsc_node(state: GEOState) -> dict:
-    gsc_site_url = state["client_config"].get("gsc_site_url", "")
+    # Strip whitespace — GSC property IDs must match byte-for-byte, and the
+    # config UI has accepted values with stray spaces.
+    gsc_site_url = (state["client_config"].get("gsc_site_url") or "").strip()
     if not gsc_site_url:
         print("  GSC: no site URL configured, skipping")
         return {"gsc_metrics": {}}

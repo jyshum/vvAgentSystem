@@ -94,8 +94,9 @@ describe("PATCH /api/admin/clients/[id]", () => {
       throw new Error(`unexpected table ${table}`);
     });
 
-    const res = await callPatch({ gsc_site_url: "https://www.x.com/", id: "evil", created_at: "now" });
+    const res = await callPatch({ gsc_site_url: " https://www.x.com/ ", id: "evil", created_at: "now" });
     expect(res.status).toBe(200);
+    // stray whitespace trimmed — GSC property IDs must match byte-for-byte
     expect(clientsUpdate).toHaveBeenCalledWith({ gsc_site_url: "https://www.x.com/" });
   });
 

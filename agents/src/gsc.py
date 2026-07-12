@@ -8,14 +8,24 @@ _service = None
 def _get_service():
     global _service
     if _service is None:
+        import json
+
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
 
+        scopes = ["https://www.googleapis.com/auth/webmasters.readonly"]
         creds_path = os.environ.get("GSC_CREDENTIALS_PATH", "gsc-credentials.json")
-        creds = service_account.Credentials.from_service_account_file(
-            creds_path,
-            scopes=["https://www.googleapis.com/auth/webmasters.readonly"],
-        )
+        if os.path.exists(creds_path):
+            creds = service_account.Credentials.from_service_account_file(creds_path, scopes=scopes)
+        else:
+            # Deployed environments (Railway) have no credentials file — the
+            # service-account JSON is provided via env instead.
+            raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+            if not raw:
+                raise FileNotFoundError(
+                    f"No GSC credentials: {creds_path} missing and GOOGLE_SERVICE_ACCOUNT_JSON unset"
+                )
+            creds = service_account.Credentials.from_service_account_info(json.loads(raw), scopes=scopes)
         _service = build("searchconsole", "v1", credentials=creds)
     return _service
 
