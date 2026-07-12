@@ -123,8 +123,40 @@ class TestPrioritizeCards:
 
 def _mock_client_returning(text: str) -> MagicMock:
     client = MagicMock()
-    client.messages.create.return_value = MagicMock(content=[MagicMock(text=text)])
+    client.messages.create.return_value = MagicMock(content=[MagicMock(type="text", text=text)])
     return client
+
+
+class TestThinkingBlockHandling:
+    @patch("src.improvement.card_generator._get_client")
+    def test_text_extracted_when_thinking_block_precedes_it(self, mock_get_client):
+        """Sonnet 5 runs adaptive thinking by default — content[0] may be a
+        thinking block with no .text worth reading."""
+        thinking = MagicMock(type="thinking")
+        text = MagicMock(type="text", text=json.dumps({
+            "specificity": 4, "completeness": 3, "answer_directness": 5, "summary": "ok",
+        }))
+        client = MagicMock()
+        client.messages.create.return_value = MagicMock(content=[thinking, text])
+        mock_get_client.return_value = client
+
+        result = generate_sonnet_quality("page text", "query", {})
+        assert result["specificity"] == 4
+
+    @patch("src.improvement.card_generator._get_client")
+    def test_thinking_disabled_on_card_calls(self, mock_get_client):
+        client = _mock_client_returning("{}")
+        mock_get_client.return_value = client
+        generate_sonnet_quality("page text", "query", {})
+        assert client.messages.create.call_args.kwargs["thinking"] == {"type": "disabled"}
+
+    @patch("src.improvement.card_generator._get_client")
+    def test_no_text_blocks_raises(self, mock_get_client):
+        client = MagicMock()
+        client.messages.create.return_value = MagicMock(content=[MagicMock(type="thinking")])
+        mock_get_client.return_value = client
+        with pytest.raises(CardGenerationError, match="no text"):
+            generate_sonnet_quality("page text", "query", {})
 
 
 class TestCardGenModel:

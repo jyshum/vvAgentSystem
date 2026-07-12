@@ -29,9 +29,20 @@ def _card_gen_message(prompt: str, max_tokens: int) -> str:
         response = _get_client().messages.create(
             model=_card_gen_model(),
             max_tokens=max_tokens,
+            # Sonnet 5 runs adaptive thinking when the param is omitted; these
+            # are small structured-JSON calls, so keep thinking off — otherwise
+            # thinking blocks eat the max_tokens budget and lead the content list.
+            thinking={"type": "disabled"},
             messages=[{"role": "user", "content": prompt}],
         )
-        return response.content[0].text
+        texts = [b.text for b in response.content if getattr(b, "type", None) == "text"]
+        if not texts:
+            raise CardGenerationError(
+                f"card model returned no text blocks ({_card_gen_model()})"
+            )
+        return "".join(texts)
+    except CardGenerationError:
+        raise
     except Exception as e:
         raise CardGenerationError(f"card model call failed ({_card_gen_model()}): {e}") from e
 
