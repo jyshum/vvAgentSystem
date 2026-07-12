@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { TagInput } from "./TagInput";
 import type { Client } from "@/lib/types";
 
@@ -27,22 +26,36 @@ export function ConfigForm({ client }: { client: Client }) {
   async function save() {
     setSaving(true);
     setSaveError(null);
-    const supabase = createClient();
-    const { error } = await supabase.from("clients").update({
-      name: clientName,
-      brand_name: brandName,
-      website_domain: domain,
-      brand_variations: variations,
-      competitors: competitors,
-      gsc_site_url: gscSiteUrl,
-      cms_type: cmsType,
-      cms_config: cmsConfig,
-      cycle_frequency: cycleFrequency,
-      cycle_day: cycleDay,
-    }).eq("id", client.id);
+    // Saved via server route: browser-side updates are silently dropped by RLS
+    // for ADMIN_EMAILS admins (no client_users row), showing a false "SAVED ✓".
+    let errorMessage: string | null = null;
+    try {
+      const res = await fetch(`/api/admin/clients/${client.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: clientName,
+          brand_name: brandName,
+          website_domain: domain,
+          brand_variations: variations,
+          competitors: competitors,
+          gsc_site_url: gscSiteUrl,
+          cms_type: cmsType,
+          cms_config: cmsConfig,
+          cycle_frequency: cycleFrequency,
+          cycle_day: cycleDay,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        errorMessage = data?.error ?? `Save failed (${res.status})`;
+      }
+    } catch (e) {
+      errorMessage = e instanceof Error ? e.message : "Network error";
+    }
     setSaving(false);
-    if (error) {
-      setSaveError(error.message);
+    if (errorMessage) {
+      setSaveError(errorMessage);
       return;
     }
     setSaved(true);
