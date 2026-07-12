@@ -30,6 +30,11 @@ describe("HeatTable", () => {
     expect(screen.getByText(/KinderCare/)).toBeTruthy();
     expect(screen.getByText(/2 PENDING/)).toBeTruthy();
   });
+  it("pending badge deep-links to approvals filtered by query", () => {
+    render(<HeatTable rows={[row]} clientId="c1" />);
+    const badges = screen.getAllByText(/2 PENDING/) as HTMLAnchorElement[];
+    expect(badges.at(-1)!.getAttribute("href")).toBe("/admin/approvals?query=query-1");
+  });
   it("flags weak matches", () => {
     render(<HeatTable rows={[{ ...row, page: { ...row.page!, weak: true } }]} clientId="c1" />);
     expect(screen.getByText(/WEAK/)).toBeTruthy();

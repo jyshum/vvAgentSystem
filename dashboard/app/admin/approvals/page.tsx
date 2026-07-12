@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { InboxGroup, type InboxGroupData } from "@/components/approvals/InboxGroup";
+import { CardHighlighter } from "@/components/approvals/CardHighlighter";
 import type { ReviewCardData } from "@/components/approvals/card-shared";
 import { topCompetitor, rankAndGap } from "@/lib/derive";
 import { formatRate, formatDelta } from "@/lib/utils";
@@ -218,6 +219,7 @@ export default async function ApprovalsPage() {
       {groups.map((g) => (
         <InboxGroup key={g.runId} group={g} />
       ))}
+      <CardHighlighter />
     </div>
   );
 }

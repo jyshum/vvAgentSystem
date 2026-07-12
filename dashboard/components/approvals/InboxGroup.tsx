@@ -95,17 +95,26 @@ export function InboxGroup({ group }: { group: InboxGroupData }) {
           <div className="space-y-4 my-5">
             {group.cards.map((card) => {
               const cardProps = { card, decision: decisions[card.id], onDecide };
-              switch (card.action_type) {
-                case "content_brief":
-                  return <BriefCard key={card.id} {...cardProps} />;
-                case "community_check":
-                case "reddit_engagement":
-                  return <CommunityCheckCard key={card.id} {...cardProps} />;
-                case "fix_crawlability":
-                  return <CrawlabilityCard key={card.id} {...cardProps} />;
-                default:
-                  return <AutomatedCard key={card.id} {...cardProps} />;
-              }
+              const inner = (() => {
+                switch (card.action_type) {
+                  case "content_brief":
+                    return <BriefCard {...cardProps} />;
+                  case "community_check":
+                  case "reddit_engagement":
+                    return <CommunityCheckCard {...cardProps} />;
+                  case "fix_crawlability":
+                    return <CrawlabilityCard {...cardProps} />;
+                  default:
+                    return <AutomatedCard {...cardProps} />;
+                }
+              })();
+              return (
+                // Anchor for deep links from the queries tab (?query=<id>):
+                // CardHighlighter scrolls to and highlights matching cards.
+                <div key={card.id} id={`card-${card.id}`} data-query-id={card.query_id ?? ""}>
+                  {inner}
+                </div>
+              );
             })}
           </div>
 

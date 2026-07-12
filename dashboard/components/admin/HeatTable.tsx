@@ -33,6 +33,10 @@ interface HeatTableProps {
   clientId: string;
 }
 
+function approvalsHref(queryId: string | null): string {
+  return queryId ? `/admin/approvals?query=${queryId}` : "/admin/approvals";
+}
+
 function heatBg(rate: number | null): string {
   if (rate === null) return "transparent";
   if (rate === 0) return "rgba(232,154,160,0.14)";
@@ -213,7 +217,7 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
                   <div>
                     {row.waiting > 0 ? (
                       <Link
-                        href="/admin/approvals"
+                        href={approvalsHref(row.queryId)}
                         title="Pending action cards generated for this query — review in the approvals inbox"
                         onClick={(e) => e.stopPropagation()}
                         className="font-mono text-[8px] tracking-[0.08em] px-1.5 py-0.5"
@@ -229,7 +233,22 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
                   </div>
                 </div>
 
-                {isExpanded && <QueryExpansion clientId={clientId} query={row.query} queryId={row.queryId} />}
+                {isExpanded && (
+                  <>
+                    <QueryExpansion clientId={clientId} query={row.query} queryId={row.queryId} />
+                    {row.waiting > 0 && (
+                      <div className="px-4 pb-3">
+                        <Link
+                          href={approvalsHref(row.queryId)}
+                          className="inline-block font-mono text-[9px] tracking-[0.1em] uppercase px-3 py-1.5"
+                          style={{ color: "var(--white)", border: "1px solid var(--hair)", background: "var(--ink-soft)" }}
+                        >
+                          VIEW {row.waiting} PENDING CARD{row.waiting > 1 ? "S" : ""} FOR THIS QUERY →
+                        </Link>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             );
           })}
