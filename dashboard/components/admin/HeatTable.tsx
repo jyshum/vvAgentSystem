@@ -87,7 +87,11 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
             key={i}
             className="font-mono text-[8px] tracking-[0.18em] uppercase text-center"
             style={{ color: changed ? "#d4a017" : "var(--faint)" }}
-            title={changed ? "Query set changed on this cycle" : undefined}
+            title={
+              changed
+                ? "Query set changed on this cycle"
+                : "Mention rate for this intent, averaged equally across engines"
+            }
           >
             {label}{changed ? "*" : ""}
           </div>
@@ -95,7 +99,11 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
         <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
           STABILITY
         </div>
-        <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
+        <div
+          className="font-mono text-[8px] tracking-[0.18em] uppercase"
+          style={{ color: "var(--faint)" }}
+          title="Of the responses that mentioned the brand, how many cited the site — averaged across engines"
+        >
           CITED
         </div>
         <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
@@ -105,7 +113,7 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
           TOP COMPETITOR
         </div>
         <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
-          WAITING
+          CARDS
         </div>
       </div>
 
@@ -185,6 +193,7 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
                           <span
                             className="font-mono text-[8px] tracking-[0.08em] ml-1.5 px-1"
                             style={{ color: "#d4a017", border: "1px solid #d4a017" }}
+                            title="Weak match (similarity 0.3–0.5): no page is close enough to this query to score or generate cards — consider new content for it"
                           >
                             WEAK
                           </span>
@@ -205,11 +214,12 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
                     {row.waiting > 0 ? (
                       <Link
                         href="/admin/approvals"
+                        title="Pending action cards generated for this query — review in the approvals inbox"
                         onClick={(e) => e.stopPropagation()}
                         className="font-mono text-[8px] tracking-[0.08em] px-1.5 py-0.5"
                         style={{ color: "#d4a017", border: "1px solid #d4a017" }}
                       >
-                        {row.waiting} WAITING
+                        {row.waiting} PENDING
                       </Link>
                     ) : (
                       <span className="font-mono text-[9px]" style={{ color: "var(--faint)" }}>

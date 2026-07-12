@@ -1,5 +1,71 @@
 import { describe, it, expect } from "vitest";
-import { extractMentionSentence, pickRepresentative } from "@/lib/mention";
+import {
+  extractMentionSentence,
+  pickRepresentative,
+  aggregateCompetitorMentions,
+  extractAllMentionEvidence,
+} from "@/lib/mention";
+
+describe("aggregateCompetitorMentions", () => {
+  it("unions competitor names across rows with counts, sorted desc", () => {
+    const rows = [
+      { competitor_mentions: ["YNAB", "MD Financial Management"] },
+      { competitor_mentions: ["YNAB"] },
+      { competitor_mentions: null },
+      { competitor_mentions: [] },
+    ];
+    expect(aggregateCompetitorMentions(rows)).toEqual([
+      { name: "YNAB", count: 2 },
+      { name: "MD Financial Management", count: 1 },
+    ]);
+  });
+  it("empty when no rows mention competitors", () => {
+    expect(aggregateCompetitorMentions([{ competitor_mentions: null }])).toEqual([]);
+    expect(aggregateCompetitorMentions([])).toEqual([]);
+  });
+});
+
+describe("extractAllMentionEvidence", () => {
+  const rows = [
+    {
+      brand_mentioned: true,
+      query: "wording A",
+      response_text: "Intro. Brightwheel is great for daycares. Outro.",
+    },
+    {
+      brand_mentioned: false,
+      query: "wording B",
+      response_text: "Brightwheel never mind this row is unmentioned.",
+    },
+    {
+      brand_mentioned: true,
+      query: "wording C",
+      response_text: "Try bright wheel today.",
+    },
+  ];
+  it("returns one evidence item per mentioned row, tagged with its wording", () => {
+    const out = extractAllMentionEvidence(rows, ["Brightwheel", "bright wheel"]);
+    expect(out).toEqual([
+      {
+        wording: "wording A",
+        sentence: "Brightwheel is great for daycares.",
+        brand: "Brightwheel",
+      },
+      {
+        wording: "wording C",
+        sentence: "Try bright wheel today.",
+        brand: "bright wheel",
+      },
+    ]);
+  });
+  it("skips mentioned rows where no sentence can be extracted", () => {
+    const out = extractAllMentionEvidence(
+      [{ brand_mentioned: true, query: "w", response_text: "no brand here." }],
+      ["Brightwheel"],
+    );
+    expect(out).toEqual([]);
+  });
+});
 
 describe("extractMentionSentence", () => {
   const text =

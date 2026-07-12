@@ -28,7 +28,7 @@ describe("HeatTable", () => {
     expect(screen.getByText(/gaining/i)).toBeTruthy();
     expect(screen.getByText("25%")).toBeTruthy();
     expect(screen.getByText(/KinderCare/)).toBeTruthy();
-    expect(screen.getByText(/2 WAITING/)).toBeTruthy();
+    expect(screen.getByText(/2 PENDING/)).toBeTruthy();
   });
   it("flags weak matches", () => {
     render(<HeatTable rows={[{ ...row, page: { ...row.page!, weak: true } }]} clientId="c1" />);

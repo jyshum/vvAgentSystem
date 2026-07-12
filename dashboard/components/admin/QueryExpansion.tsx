@@ -2,6 +2,17 @@
 
 import { useEffect, useState } from "react";
 
+interface CompetitorCount {
+  name: string;
+  count: number;
+}
+
+interface MentionEvidence {
+  wording: string;
+  sentence: string;
+  brand: string;
+}
+
 interface EngineDetail {
   engine: string;
   total: number;
@@ -10,8 +21,8 @@ interface EngineDetail {
   mentioned: boolean;
   cited: boolean;
   citationUrl: string | null;
-  sentence: { sentence: string; brand: string } | null;
-  competitorsRecommended: string[];
+  mentions: MentionEvidence[];
+  competitorsNamed: CompetitorCount[];
   wordings: string[];
 }
 
@@ -96,18 +107,23 @@ export function QueryExpansion({ clientId, query, queryId }: QueryExpansionProps
             {eng.engine}
           </div>
           <div className="font-mono text-[9px] mb-1.5" style={{ color: "var(--mute)" }}>
-            mentioned {eng.mentionedCount}/{eng.total} · cited {eng.citedCount}/{eng.total}
+            mentioned {eng.mentionedCount}/{eng.total} wordings · cited {eng.citedCount}/{eng.total} wordings
           </div>
           {eng.wordings.length > 1 && (
             <div className="font-mono text-[8px] mb-1.5" style={{ color: "var(--faint)" }}>
               {eng.wordings.length} wordings sampled
             </div>
           )}
-          {eng.sentence && (
-            <div className="font-serif text-[13px] mb-1.5" style={{ color: "var(--white)" }}>
-              <HighlightedSentence sentence={eng.sentence.sentence} brand={eng.sentence.brand} />
+          {eng.mentions.map((m, i) => (
+            <div key={i} className="mb-1.5">
+              <div className="font-serif text-[13px]" style={{ color: "var(--white)" }}>
+                <HighlightedSentence sentence={m.sentence} brand={m.brand} />
+              </div>
+              <div className="font-mono text-[8px] mt-0.5" style={{ color: "var(--faint)" }}>
+                wording: &ldquo;{m.wording}&rdquo;
+              </div>
             </div>
-          )}
+          ))}
           {eng.cited && eng.citationUrl && (
             <a
               href={eng.citationUrl}
@@ -119,14 +135,17 @@ export function QueryExpansion({ clientId, query, queryId }: QueryExpansionProps
               {eng.citationUrl}
             </a>
           )}
-          {!eng.mentioned && (
+          {eng.competitorsNamed.length > 0 ? (
             <div
               className="font-serif text-[12px]"
-              style={{ color: eng.competitorsRecommended.length > 0 ? "var(--neg)" : "var(--faint)" }}
+              style={{ color: eng.mentioned ? "#d4a017" : "var(--neg)" }}
             >
-              {eng.competitorsRecommended.length > 0
-                ? `answer recommended: ${eng.competitorsRecommended.join(", ")}`
-                : "no competitors named"}
+              {eng.mentioned ? "co-mentioned with competitors: " : "answer recommended: "}
+              {eng.competitorsNamed.map((c) => `${c.name} ${c.count}/${eng.total}`).join(", ")}
+            </div>
+          ) : (
+            <div className="font-serif text-[12px]" style={{ color: "var(--faint)" }}>
+              no competitors named
             </div>
           )}
         </div>

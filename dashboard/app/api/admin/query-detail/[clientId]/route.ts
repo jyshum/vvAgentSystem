@@ -1,7 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminUser } from "@/lib/auth/admin";
-import { pickRepresentative, extractMentionSentence } from "@/lib/mention";
+import {
+  pickRepresentative,
+  aggregateCompetitorMentions,
+  extractAllMentionEvidence,
+} from "@/lib/mention";
 
 export async function GET(
   request: Request,
@@ -84,10 +88,8 @@ export async function GET(
     const citedCount = engineRows.filter((r) => r.brand_cited).length;
     const mentioned = mentionedCount > 0;
     const cited = citedCount > 0;
+    const mentions = extractAllMentionEvidence(engineRows, allBrandTerms);
     const rep = pickRepresentative(engineRows);
-    const sentence = rep?.response_text
-      ? extractMentionSentence(rep.response_text, allBrandTerms)
-      : null;
 
     let citationUrl: string | null = null;
     if (rep?.brand_cited && rep.citation_url) {
@@ -97,8 +99,6 @@ export async function GET(
       citationUrl = firstCited?.citation_url ?? null;
     }
 
-    const competitorsRecommended = !mentioned ? (rep?.competitor_mentions ?? []) : [];
-
     return {
       engine,
       total,
@@ -107,8 +107,8 @@ export async function GET(
       mentioned,
       cited,
       citationUrl,
-      sentence,
-      competitorsRecommended,
+      mentions,
+      competitorsNamed: aggregateCompetitorMentions(engineRows),
       wordings: Array.from(new Set(engineRows.map((r) => r.query))),
     };
   });

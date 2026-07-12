@@ -323,7 +323,7 @@ export default async function RunDetailPage({
           className="font-mono text-[10px] tracking-[0.06em] mb-8"
           style={{ color: "var(--mute)" }}
         >
-          {queryMatches.length} queries → {matchedCount} matched → {citationScores.length} scored → {gapsCount} gaps → {totalCards} cards → {autoCards} auto + {pendingCards} to you
+          {queryMatches.length} queries → {matchedCount} matched · {weakCount} weak · {gapsCount} content gaps → {citationScores.length} page{citationScores.length === 1 ? "" : "s"} scored → {improvementRun.competitive_gaps_found ?? 0} competitive gaps → {totalCards} cards → {autoCards} auto + {pendingCards} to you
         </div>
       )}
 

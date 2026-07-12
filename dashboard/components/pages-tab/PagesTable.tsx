@@ -49,6 +49,19 @@ function checkLabel(key: string): string {
   return key.replace(/_/g, " ").toUpperCase();
 }
 
+// Fixed per-check maximums from agents/src/improvement/scorer.py — sum to 100.
+const CHECK_MAX: Record<string, number> = {
+  answer_first: 15,
+  faq_schema: 10,
+  comparison_tables: 10,
+  lists: 10,
+  freshness: 10,
+  word_count: 10,
+  source_citations: 10,
+  author_attribution: 10,
+  schema_validation: 15,
+};
+
 function pagePathname(url: string): string {
   try {
     return new URL(url).pathname;
@@ -197,28 +210,51 @@ export function PagesTable({ rows, gaps }: PagesTableProps) {
                     <div>
                       {CHECK_ORDER.filter((key) => row.checks && key in row.checks).map((key) => {
                         const check = row.checks![key];
+                        const max = CHECK_MAX[key];
+                        const fraction = max ? Math.max(0, Math.min(1, check.score / max)) : 0;
                         return (
                           <div
                             key={key}
-                            className="flex items-baseline justify-between py-1.5 border-b"
+                            className="flex items-baseline justify-between gap-3 py-1.5 border-b"
                             style={{ borderColor: "var(--hair)" }}
                           >
                             <span
-                              className="font-mono text-[9px] tracking-[0.06em] uppercase"
+                              className="font-mono text-[9px] tracking-[0.06em] uppercase shrink-0"
                               style={{ color: "var(--mute)" }}
                             >
                               {checkLabel(key)}
                             </span>
-                            <span className="font-mono text-[10px]" style={{ color: "var(--white)" }}>
-                              {check.score} pts
+                            <span className="flex items-baseline justify-end gap-2 min-w-0">
                               {check.detail && (
                                 <span
-                                  className="font-serif not-italic text-[12px] ml-2"
+                                  className="font-serif not-italic text-[12px] truncate"
                                   style={{ color: "var(--faint)" }}
                                 >
                                   {check.detail}
                                 </span>
                               )}
+                              {max != null && (
+                                <span
+                                  className="inline-block h-[4px] w-[48px] shrink-0 self-center"
+                                  style={{ background: "var(--hair)" }}
+                                  aria-hidden
+                                >
+                                  <span
+                                    className="block h-full"
+                                    style={{
+                                      width: `${Math.round(fraction * 100)}%`,
+                                      background:
+                                        fraction >= 0.99 ? "var(--pos)" : fraction > 0 ? "#ffc107" : "var(--neg)",
+                                    }}
+                                  />
+                                </span>
+                              )}
+                              <span
+                                className="font-mono text-[10px] shrink-0"
+                                style={{ color: "var(--white)" }}
+                              >
+                                {max != null ? `${check.score}/${max} pts` : `${check.score} pts`}
+                              </span>
                             </span>
                           </div>
                         );

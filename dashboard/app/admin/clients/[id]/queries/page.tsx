@@ -177,8 +177,13 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
 
   return (
     <div>
-      <div className="font-mono text-[9px] tracking-[0.18em] uppercase mb-5" style={{ color: "var(--faint)" }}>
-        QUERY × CYCLE
+      <div className="mb-5">
+        <div className="font-mono text-[9px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
+          QUERY × CYCLE
+        </div>
+        <div className="font-serif italic text-[11px] mt-1" style={{ color: "var(--faint)" }}>
+          cell % = intent mention rate averaged equally across engines · cited % = of responses that mentioned the brand
+        </div>
       </div>
       <HeatTable rows={rows} clientId={id} />
     </div>
