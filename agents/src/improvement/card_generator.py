@@ -4,12 +4,36 @@ import anthropic
 
 _client = None
 
+DEFAULT_CARD_GEN_MODEL = "claude-sonnet-5"
+
+
+class CardGenerationError(Exception):
+    """API-level failure during card generation — must abort the run, not degrade it silently."""
+
+
+def _card_gen_model() -> str:
+    return os.environ.get("CARD_GEN_MODEL", DEFAULT_CARD_GEN_MODEL)
+
 
 def _get_client():
     global _client
     if _client is None:
         _client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     return _client
+
+
+def _card_gen_message(prompt: str, max_tokens: int) -> str:
+    # SDK retries transient errors itself; anything that still raises here
+    # (retired model, auth, quota) would poison every card in the run.
+    try:
+        response = _get_client().messages.create(
+            model=_card_gen_model(),
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.content[0].text
+    except Exception as e:
+        raise CardGenerationError(f"card model call failed ({_card_gen_model()}): {e}") from e
 
 
 def classify_actions(score_result: dict, page_url: str) -> list[dict]:
@@ -200,32 +224,26 @@ Rules:
 - For update_freshness: provide updated meta tag with today's date
 - All schema output must include @context and valid @type"""
 
+    raw = _card_gen_message(prompt, max_tokens=2048)
+
     try:
-        response = _get_client().messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = response.content[0].text
-
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            import re
-            match = re.search(r'\{.*\}', raw, re.DOTALL)
-            if match:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        import re
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if match:
+            try:
                 data = json.loads(match.group())
-            else:
+            except json.JSONDecodeError:
                 return {"before_text": "", "after_text": "", "code_block": ""}
+        else:
+            return {"before_text": "", "after_text": "", "code_block": ""}
 
-        return {
-            "before_text": data.get("before_text", ""),
-            "after_text": data.get("after_text", ""),
-            "code_block": data.get("code_block", ""),
-        }
-    except Exception as e:
-        print(f"  Sonnet card generation failed: {e}")
-        return {"before_text": "", "after_text": "", "code_block": ""}
+    return {
+        "before_text": data.get("before_text", ""),
+        "after_text": data.get("after_text", ""),
+        "code_block": data.get("code_block", ""),
+    }
 
 
 def generate_sonnet_quality(page_content: str, query: str, check_results: dict) -> dict:
@@ -248,33 +266,28 @@ Return ONLY valid JSON:
     "summary": "One sentence assessment"
 }}"""
 
+    raw = _card_gen_message(prompt, max_tokens=256)
+
+    fallback = {"specificity": 0, "completeness": 0, "answer_directness": 0, "summary": "Unparseable quality response"}
     try:
-        response = _get_client().messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=256,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = response.content[0].text
-
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            import re
-            match = re.search(r'\{.*\}', raw, re.DOTALL)
-            if match:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        import re
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if match:
+            try:
                 data = json.loads(match.group())
-            else:
-                return {"specificity": 0, "completeness": 0, "answer_directness": 0, "summary": "Sonnet call failed"}
+            except json.JSONDecodeError:
+                return fallback
+        else:
+            return fallback
 
-        return {
-            "specificity": data.get("specificity", 0),
-            "completeness": data.get("completeness", 0),
-            "answer_directness": data.get("answer_directness", 0),
-            "summary": data.get("summary", ""),
-        }
-    except Exception as e:
-        print(f"  Sonnet quality scoring failed: {e}")
-        return {"specificity": 0, "completeness": 0, "answer_directness": 0, "summary": str(e)}
+    return {
+        "specificity": data.get("specificity", 0),
+        "completeness": data.get("completeness", 0),
+        "answer_directness": data.get("answer_directness", 0),
+        "summary": data.get("summary", ""),
+    }
 
 
 def prioritize_cards(cards: list[dict]) -> list[dict]:

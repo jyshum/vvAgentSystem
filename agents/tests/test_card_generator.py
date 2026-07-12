@@ -1,7 +1,17 @@
+import json
+from unittest.mock import patch, MagicMock
+
+import pytest
+
 from src.improvement.card_generator import (
+    CardGenerationError,
+    DEFAULT_CARD_GEN_MODEL,
+    _card_gen_model,
     classify_actions,
     build_content_brief,
     build_crawlability_card,
+    generate_sonnet_quality,
+    generate_sonnet_specifics,
     prioritize_cards,
 )
 
@@ -109,6 +119,70 @@ class TestPrioritizeCards:
         ]
         sorted_cards = prioritize_cards(cards)
         assert sorted_cards[0]["competitive_gap"] == 0.8
+
+
+def _mock_client_returning(text: str) -> MagicMock:
+    client = MagicMock()
+    client.messages.create.return_value = MagicMock(content=[MagicMock(text=text)])
+    return client
+
+
+class TestCardGenModel:
+    def test_default_is_not_a_retired_snapshot(self):
+        assert DEFAULT_CARD_GEN_MODEL != "claude-sonnet-4-20250514"
+        assert _card_gen_model() == DEFAULT_CARD_GEN_MODEL
+
+    def test_env_var_overrides_default(self, monkeypatch):
+        monkeypatch.setenv("CARD_GEN_MODEL", "claude-test-model")
+        assert _card_gen_model() == "claude-test-model"
+
+    @patch("src.improvement.card_generator._get_client")
+    def test_api_calls_use_configured_model(self, mock_get_client, monkeypatch):
+        monkeypatch.setenv("CARD_GEN_MODEL", "claude-test-model")
+        client = _mock_client_returning(json.dumps({
+            "before_text": "old", "after_text": "new", "code_block": "",
+        }))
+        mock_get_client.return_value = client
+
+        generate_sonnet_specifics("page text", "query", "add_citations", "issue", "gap")
+        assert client.messages.create.call_args.kwargs["model"] == "claude-test-model"
+
+        generate_sonnet_quality("page text", "query", {})
+        assert client.messages.create.call_args.kwargs["model"] == "claude-test-model"
+
+
+class TestApiFailuresAreLoud:
+    @patch("src.improvement.card_generator._get_client")
+    def test_specifics_raises_on_api_error(self, mock_get_client):
+        client = MagicMock()
+        client.messages.create.side_effect = RuntimeError("404 model not found")
+        mock_get_client.return_value = client
+
+        with pytest.raises(CardGenerationError, match="404 model not found"):
+            generate_sonnet_specifics("page text", "query", "add_citations", "issue", "gap")
+
+    @patch("src.improvement.card_generator._get_client")
+    def test_quality_raises_on_api_error(self, mock_get_client):
+        client = MagicMock()
+        client.messages.create.side_effect = RuntimeError("404 model not found")
+        mock_get_client.return_value = client
+
+        with pytest.raises(CardGenerationError, match="404 model not found"):
+            generate_sonnet_quality("page text", "query", {})
+
+    @patch("src.improvement.card_generator._get_client")
+    def test_specifics_unparseable_response_still_falls_back(self, mock_get_client):
+        mock_get_client.return_value = _mock_client_returning("not json at all")
+        result = generate_sonnet_specifics("page text", "query", "add_citations", "issue", "gap")
+        assert result == {"before_text": "", "after_text": "", "code_block": ""}
+
+    @patch("src.improvement.card_generator._get_client")
+    def test_quality_unparseable_response_still_falls_back(self, mock_get_client):
+        mock_get_client.return_value = _mock_client_returning("not json at all")
+        result = generate_sonnet_quality("page text", "query", {})
+        assert result["specificity"] == 0
+        assert result["completeness"] == 0
+        assert result["answer_directness"] == 0
 
 
 class TestBuildCrawlabilityCard:

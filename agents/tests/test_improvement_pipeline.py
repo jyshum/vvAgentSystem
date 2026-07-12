@@ -304,6 +304,59 @@ class TestRunImprovementPipeline:
     @patch("src.improvement.pipeline.generate_sonnet_specifics")
     @patch("src.improvement.pipeline.validate_json_ld")
     @patch("src.improvement.pipeline.qa_card")
+    def test_api_failure_marks_run_error_and_raises(
+        self, mock_qa, mock_validate, mock_sonnet, mock_classify,
+        mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
+        mock_crawl, mock_sb,
+    ):
+        from src.improvement.card_generator import CardGenerationError
+
+        mock_table = MagicMock()
+        mock_table.insert.return_value.execute.return_value = MagicMock(data=[{"id": "run-123"}])
+        mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
+        mock_sb.return_value.table.return_value = mock_table
+
+        mock_crawl.return_value = {"has_critical_blocker": False}
+        mock_inv.return_value = [
+            {"url": "https://x.com/p1", "title": "Page 1", "h1": "H1", "first_paragraph": "text",
+             "raw_html": "<html><body><p>content here</p></body></html>", "last_modified": None,
+             "word_count": 500, "outbound_link_count": 0, "has_faq_schema": False,
+             "has_comparison_table": False, "schema_types": []},
+        ]
+        mock_match.return_value = [
+            {"query": "q1", "query_id": "id1", "match_type": "matched",
+             "matched_page_url": "https://x.com/p1", "similarity_score": 0.7, "bucket": "awareness"},
+        ]
+        mock_score.return_value = {"structural_score": 60, "check_results": {}, "schema_status": "missing", "schema_errors": []}
+        mock_quality.side_effect = CardGenerationError("card model call failed: 404 not_found_error")
+
+        state = {"client_id": "client-1",
+                 "client_config": {"website_domain": "x.com", "brand_name": "BrandX", "competitors": []},
+                 "tracker_results": []}
+        queries = [{"id": "id1", "prompt_text": "q1", "bucket": "awareness"}]
+
+        import pytest
+        with pytest.raises(CardGenerationError):
+            run_improvement_pipeline(state, queries, competitive_gaps_data=[])
+
+        error_updates = [
+            c.args[0] for c in mock_table.update.call_args_list
+            if c.args and c.args[0].get("status") == "error"
+        ]
+        assert error_updates, "improvement_runs was never marked as error"
+        assert "404 not_found_error" in error_updates[0]["error_message"]
+
+    @patch("src.improvement.pipeline._get_supabase")
+    @patch("src.improvement.pipeline.run_crawlability_gate")
+    @patch("src.improvement.pipeline.build_inventory")
+    @patch("src.improvement.pipeline.match_queries_to_pages")
+    @patch("src.improvement.pipeline.compute_structural_score")
+    @patch("src.improvement.pipeline.generate_sonnet_quality")
+    @patch("src.improvement.pipeline.check_competitive_gaps")
+    @patch("src.improvement.pipeline.classify_actions")
+    @patch("src.improvement.pipeline.generate_sonnet_specifics")
+    @patch("src.improvement.pipeline.validate_json_ld")
+    @patch("src.improvement.pipeline.qa_card")
     def test_card_passing_qa_on_retry_is_kept(
         self, mock_qa, mock_validate, mock_sonnet, mock_classify,
         mock_gaps, mock_quality, mock_score, mock_match, mock_inv,
