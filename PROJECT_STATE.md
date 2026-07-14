@@ -1,5 +1,18 @@
 # VV Agent System — Project State
 
+## Active Development — Deterministic Technical Audit Foundation
+
+- **Branch:** `feature/deterministic-technical-audit`
+- **Rollout:** development only; default off with `TECHNICAL_AUDIT_V1_ENABLED=false`
+- **Database:** additive migration `supabase/migrations/014_technical_audit_foundation.sql`; not applied to production by this branch
+- **Implemented slice:** immutable five-status audit contract, bounded evidence observations, versioned registry, deterministic `llms.txt`/title/description/canonical checks, persisted runs/results, and no-score run checklist
+- **Safety boundary:** when enabled, legacy structural scoring and AI-generated technical cards are skipped; the new findings cannot create or publish remediation
+- **Agent verification:** `cd agents && .venv/bin/python -m pytest -q`
+- **Dashboard verification:** `cd dashboard && npm test && npm run build`
+- **Operator guide:** `docs/technical-audit-operations.md`
+
+The approved remaining sections and remediation adapters are sequenced in `docs/superpowers/plans/2026-07-14-technical-audit-foundation.md`. Historical readiness scores remain readable as legacy data.
+
 ## What This Is
 GEO (Generative Engine Optimization) platform for Victory Velocity agency. Tracks how often client brands appear in AI responses, audits client websites for GEO health, and generates actionable fixes.
 

@@ -88,7 +88,7 @@ This plan proves the shared contract with four checks. Follow-on plans use the s
 - Consumes: Python standard library only.
 - Produces: `AuditStatus`, `Confidence`, `Observation`, `Applicability`, `NextAction`, `CheckResult`, and `AuditContext`, each with `to_dict()` where persistence needs JSON.
 
-- [ ] **Step 1: Write failing contract tests**
+- [x] **Step 1: Write failing contract tests**
 
 ```python
 from dataclasses import FrozenInstanceError
@@ -143,13 +143,13 @@ def test_check_result_is_immutable():
         result.status = AuditStatus.FAIL
 ```
 
-- [ ] **Step 2: Run the model tests and verify RED**
+- [x] **Step 2: Run the model tests and verify RED**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_models.py -q`
 
 Expected: collection fails with `ModuleNotFoundError: No module named 'src.technical_audit'`.
 
-- [ ] **Step 3: Implement the model contract**
+- [x] **Step 3: Implement the model contract**
 
 Create frozen dataclasses and string enums. `CheckResult.__post_init__` must reject an empty `check_id`, nonpositive version, or a `not_applicable` result whose applicability says `applies=True`. `CheckResult.not_applicable(...)` must populate low severity, high confidence, empty evidence, owner `system`, instruction `No action required`, and no remediation ID. `to_dict()` must recursively convert enums, tuples, and dataclasses into JSON-compatible dictionaries/lists.
 
@@ -172,13 +172,13 @@ class Confidence(str, Enum):
 
 `AuditContext` contains `client_id`, `domain`, `profile`, `pages`, `site_observations`, and `run_timestamp`. `Observation` contains `id`, `kind`, `subject`, `retrieved_at`, `fingerprint`, and `data`.
 
-- [ ] **Step 4: Run the model tests and verify GREEN**
+- [x] **Step 4: Run the model tests and verify GREEN**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_models.py -q`
 
 Expected: `2 passed`.
 
-- [ ] **Step 5: Commit the contract**
+- [x] **Step 5: Commit the contract**
 
 ```bash
 git add agents/src/technical_audit agents/tests/technical_audit/test_models.py
@@ -195,7 +195,7 @@ git commit -m "feat: define technical audit result contract"
 - Consumes: `Observation` from Task 1 and inventory dictionaries containing `url` and `raw_html`.
 - Produces: `extract_page_observation(page: dict, retrieved_at: str) -> Observation` and `normalize_url(url: str) -> str`.
 
-- [ ] **Step 1: Write failing extraction tests**
+- [x] **Step 1: Write failing extraction tests**
 
 ```python
 from src.technical_audit.observations import extract_page_observation
@@ -231,23 +231,23 @@ def test_preserves_duplicate_empty_declarations_for_checks_to_evaluate():
     assert observation.data["meta_descriptions"] == [""]
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_observations.py -q`
 
 Expected: import fails because `observations.py` does not exist.
 
-- [ ] **Step 3: Implement extraction**
+- [x] **Step 3: Implement extraction**
 
 Use BeautifulSoup to inspect only `<head>`. Preserve declaration count and trimmed values. Resolve canonical `href` values with `urljoin(page["url"], href)`. Calculate SHA-256 over UTF-8 `raw_html`. Treat a parsed HTML document as HTML unless the inventory supplies a non-HTML `content_type`. Store `url`, `titles`, `meta_descriptions`, `canonicals`, `robots_directives`, `h1_texts`, and `is_html` in `data`. URL normalization lowercases scheme/host, removes fragments, preserves path/query, and ensures an empty path becomes `/`.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_observations.py -q`
 
 Expected: `2 passed`.
 
-- [ ] **Step 5: Commit observations**
+- [x] **Step 5: Commit observations**
 
 ```bash
 git add agents/src/technical_audit/observations.py agents/tests/technical_audit/test_observations.py
@@ -264,7 +264,7 @@ git commit -m "feat: extract technical audit observations"
 - Consumes: `AuditContext` and `CheckResult`.
 - Produces: `CheckDefinition`, `CheckRegistry.register()`, `CheckRegistry.definitions()`, and `CheckRegistry.run(context)`.
 
-- [ ] **Step 1: Write failing registry tests**
+- [x] **Step 1: Write failing registry tests**
 
 ```python
 import pytest
@@ -292,23 +292,23 @@ def test_registry_runs_in_stable_id_version_order():
     assert calls == ["a1", "a2", "z"]
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_registry.py -q`
 
 Expected: import fails because `registry.py` does not exist.
 
-- [ ] **Step 3: Implement the registry**
+- [x] **Step 3: Implement the registry**
 
 `CheckDefinition` is frozen and contains `id`, `version`, `section`, `scope`, and an evaluator callable. Registry keys are `(id, version)`. `definitions()` returns a tuple sorted by ID then version. `run()` concatenates evaluator results and validates that every result's ID/version/section match its definition; a mismatch raises `ValueError` instead of persisting corrupt provenance.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_registry.py -q`
 
 Expected: `2 passed`.
 
-- [ ] **Step 5: Commit the registry**
+- [x] **Step 5: Commit the registry**
 
 ```bash
 git add agents/src/technical_audit/registry.py agents/tests/technical_audit/test_registry.py
@@ -328,7 +328,7 @@ git commit -m "feat: add versioned technical check registry"
 - Consumes: `AuditContext` page observations and `site_observations["llms_txt"]` with `status_code`, `content_type`, `body`, `final_url`, and `error`.
 - Produces: `build_v1_registry() -> CheckRegistry` containing `llms_txt.integrity`, `meta_title.integrity`, `meta_description.integrity`, and `canonical.integrity`, all version 1.
 
-- [ ] **Step 1: Write failing behavior tests**
+- [x] **Step 1: Write failing behavior tests**
 
 Cover these exact outcomes in table-driven tests:
 
@@ -365,13 +365,13 @@ def test_llms_txt_is_optional_until_profile_enables_it(context_factory):
 
 The fixture helper constructs one page observation and returns `AuditContext`. For a non-indexable or non-HTML page, title/description/canonical checks return `not_applicable` with the precise reason. Description absence is `review` on priority pages and `not_applicable` on nonpriority pages. The short-description case above is `review` because it is below 50 characters.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_checks.py -q`
 
 Expected: imports fail because check modules do not exist.
 
-- [ ] **Step 3: Implement the four evaluators**
+- [x] **Step 3: Implement the four evaluators**
 
 Use only observation fields and profile data. Required decision tables:
 
@@ -384,13 +384,13 @@ Use only observation fields and profile data. Required decision tables:
 
 Do not fetch canonical targets in this tranche; the result's expected text must state that target-health validation belongs to the protocol-integrity plan. Use remediation IDs `llms_txt.correct`, `meta_title.correct`, `meta_description.correct`, and `canonical.correct` only for fail/review results.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_checks.py -q`
 
 Expected: all parameterized cases pass.
 
-- [ ] **Step 5: Commit the checks**
+- [x] **Step 5: Commit the checks**
 
 ```bash
 git add agents/src/technical_audit/checks agents/tests/technical_audit/test_checks.py
@@ -407,7 +407,7 @@ git commit -m "feat: add initial deterministic audit checks"
 - Consumes: `run_technical_audit(client_id: str, domain: str, inventory: list[dict], profile: dict, fetcher: Callable) -> dict`.
 - Produces: `{"audit_version": 1, "observations": list[dict], "results": list[dict], "summary": dict}`.
 
-- [ ] **Step 1: Write a failing end-to-end runner test**
+- [x] **Step 1: Write a failing end-to-end runner test**
 
 ```python
 def test_runner_returns_counts_and_never_a_score():
@@ -430,29 +430,29 @@ def test_runner_returns_counts_and_never_a_score():
     assert all("score" not in result for result in report["results"])
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_runner.py -q`
 
 Expected: import fails because `runner.py` does not exist.
 
-- [ ] **Step 3: Implement the runner**
+- [x] **Step 3: Implement the runner**
 
 Extract one page observation per inventory row, fetch only `https://{domain}/llms.txt`, build `AuditContext`, execute `build_v1_registry()`, and count statuses from the returned results. The injected fetcher makes network behavior testable. The production default uses `httpx.get(timeout=10, follow_redirects=True)` and returns a structured error rather than raising. Ensure homepage is included in inventory by adding a fetched homepage observation only when the existing inventory omitted both `https://domain` and `https://domain/`.
 
-- [ ] **Step 4: Run and verify GREEN**
+- [x] **Step 4: Run and verify GREEN**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit/test_runner.py -q`
 
 Expected: runner tests pass.
 
-- [ ] **Step 5: Run the entire new package suite**
+- [x] **Step 5: Run the entire new package suite**
 
 Run: `cd agents && python3 -m pytest tests/technical_audit -q`
 
 Expected: all technical-audit tests pass with no warnings.
 
-- [ ] **Step 6: Commit the runner**
+- [x] **Step 6: Commit the runner**
 
 ```bash
 git add agents/src/technical_audit/runner.py agents/tests/technical_audit/test_runner.py
@@ -469,7 +469,7 @@ git commit -m "feat: run unscored technical audits"
 - Consumes: `clients`, `improvement_runs`, and `pipeline_runs` IDs.
 - Produces: `client_site_profiles`, `technical_audit_runs`, `technical_audit_observations`, and `technical_audit_results`.
 
-- [ ] **Step 1: Write the additive migration**
+- [x] **Step 1: Write the additive migration**
 
 The migration creates:
 
@@ -529,11 +529,11 @@ Between the run and result tables, create `technical_audit_observations` with a 
 
 Add indexes for run/client, result run/status/section, enable RLS, grant admin management using the existing `is_admin()` function, and grant authenticated client users select access only where `client_id = get_my_client_id()`. Do not add client write policies.
 
-- [ ] **Step 2: Fold the same tables into the consolidated schema**
+- [x] **Step 2: Fold the same tables into the consolidated schema**
 
 Add drop statements in dependency order, table definitions after `improvement_runs`, indexes, RLS enablement, and policies matching the migration. Preserve every legacy table and comment that old readiness rows remain historical.
 
-- [ ] **Step 3: Validate migration syntax and destructive-operation absence**
+- [x] **Step 3: Validate migration syntax and destructive-operation absence**
 
 Run:
 
@@ -544,7 +544,7 @@ git diff --check
 
 Expected: the first command returns no matches and `git diff --check` exits 0.
 
-- [ ] **Step 4: Commit persistence**
+- [x] **Step 4: Commit persistence**
 
 ```bash
 git add supabase/migrations/014_technical_audit_foundation.sql supabase/schema.sql
@@ -564,7 +564,7 @@ git commit -m "feat: persist versioned technical audits"
 - Consumes: `run_technical_audit(...)` and Supabase tables from Task 6.
 - Produces: `technical_audit_run_id` and `technical_audit_summary` in pipeline/state output.
 
-- [ ] **Step 1: Add a failing pipeline separation test**
+- [x] **Step 1: Add a failing pipeline separation test**
 
 Patch `src.improvement.pipeline.run_technical_audit` to return one failing title result and summary. Assert:
 
@@ -586,13 +586,13 @@ assert "technical_audit_results" in inserted_tables
 
 Add a graph-node test asserting the handled error fallback contains `technical_audit_run_id: None` and an empty `technical_audit_summary`.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd agents && python3 -m pytest tests/test_improvement_pipeline.py tests/test_graph_nodes.py -q`
 
 Expected: assertions fail because the pipeline has no technical-audit fields or calls.
 
-- [ ] **Step 3: Integrate the runner and persistence**
+- [x] **Step 3: Integrate the runner and persistence**
 
 After inventory and before legacy scoring/card generation:
 
@@ -611,19 +611,19 @@ technical_audit_enabled = os.environ.get("TECHNICAL_AUDIT_V1_ENABLED", "false").
 
 When enabled, do not call `compute_structural_score`, `generate_sonnet_quality`, `classify_actions`, or `generate_sonnet_specifics`, and do not write `page_citation_scores` or technical `action_cards`. Continue query matching, competitive-gap calculation, content-gap cards, and community-check cards because those are independent of the technical audit. When disabled, preserve the current legacy path exactly as a rollback route. Add the new state fields in both paths.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run: `cd agents && python3 -m pytest tests/test_improvement_pipeline.py tests/test_graph_nodes.py -q`
 
 Expected: all focused tests pass.
 
-- [ ] **Step 5: Run the complete agent suite**
+- [x] **Step 5: Run the complete agent suite**
 
 Run: `cd agents && python3 -m pytest -q`
 
 Expected: all tests pass. If pre-existing baseline failures recur, compare against the recorded worktree baseline and do not conceal them.
 
-- [ ] **Step 6: Commit pipeline integration**
+- [x] **Step 6: Commit pipeline integration**
 
 ```bash
 git add agents/src/improvement/pipeline.py agents/src/graph/state.py agents/src/graph/nodes.py agents/tests/test_improvement_pipeline.py agents/tests/test_graph_nodes.py
@@ -642,7 +642,7 @@ git commit -m "feat: attach technical checklist to improvement runs"
 - Consumes: `TechnicalAuditRun` and `TechnicalAuditResult[]` selected by `improvement_run_id`.
 - Produces: `<TechnicalAuditChecklist run={run} results={results} />`.
 
-- [ ] **Step 1: Write failing component tests**
+- [x] **Step 1: Write failing component tests**
 
 ```tsx
 it("shows five status counts and no readiness score", () => {
@@ -668,27 +668,27 @@ it("shows the resolution contract for a non-pass result", () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `cd dashboard && npm test -- __tests__/components/technical-audit-checklist.test.tsx`
 
 Expected: import fails because the component does not exist.
 
-- [ ] **Step 3: Implement typed status presentation**
+- [x] **Step 3: Implement typed status presentation**
 
 Define the status union exactly as the database constraint. Export labels/order/colors from the type module. Render one compact summary row and results grouped by section in `<details>` elements. Each row shows status, summary, subject, scope, expected, observed JSON in a `<pre>`, applicability reason, confidence, owner, and next action. Collapse `pass` and `not_applicable` groups initially; keep `fail`, `review`, and `unknown` open. Do not render a score, percentage, “clear/blocked” shortcut, approve/reject controls, or implementation button.
 
-- [ ] **Step 4: Integrate the run page**
+- [x] **Step 4: Integrate the run page**
 
 Query `technical_audit_runs` by `improvement_run_id`, then query `technical_audit_results` by audit run ID ordered by section/check ID/subject. Replace the current readiness tile for new audit runs with status counts and render the checklist below the evidence tiles. When no new audit exists but `page_citation_scores` do, label that tile `LEGACY READINESS` and preserve historical rendering. Update the funnel copy for new runs to say `{total} technical checks · {fail} failures · {review} reviews · {unknown} unknown` instead of “pages scored.”
 
-- [ ] **Step 5: Run component tests and verify GREEN**
+- [x] **Step 5: Run component tests and verify GREEN**
 
 Run: `cd dashboard && npm test -- __tests__/components/technical-audit-checklist.test.tsx`
 
 Expected: component tests pass.
 
-- [ ] **Step 6: Run dashboard verification**
+- [x] **Step 6: Run dashboard verification**
 
 Run:
 
@@ -701,7 +701,7 @@ npm run build
 
 Expected: tests, lint, type checking, and production build pass.
 
-- [ ] **Step 7: Commit the dashboard slice**
+- [x] **Step 7: Commit the dashboard slice**
 
 ```bash
 git add dashboard/lib/technical-audit-types.ts dashboard/components/runs/TechnicalAuditChecklist.tsx dashboard/__tests__/components/technical-audit-checklist.test.tsx dashboard/app/admin/clients/'[id]'/runs/'[runId]'/page.tsx
@@ -718,7 +718,7 @@ git commit -m "feat: show evidence-backed technical checklist"
 - Consumes: implemented audit runner, database model, and checklist UI.
 - Produces: operator instructions for statuses, profiles, rollout, failure handling, and rollback flag use.
 
-- [ ] **Step 1: Write operator documentation**
+- [x] **Step 1: Write operator documentation**
 
 Document:
 
@@ -733,11 +733,11 @@ Document:
 
 Update `PROJECT_STATE.md` with the feature branch name, migration number, new test commands, and the current rollout state `development only`.
 
-- [ ] **Step 2: Verify the rollback route explicitly**
+- [x] **Step 2: Verify the rollback route explicitly**
 
 Run the two focused Task 7 tests that set `TECHNICAL_AUDIT_V1_ENABLED=true` and `false`. The enabled test must assert that the four legacy scoring/card mocks have zero calls. The disabled test must assert that no `technical_audit_runs` insert occurs and the existing legacy structural-card fixture still passes.
 
-- [ ] **Step 3: Run final verification**
+- [x] **Step 3: Run final verification**
 
 Run:
 
@@ -749,14 +749,14 @@ cd .. && git diff --check && git status --short
 
 Expected: all tests/build checks pass; `git diff --check` is clean; status contains only the intended documentation or is clean after commit.
 
-- [ ] **Step 4: Commit operations documentation and flag**
+- [x] **Step 4: Commit operations documentation and flag**
 
 ```bash
 git add docs/technical-audit-operations.md PROJECT_STATE.md
 git commit -m "docs: add technical audit rollout controls"
 ```
 
-- [ ] **Step 5: Review against acceptance criteria**
+- [x] **Step 5: Review against acceptance criteria**
 
 Confirm from tests and rendered output:
 

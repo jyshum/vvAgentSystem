@@ -636,3 +636,37 @@ def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monke
     mock_sonnet.assert_not_called()
     tables["technical_audit_observations"].insert.assert_called_once()
     tables["technical_audit_results"].insert.assert_called_once()
+
+
+def test_v1_flag_disabled_preserves_legacy_route_without_audit_writes(monkeypatch):
+    monkeypatch.setenv("TECHNICAL_AUDIT_V1_ENABLED", "false")
+    tables = {
+        "improvement_runs": _chainable_table([{"id": "improvement-run-1"}]),
+        "action_cards": _chainable_table(),
+    }
+    sb = MagicMock()
+    sb.table.side_effect = lambda name: tables[name]
+
+    with patch("src.improvement.pipeline._get_supabase", return_value=sb), \
+         patch("src.improvement.pipeline.run_crawlability_gate", return_value={"has_critical_blocker": False}), \
+         patch("src.improvement.pipeline.build_inventory", return_value=[]), \
+         patch("src.improvement.pipeline.match_queries_to_pages", return_value=[]), \
+         patch("src.improvement.pipeline.check_competitive_gaps", return_value=[]), \
+         patch("src.improvement.pipeline.run_technical_audit") as mock_audit:
+        result = run_improvement_pipeline(
+            {
+                "client_id": "client-1",
+                "client_config": {
+                    "website_domain": "x.com",
+                    "brand_name": "BrandX",
+                    "competitors": [],
+                },
+            },
+            [],
+            [],
+        )
+
+    assert result["technical_audit_run_id"] is None
+    assert result["technical_audit_summary"] == {}
+    mock_audit.assert_not_called()
+    assert "technical_audit_runs" not in [call.args[0] for call in sb.table.call_args_list]
