@@ -10,6 +10,7 @@ import type { PipelineRun, ImprovementRun, PageCitationScore, QueryPageMatch, Ac
 import type { TrackerRun, CompetitiveGap } from "@/lib/types";
 import type { TechnicalAuditResult, TechnicalAuditRun } from "@/lib/technical-audit-types";
 import { PIPELINE_STATUS_COLOR } from "@/lib/run-status";
+import { buildRunFunnel, runPresentationMode } from "@/lib/run-presentation";
 
 function formatDuration(startedAt: string, completedAt: string | null): string {
   if (!completedAt) return "running";
@@ -145,6 +146,8 @@ export default async function RunDetailPage({
     not_applicable: technicalAudit.run.summary?.not_applicable ?? 0,
     total: technicalAudit.run.summary?.total ?? 0,
   } : null;
+  const presentationMode = runPresentationMode(technicalAudit.run);
+  const technicalAuditStatus = technicalAudit.run?.status ?? null;
 
   // Worst competitive gap
   let worstGap: { query: string; gap: number; competitorName: string } | null = null;
@@ -176,19 +179,26 @@ export default async function RunDetailPage({
     }
   }
 
-  // Matching counts
-  const matchedCount = queryMatches.filter((m) => m.match_type === "matched").length;
-  const weakCount = queryMatches.filter((m) => m.match_type === "weak").length;
-  const gapsCount = queryMatches.filter((m) => m.match_type === "content_gap").length;
-
-  // Readiness
-  const scores = citationScores.map((s) => s.structural_score).filter((s) => s != null);
+  const matchedCount = presentationMode === "legacy"
+    ? queryMatches.filter((m) => m.match_type === "matched").length
+    : 0;
+  const weakCount = presentationMode === "legacy"
+    ? queryMatches.filter((m) => m.match_type === "weak").length
+    : 0;
+  const gapsCount = presentationMode === "legacy"
+    ? queryMatches.filter((m) => m.match_type === "content_gap").length
+    : 0;
+  const scores = presentationMode === "legacy"
+    ? citationScores.map((s) => s.structural_score).filter((s) => s != null)
+    : [];
   const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
   const minScore = scores.length > 0 ? Math.min(...scores) : null;
 
   // Cards
   const totalCards = actionCards.length;
-  const autoCards = actionCards.filter((c) => c.auto_approved).length;
+  const autoCards = presentationMode === "legacy"
+    ? actionCards.filter((c) => c.auto_approved).length
+    : 0;
   const pendingCards = actionCards.filter((c) => c.status === "pending" && !c.auto_approved).length;
 
   const duration = formatDuration(pipeline.started_at, pipeline.completed_at);
@@ -213,6 +223,11 @@ export default async function RunDetailPage({
             {trackerRun?.query_set_changed && (
               <span className="ml-2 font-mono text-[8px] tracking-[0.1em] uppercase px-2 py-1" style={{ color: "#d4a017", border: "1px solid #d4a017" }}>
                 query set changed
+              </span>
+            )}
+            {improvementRun && presentationMode === "legacy" && (
+              <span className="ml-2 font-mono text-[8px] tracking-[0.1em] uppercase px-2 py-1" style={{ color: "#d4a017", border: "1px solid #d4a017" }}>
+                legacy content audit
               </span>
             )}
           </div>
@@ -298,10 +313,10 @@ export default async function RunDetailPage({
           )}
         </div>
 
-        {/* PAGES */}
+        {/* AUDIT SCOPE / PAGES */}
         <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
           <div className="font-mono text-[8px] tracking-[0.14em] mb-1.5" style={{ color: "var(--faint)" }}>
-            PAGES
+            {presentationMode === "technical_v1" ? "AUDIT SCOPE" : "PAGES"}
           </div>
           <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
             {improvementRun ? improvementRun.pages_inventoried : "—"}
@@ -311,55 +326,60 @@ export default async function RunDetailPage({
           </div>
         </div>
 
-        {/* MATCHING */}
-        <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
-          <div className="font-mono text-[8px] tracking-[0.14em] mb-1.5" style={{ color: "var(--faint)" }}>
-            MATCHING
+        {presentationMode === "legacy" && (
+          <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
+            <div className="font-mono text-[8px] tracking-[0.14em] mb-1.5" style={{ color: "var(--faint)" }}>
+              MATCHING
+            </div>
+            <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
+              {improvementRun ? matchedCount : "—"}
+            </div>
+            <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--mute)" }}>
+              {improvementRun ? `${matchedCount} matched · ${weakCount} weak · ${gapsCount} gaps` : ""}
+            </div>
           </div>
-          <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
-            {improvementRun ? matchedCount : "—"}
-          </div>
-          <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--mute)" }}>
-            {improvementRun ? `${matchedCount} matched · ${weakCount} weak · ${gapsCount} gaps` : ""}
-          </div>
-        </div>
+        )}
 
         {/* TECHNICAL AUDIT / LEGACY READINESS */}
         <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
           <div className="font-mono text-[8px] tracking-[0.14em] mb-1.5" style={{ color: "var(--faint)" }}>
-            {technicalAudit.run ? "TECHNICAL AUDIT" : "LEGACY READINESS"}
+            {presentationMode === "technical_v1" ? "TECHNICAL AUDIT" : "LEGACY READINESS"}
           </div>
           <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
-            {technicalAudit.run
-              ? technicalAudit.run.status === "completed" ? auditSummary?.total : technicalAudit.run.status.toUpperCase()
+            {presentationMode === "technical_v1"
+              ? technicalAuditStatus === "completed" ? auditSummary?.total : technicalAuditStatus?.toUpperCase() ?? "—"
               : avgScore != null ? Math.round(avgScore) : "—"}
           </div>
           <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--mute)" }}>
-            {technicalAudit.run
-              ? technicalAudit.run.status === "completed"
+            {presentationMode === "technical_v1"
+              ? technicalAuditStatus === "completed"
                 ? `${auditSummary?.fail} fail · ${auditSummary?.review} review · ${auditSummary?.unknown} unknown`
-                : technicalAudit.run.error_message || "Checklist not yet available"
+                : technicalAudit.run?.error_message || "Checklist not yet available"
               : avgScore != null
                 ? `legacy avg ${Math.round(avgScore)} · lowest ${minScore}`
                 : ""}
           </div>
         </div>
 
-        {/* CARDS */}
+        {/* CARDS / MANUAL REVIEW WORK */}
         <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
           <div className="font-mono text-[8px] tracking-[0.14em] mb-1.5" style={{ color: "var(--faint)" }}>
-            CARDS
+            {presentationMode === "technical_v1" ? "MANUAL REVIEW WORK" : "CARDS"}
           </div>
           <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
             {improvementRun ? totalCards : "—"}
           </div>
           <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--mute)" }}>
-            {improvementRun ? `${autoCards} auto · ${pendingCards} to you` : ""}
+            {improvementRun
+              ? presentationMode === "technical_v1"
+                ? `${totalCards} manual cards · ${pendingCards} to review`
+                : `${autoCards} auto · ${pendingCards} to you`
+              : ""}
           </div>
         </div>
       </div>
 
-      {technicalAudit.run && (
+      {presentationMode === "technical_v1" && technicalAudit.run && (
         <TechnicalAuditChecklist run={technicalAudit.run} results={technicalAudit.results} />
       )}
 
@@ -369,11 +389,20 @@ export default async function RunDetailPage({
           className="font-mono text-[10px] tracking-[0.06em] mb-8"
           style={{ color: "var(--mute)" }}
         >
-          {queryMatches.length} queries → {matchedCount} matched · {weakCount} weak · {gapsCount} content gaps → {technicalAudit.run
-            ? technicalAudit.run.status === "completed"
-              ? `${auditSummary?.total} technical checks · ${auditSummary?.fail} failures · ${auditSummary?.review} reviews · ${auditSummary?.unknown} unknown`
-              : `technical audit ${technicalAudit.run.status}`
-            : `${citationScores.length} page${citationScores.length === 1 ? "" : "s"} scored`} → {improvementRun.competitive_gaps_found ?? 0} competitive gaps → {totalCards} cards → {autoCards} auto + {pendingCards} to you
+          {buildRunFunnel({
+            mode: presentationMode,
+            technicalStatus: technicalAudit.run?.status ?? null,
+            technicalChecks: auditSummary?.total ?? 0,
+            technicalFailures: auditSummary?.fail ?? 0,
+            technicalReviews: auditSummary?.review ?? 0,
+            technicalUnknown: auditSummary?.unknown ?? 0,
+            competitorLeads: improvementRun.competitive_gaps_found ?? 0,
+            cards: totalCards,
+            matched: matchedCount,
+            weak: weakCount,
+            contentGaps: gapsCount,
+            scoredPages: presentationMode === "legacy" ? citationScores.length : 0,
+          })}
         </div>
       )}
 
