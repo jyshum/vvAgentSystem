@@ -134,6 +134,10 @@ def test_non_html_and_noindex_pages_are_not_forced_to_have_metadata():
 
 def test_llms_txt_is_optional_until_profile_enables_it():
     assert _status(_context(llms_enabled=False), "llms_txt.integrity") == "not_applicable"
+    assert _status(
+        _context(llms_enabled=False, llms_status=403, llms_error="forbidden"),
+        "llms_txt.integrity",
+    ) == "not_applicable"
     assert _status(_context(llms_enabled=True), "llms_txt.integrity") == "fail"
 
 

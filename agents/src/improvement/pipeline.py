@@ -171,13 +171,17 @@ def run_improvement_pipeline(
 
         if technical_audit_enabled:
             print("  Step 2b: Deterministic technical audit...")
-            audit_output = _run_and_persist_technical_audit(
-                sb, state, run_id, inventory
-            )
-            technical_audit_run_id = audit_output["run_id"]
-            technical_audit_summary = audit_output["summary"]
-            technical_audit_results = audit_output["results"]
-            technical_audit_error = audit_output["error"]
+            try:
+                audit_output = _run_and_persist_technical_audit(
+                    sb, state, run_id, inventory
+                )
+                technical_audit_run_id = audit_output["run_id"]
+                technical_audit_summary = audit_output["summary"]
+                technical_audit_results = audit_output["results"]
+                technical_audit_error = audit_output["error"]
+            except Exception as exc:
+                technical_audit_error = str(exc)
+                print(f"  Technical audit initialization failed: {exc}")
 
         print("  Step 3: Query-page matching...")
         query_dicts = [{"query": q["prompt_text"], "query_id": q["id"], "bucket": q.get("bucket", "")} for q in queries]

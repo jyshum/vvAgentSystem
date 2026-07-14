@@ -42,7 +42,7 @@ def extract_page_observation(page: dict, retrieved_at: str) -> Observation:
             if (meta.get("name") or "").strip().lower() == "description"
         ]
         canonicals = [
-            normalize_url(urljoin(url, link.get("href") or ""))
+            urljoin(url, link.get("href") or "")
             for link in head.find_all("link")
             if "canonical" in [str(value).lower() for value in (link.get("rel") or [])]
             and (link.get("href") or "").strip()

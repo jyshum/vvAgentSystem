@@ -99,3 +99,28 @@ def test_runner_bounds_persisted_llms_txt_evidence():
     assert "body" not in llms["data"]
     assert len(llms["data"]["body_excerpt"]) == 4_000
     assert llms["data"]["body_bytes"] == 10_000
+
+
+def test_homepage_is_a_priority_page_when_profile_has_no_priority_urls():
+    report = run_technical_audit(
+        client_id="client-1",
+        domain="example.com",
+        inventory=[{
+            "url": "https://example.com/",
+            "raw_html": '<html><head><title>Home</title><link rel="canonical" href="https://example.com/"></head></html>',
+        }],
+        profile={"llms_txt_enabled": False},
+        fetcher=lambda url: {
+            "status_code": 404,
+            "content_type": "text/plain",
+            "body": "",
+            "final_url": url,
+            "error": None,
+        },
+    )
+
+    description = next(
+        result for result in report["results"]
+        if result["check_id"] == "meta_description.integrity"
+    )
+    assert description["status"] == "review"

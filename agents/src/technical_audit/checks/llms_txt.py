@@ -48,7 +48,7 @@ def evaluate_llms_txt(context: AuditContext) -> list[CheckResult]:
     body = data.get("body") or ""
     exists = status_code == 200 and bool(body.strip())
 
-    if not enabled and not exists and status_code not in {403, 429} and not data.get("error"):
+    if not enabled and not exists:
         return [
             CheckResult.not_applicable(
                 check_id="llms_txt.integrity",

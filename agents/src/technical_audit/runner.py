@@ -65,6 +65,11 @@ def run_technical_audit(
 ) -> dict[str, Any]:
     run_timestamp = datetime.now(timezone.utc).isoformat()
     homepage = normalize_url(f"https://{domain}/")
+    effective_profile = dict(profile)
+    priority_urls = list(effective_profile.get("priority_urls") or [])
+    if homepage not in {normalize_url(url) for url in priority_urls}:
+        priority_urls.append(homepage)
+    effective_profile["priority_urls"] = priority_urls
     pages = [dict(page) for page in inventory]
     inventory_urls = {
         normalize_url(page["url"])
@@ -105,7 +110,7 @@ def run_technical_audit(
     context = AuditContext(
         client_id=client_id,
         domain=domain,
-        profile=profile,
+        profile=effective_profile,
         pages=page_observations,
         site_observations={"llms_txt": llms_observation},
         run_timestamp=run_timestamp,

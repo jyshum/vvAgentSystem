@@ -50,3 +50,15 @@ def test_non_html_content_is_marked_without_guessing_from_markup():
     )
 
     assert observation.data["is_html"] is False
+
+
+def test_canonical_fragment_is_preserved_for_the_check_to_reject():
+    observation = extract_page_observation(
+        {
+            "url": "https://example.com/page",
+            "raw_html": '<html><head><link rel="canonical" href="/page#section"></head></html>',
+        },
+        "2026-07-14T10:00:00+00:00",
+    )
+
+    assert observation.data["canonicals"] == ["https://example.com/page#section"]
