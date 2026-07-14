@@ -7,6 +7,7 @@ import { fetchSchedules } from "@/lib/schedules";
 import { rankAndGap, topCompetitor } from "@/lib/derive";
 import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatDelta, formatRate } from "@/lib/utils";
+import { clientTabs } from "@/lib/client-tabs";
 import type { Client, TrackerRun } from "@/lib/types";
 import type { CrawlabilityReport, ImprovementRun } from "@/lib/improvement-types";
 
@@ -81,15 +82,7 @@ export default async function ClientLayout({
       }))
     : [];
 
-  const tabs = [
-    { label: "OVERVIEW", href: `/admin/clients/${id}/overview` },
-    { label: "QUERIES", href: `/admin/clients/${id}/queries` },
-    { label: "PAGES", href: `/admin/clients/${id}/pages` },
-    { label: "RUNS", href: `/admin/clients/${id}/runs` },
-    { label: "CARDS", href: `/admin/clients/${id}/cards` },
-    { label: "CONFIG", href: `/admin/clients/${id}/config` },
-    { label: "REPORTS", href: `/admin/clients/${id}/reports` },
-  ];
+  const tabs = clientTabs(id);
 
   return (
     <div>
