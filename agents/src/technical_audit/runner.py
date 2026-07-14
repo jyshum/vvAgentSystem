@@ -98,6 +98,7 @@ def run_technical_audit(
     domain: str,
     inventory: list[dict],
     profile: dict,
+    enabled_check_sets: tuple[str, ...] = ("foundation",),
     fetcher: Fetcher = _default_fetcher,
 ) -> dict[str, Any]:
     run_timestamp = datetime.now(timezone.utc).isoformat()
@@ -185,7 +186,7 @@ def run_technical_audit(
         site_observations={"llms_txt": llms_observation},
         run_timestamp=run_timestamp,
     )
-    results = build_v1_registry().run(context)
+    results = build_v1_registry(enabled_check_sets).run(context)
     counts = Counter(result.status.value for result in results)
     summary = {
         status.value: counts.get(status.value, 0)

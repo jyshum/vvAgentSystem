@@ -6,6 +6,7 @@ from src.improvement.inventory import build_inventory
 from src.improvement.matcher import match_queries_to_pages
 from src.improvement.scorer import compute_structural_score, extract_body_text
 from src.improvement.gap_check import check_competitive_gaps
+from src.improvement.community import select_community_opportunities
 from src.improvement.card_generator import (
     classify_actions,
     build_content_brief,
@@ -23,6 +24,7 @@ from src.improvement.auto_approve import (
     HISTORY_ELIGIBLE_TYPES,
 )
 from src.technical_audit.runner import run_technical_audit
+from src.technical_audit.rollout import AuditRolloutPolicy
 
 
 def _get_supabase():
@@ -35,6 +37,7 @@ def _run_and_persist_technical_audit(
     state: dict,
     improvement_run_id: str,
     inventory: list[dict],
+    enabled_check_sets: tuple[str, ...],
 ) -> dict:
     client_id = state["client_id"]
     config = state["client_config"]
@@ -63,7 +66,10 @@ def _run_and_persist_technical_audit(
         "pipeline_run_id": pipeline_run_id,
         "audit_version": 1,
         "status": "running",
-        "scope": {"inventory_pages": len(inventory)},
+        "scope": {
+            "inventory_pages": len(inventory),
+            "check_sets": list(enabled_check_sets),
+        },
     }).execute()
     audit_run_id = run_resp.data[0]["id"]
 
@@ -73,6 +79,7 @@ def _run_and_persist_technical_audit(
             domain=config["website_domain"],
             inventory=inventory,
             profile=profile,
+            enabled_check_sets=enabled_check_sets,
         )
 
         observations = [{
@@ -97,6 +104,7 @@ def _run_and_persist_technical_audit(
             "scope": {
                 "inventory_pages": len(inventory),
                 "observations": len(observations),
+                "check_sets": list(enabled_check_sets),
             },
             "summary": report["summary"],
             "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -129,6 +137,8 @@ def run_improvement_pipeline(
     config = state["client_config"]
     domain = config["website_domain"]
     client_id = state["client_id"]
+    policy = AuditRolloutPolicy.from_environment()
+    technical_v1_active = policy.active_for(client_id)
 
     sb = _get_supabase()
 
@@ -138,9 +148,6 @@ def run_improvement_pipeline(
         "thread_id": state.get("thread_id"),
     }).execute()
     run_id = run_resp.data[0]["id"]
-    technical_audit_enabled = (
-        os.environ.get("TECHNICAL_AUDIT_V1_ENABLED", "false").lower() == "true"
-    )
     technical_audit_run_id = None
     technical_audit_summary = {}
     technical_audit_results = []
@@ -169,11 +176,11 @@ def run_improvement_pipeline(
             } for p in inventory]
             sb.table("page_inventory").insert(inv_rows).execute()
 
-        if technical_audit_enabled:
+        if technical_v1_active:
             print("  Step 2b: Deterministic technical audit...")
             try:
                 audit_output = _run_and_persist_technical_audit(
-                    sb, state, run_id, inventory
+                    sb, state, run_id, inventory, policy.check_sets
                 )
                 technical_audit_run_id = audit_output["run_id"]
                 technical_audit_summary = audit_output["summary"]
@@ -183,32 +190,43 @@ def run_improvement_pipeline(
                 technical_audit_error = str(exc)
                 print(f"  Technical audit initialization failed: {exc}")
 
-        print("  Step 3: Query-page matching...")
-        query_dicts = [{"query": q["prompt_text"], "query_id": q["id"], "bucket": q.get("bucket", "")} for q in queries]
-        matches = match_queries_to_pages(inventory, query_dicts)
+        if technical_v1_active:
+            print("  Step 3: Query-page matching deferred for technical V1...")
+            matches = []
+        else:
+            print("  Step 3: Query-page matching...")
+            query_dicts = [
+                {
+                    "query": q["prompt_text"],
+                    "query_id": q["id"],
+                    "bucket": q.get("bucket", ""),
+                }
+                for q in queries
+            ]
+            matches = match_queries_to_pages(inventory, query_dicts)
 
-        if matches:
-            match_rows = [{
-                "run_id": run_id,
-                "query_id": m["query_id"],
-                "query_text": m["query"],
-                "match_type": m["match_type"],
-                "matched_page_url": m.get("matched_page_url"),
-                "similarity_score": m["similarity_score"],
-                "bucket": m.get("bucket"),
-            } for m in matches]
-            sb.table("query_page_matches").insert(match_rows).execute()
+            if matches:
+                match_rows = [{
+                    "run_id": run_id,
+                    "query_id": m["query_id"],
+                    "query_text": m["query"],
+                    "match_type": m["match_type"],
+                    "matched_page_url": m.get("matched_page_url"),
+                    "similarity_score": m["similarity_score"],
+                    "bucket": m.get("bucket"),
+                } for m in matches]
+                sb.table("query_page_matches").insert(match_rows).execute()
 
         print(
             "  Step 4: Legacy citation-readiness scoring skipped..."
-            if technical_audit_enabled
+            if technical_v1_active
             else "  Step 4: Citation-readiness scoring..."
         )
         matched_pages = {m["matched_page_url"] for m in matches if m["match_type"] == "matched" and m["matched_page_url"]}
         page_by_url = {p["url"]: p for p in inventory}
 
         citation_scores = []
-        for page_url in matched_pages if not technical_audit_enabled else []:
+        for page_url in matched_pages if not technical_v1_active else []:
             page = page_by_url.get(page_url)
             if not page:
                 continue
@@ -246,14 +264,27 @@ def run_improvement_pipeline(
             }).execute()
 
         print("  Step 5: Competitive gap check...")
-        gap_results = check_competitive_gaps(matches, competitive_gaps_data or [])
+        if technical_v1_active:
+            community_selection = select_community_opportunities(
+                competitive_gaps_data or [], limit=5
+            )
+            gap_results = [
+                opportunity.to_gap_dict()
+                for opportunity in community_selection.opportunities
+            ]
+            comp_gaps = community_selection.competitor_lead_count
+        else:
+            gap_results = check_competitive_gaps(matches, competitive_gaps_data or [])
+            comp_gaps = sum(
+                1 for gap in gap_results if gap["competitive_gap"] > 0
+            )
 
         gap_queries = [g for g in gap_results if g["competitive_gap"] > 0]
 
         print("  Step 6: Generating action cards...")
         all_cards = []
 
-        if not technical_audit_enabled and crawl_report.get("has_critical_blocker"):
+        if not technical_v1_active and crawl_report.get("has_critical_blocker"):
             crawl_card = build_crawlability_card(crawl_report, domain)
             crawl_card["run_id"] = run_id
             crawl_card["client_id"] = client_id
@@ -416,8 +447,6 @@ def run_improvement_pipeline(
                 card["id"] = row.get("id")
 
         content_gaps = sum(1 for m in matches if m["match_type"] == "content_gap")
-        comp_gaps = sum(1 for g in gap_results if g["competitive_gap"] > 0)
-
         sb.table("improvement_runs").update({
             "status": "completed",
             "crawlability_report": crawl_report,

@@ -536,10 +536,11 @@ def _chainable_table(data=None):
 
 def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monkeypatch):
     monkeypatch.setenv("TECHNICAL_AUDIT_V1_ENABLED", "true")
+    monkeypatch.setenv("TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS", "client-1")
+    monkeypatch.setenv("TECHNICAL_AUDIT_CHECK_SETS", "foundation")
     tables = {
         "improvement_runs": _chainable_table([{"id": "improvement-run-1"}]),
         "page_inventory": _chainable_table(),
-        "query_page_matches": _chainable_table(),
         "client_site_profiles": _chainable_table({
             "client_id": "client-1",
             "llms_txt_enabled": False,
@@ -603,15 +604,17 @@ def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monke
         },
     }
 
-    matched_queries = [{
-        "query": "q1",
-        "query_id": "id1",
-        "match_type": "matched",
-        "matched_page_url": "https://x.com/p1",
-        "similarity_score": 0.7,
-        "bucket": "awareness",
-    }]
     queries = [{"id": "id1", "prompt_text": "q1", "bucket": "awareness"}]
+    tracker_gaps = [
+        {
+            "query": f"query-{number}",
+            "query_id": f"query-{number}",
+            "bucket": "awareness",
+            "client_mention_rate": 0.1,
+            "competitor_data": [{"name": "Competitor", "mention_rate": gap}],
+        }
+        for number, gap in [(4, 0.6), (1, 0.9), (7, 0.3), (2, 0.8), (6, 0.4), (3, 0.7), (5, 0.5)]
+    ]
 
     with patch("src.improvement.pipeline._get_supabase", return_value=sb), \
          patch("src.improvement.pipeline.run_crawlability_gate", return_value={
@@ -620,13 +623,16 @@ def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monke
          }), \
          patch("src.improvement.pipeline.build_crawlability_card") as mock_crawlability_card, \
          patch("src.improvement.pipeline.build_inventory", return_value=inventory), \
-         patch("src.improvement.pipeline.match_queries_to_pages", return_value=matched_queries), \
-         patch("src.improvement.pipeline.check_competitive_gaps", return_value=[]), \
+         patch("src.improvement.pipeline.match_queries_to_pages") as mock_match, \
+         patch("src.improvement.pipeline.check_competitive_gaps") as mock_gap_check, \
          patch("src.improvement.pipeline.compute_structural_score") as mock_score, \
          patch("src.improvement.pipeline.generate_sonnet_quality") as mock_quality, \
          patch("src.improvement.pipeline.classify_actions") as mock_classify, \
          patch("src.improvement.pipeline.generate_sonnet_specifics") as mock_sonnet, \
+         patch("src.improvement.pipeline.build_content_brief") as mock_brief, \
          patch("src.improvement.pipeline.run_technical_audit", return_value=audit_report, create=True):
+        mock_match.return_value = []
+        mock_gap_check.return_value = []
         result = run_improvement_pipeline(
             {
                 "client_id": "client-1",
@@ -638,20 +644,49 @@ def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monke
                 },
             },
             queries,
-            [],
+            tracker_gaps,
         )
 
     assert result["technical_audit_run_id"] == "audit-run-1"
     assert result["technical_audit_summary"]["fail"] == 1
-    assert result["action_cards"] == []
+    assert result["query_matches"] == []
+    assert result["citation_scores"] == []
+    assert len(result["competitive_gap_data"]) == 5
+    assert [card["action_type"] for card in result["action_cards"]] == [
+        "community_check"
+    ] * 5
+    assert all(card["track"] == "manual" for card in result["action_cards"])
+    mock_match.assert_not_called()
+    mock_gap_check.assert_not_called()
     mock_score.assert_not_called()
     mock_quality.assert_not_called()
     mock_classify.assert_not_called()
     mock_sonnet.assert_not_called()
+    mock_brief.assert_not_called()
     mock_crawlability_card.assert_not_called()
+    assert "query_page_matches" not in [call.args[0] for call in sb.table.call_args_list]
     assert "page_citation_scores" not in [call.args[0] for call in sb.table.call_args_list]
     tables["technical_audit_observations"].insert.assert_called_once()
     tables["technical_audit_results"].insert.assert_called_once()
+    assert tables["technical_audit_runs"].insert.call_args.args[0]["scope"] == {
+        "inventory_pages": 1,
+        "check_sets": ["foundation"],
+    }
+    completed_audit_run = next(
+        call.args[0]
+        for call in tables["technical_audit_runs"].update.call_args_list
+        if call.args[0]["status"] == "completed"
+    )
+    assert completed_audit_run["scope"] == {
+        "inventory_pages": 1,
+        "observations": 1,
+        "check_sets": ["foundation"],
+    }
+    completed_improvement_run = tables["improvement_runs"].update.call_args.args[0]
+    assert completed_improvement_run["queries_matched"] == 0
+    assert completed_improvement_run["content_gaps_found"] == 0
+    assert completed_improvement_run["competitive_gaps_found"] == 7
+    assert completed_improvement_run["cards_generated"] == 5
 
 
 def test_v1_flag_disabled_preserves_legacy_route_without_audit_writes(monkeypatch):
@@ -688,8 +723,79 @@ def test_v1_flag_disabled_preserves_legacy_route_without_audit_writes(monkeypatc
     assert "technical_audit_runs" not in [call.args[0] for call in sb.table.call_args_list]
 
 
+def test_v1_non_allowlisted_client_preserves_legacy_route_without_audit_writes(monkeypatch):
+    monkeypatch.setenv("TECHNICAL_AUDIT_V1_ENABLED", "true")
+    monkeypatch.setenv("TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS", "client-2")
+    monkeypatch.setenv("TECHNICAL_AUDIT_CHECK_SETS", "foundation")
+    tables = {
+        "improvement_runs": _chainable_table([{"id": "improvement-run-1"}]),
+        "page_inventory": _chainable_table(),
+        "query_page_matches": _chainable_table(),
+        "action_cards": _chainable_table(),
+    }
+    sb = MagicMock()
+    sb.table.side_effect = lambda name: tables[name]
+    inventory = [{
+        "url": "https://x.com/p1",
+        "title": "Page 1",
+        "h1": "H1",
+        "first_paragraph": "text",
+        "raw_html": "<html></html>",
+        "last_modified": None,
+        "word_count": 1,
+        "outbound_link_count": 0,
+        "has_faq_schema": False,
+        "has_comparison_table": False,
+        "schema_types": [],
+    }]
+    legacy_matches = [{
+        "query": "query-1",
+        "query_id": "query-1",
+        "match_type": "content_gap",
+        "matched_page_url": None,
+        "similarity_score": 0.0,
+        "bucket": "awareness",
+    }]
+    legacy_gaps = [{
+        "query": "query-1",
+        "query_id": "query-1",
+        "competitive_gap": 0.4,
+        "top_competitor": "Competitor",
+        "client_mention_rate": 0.1,
+        "competitor_mention_rate": 0.5,
+    }]
+
+    with patch("src.improvement.pipeline._get_supabase", return_value=sb), \
+         patch("src.improvement.pipeline.run_crawlability_gate", return_value={"has_critical_blocker": False}), \
+         patch("src.improvement.pipeline.build_inventory", return_value=inventory), \
+         patch("src.improvement.pipeline.match_queries_to_pages", return_value=legacy_matches) as mock_match, \
+         patch("src.improvement.pipeline.check_competitive_gaps", return_value=legacy_gaps) as mock_gap_check, \
+         patch("src.improvement.pipeline.run_technical_audit") as mock_audit:
+        result = run_improvement_pipeline(
+            {
+                "client_id": "client-1",
+                "client_config": {
+                    "website_domain": "x.com",
+                    "brand_name": "BrandX",
+                    "competitors": [],
+                },
+            },
+            [{"id": "query-1", "prompt_text": "query-1", "bucket": "awareness"}],
+            [],
+        )
+
+    mock_match.assert_called_once()
+    mock_gap_check.assert_called_once()
+    mock_audit.assert_not_called()
+    assert result["query_matches"] == legacy_matches
+    assert result["competitive_gap_data"] == legacy_gaps
+    assert "technical_audit_runs" not in [call.args[0] for call in sb.table.call_args_list]
+
+
 def test_v1_audit_initialization_failure_does_not_abort_query_pipeline(monkeypatch):
     monkeypatch.setenv("TECHNICAL_AUDIT_V1_ENABLED", "true")
+    monkeypatch.setenv("TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS", "client-1")
+    monkeypatch.setenv("TECHNICAL_AUDIT_CHECK_SETS", "foundation")
     tables = {
         "improvement_runs": _chainable_table([{"id": "improvement-run-1"}]),
         "action_cards": _chainable_table(),
@@ -700,12 +806,17 @@ def test_v1_audit_initialization_failure_does_not_abort_query_pipeline(monkeypat
     with patch("src.improvement.pipeline._get_supabase", return_value=sb), \
          patch("src.improvement.pipeline.run_crawlability_gate", return_value={"has_critical_blocker": False}), \
          patch("src.improvement.pipeline.build_inventory", return_value=[]), \
-         patch("src.improvement.pipeline.match_queries_to_pages", return_value=[]), \
-         patch("src.improvement.pipeline.check_competitive_gaps", return_value=[]), \
+         patch("src.improvement.pipeline.match_queries_to_pages") as mock_match, \
+         patch("src.improvement.pipeline.check_competitive_gaps") as mock_gap_check, \
+         patch("src.improvement.pipeline.compute_structural_score") as mock_score, \
+         patch("src.improvement.pipeline.build_content_brief") as mock_brief, \
+         patch("src.improvement.pipeline.generate_sonnet_specifics") as mock_sonnet, \
          patch(
              "src.improvement.pipeline._run_and_persist_technical_audit",
              side_effect=RuntimeError("audit tables unavailable"),
          ):
+        mock_match.return_value = []
+        mock_gap_check.return_value = []
         result = run_improvement_pipeline(
             {
                 "client_id": "client-1",
@@ -722,3 +833,8 @@ def test_v1_audit_initialization_failure_does_not_abort_query_pipeline(monkeypat
     assert result["improvement_run_id"] == "improvement-run-1"
     assert result["technical_audit_run_id"] is None
     assert result["technical_audit_error"] == "audit tables unavailable"
+    mock_match.assert_not_called()
+    mock_gap_check.assert_not_called()
+    mock_score.assert_not_called()
+    mock_brief.assert_not_called()
+    mock_sonnet.assert_not_called()
