@@ -22,9 +22,9 @@ def test_runner_returns_counts_and_never_a_score():
             "priority_urls": ["https://example.com/"],
         },
         fetcher=lambda url: {
-            "status_code": 404,
-            "content_type": "text/plain",
-            "body": "",
+            "status_code": 200 if url == "https://example.com/" else 404,
+            "content_type": "text/html" if url == "https://example.com/" else "text/plain",
+            "body": inventory[0]["raw_html"] if url == "https://example.com/" else "",
             "final_url": url,
             "error": None,
         },
@@ -102,18 +102,19 @@ def test_runner_bounds_persisted_llms_txt_evidence():
 
 
 def test_homepage_is_a_priority_page_when_profile_has_no_priority_urls():
+    homepage_html = '<html><head><title>Home</title><link rel="canonical" href="https://example.com/"></head></html>'
     report = run_technical_audit(
         client_id="client-1",
         domain="example.com",
         inventory=[{
             "url": "https://example.com/",
-            "raw_html": '<html><head><title>Home</title><link rel="canonical" href="https://example.com/"></head></html>',
+            "raw_html": homepage_html,
         }],
         profile={"llms_txt_enabled": False},
         fetcher=lambda url: {
-            "status_code": 404,
-            "content_type": "text/plain",
-            "body": "",
+            "status_code": 200 if url == "https://example.com/" else 404,
+            "content_type": "text/html" if url == "https://example.com/" else "text/plain",
+            "body": homepage_html if url == "https://example.com/" else "",
             "final_url": url,
             "error": None,
         },
@@ -273,6 +274,54 @@ def test_redirected_priority_page_is_unknown_not_destination_metadata():
     assert len(priority_results) == 3
     assert {result["status"] for result in priority_results} == {"unknown"}
     assert all("redirect" in str(result["observed"]).lower() for result in priority_results)
+
+
+def test_priority_page_in_inventory_is_refetched_without_trusting_redirected_html():
+    priority_url = "https://example.com/important"
+
+    def fetcher(url):
+        if url == priority_url:
+            return {
+                "status_code": 302,
+                "content_type": "text/html",
+                "body": "",
+                "final_url": url,
+                "redirect_location": "https://example.com/login",
+                "error": None,
+            }
+        if url == "https://example.com/":
+            return {
+                "status_code": 200,
+                "content_type": "text/html",
+                "body": "<html><head><title>Home</title></head></html>",
+                "final_url": url,
+                "error": None,
+            }
+        return {
+            "status_code": 404,
+            "content_type": "text/plain",
+            "body": "",
+            "final_url": url,
+            "error": None,
+        }
+
+    report = run_technical_audit(
+        client_id="client-1",
+        domain="example.com",
+        inventory=[{
+            "url": priority_url,
+            "raw_html": "<html><head><title>Login destination</title></head></html>",
+        }],
+        profile={"llms_txt_enabled": False, "priority_urls": [priority_url]},
+        fetcher=fetcher,
+    )
+
+    priority_results = [
+        result for result in report["results"] if result["subject"] == priority_url
+    ]
+    assert len(priority_results) == 3
+    assert {result["status"] for result in priority_results} == {"unknown"}
+    assert all("Redirect response" in str(result["observed"]) for result in priority_results)
 
 
 def test_network_body_reader_stops_at_hard_byte_limit():

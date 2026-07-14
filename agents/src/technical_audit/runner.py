@@ -56,7 +56,7 @@ def _default_fetcher(url: str) -> FetchResult:
             "GET",
             url,
             timeout=10,
-            follow_redirects=True,
+            follow_redirects=False,
             headers={"User-Agent": "Mozilla/5.0 (compatible; VV-Audit/1.0)"},
         ) as response:
             body, truncated = _bounded_text(response.iter_bytes())
@@ -66,6 +66,7 @@ def _default_fetcher(url: str) -> FetchResult:
                 "body": body,
                 "body_truncated": truncated,
                 "final_url": str(response.url),
+                "redirect_location": response.headers.get("location"),
                 "error": None,
             }
     except Exception as exc:
@@ -121,15 +122,12 @@ def run_technical_audit(
     priority_urls = [*configured_priority_urls, homepage]
     effective_profile["priority_urls"] = priority_urls
     pages = [dict(page) for page in inventory]
-    inventory_urls = {
-        normalize_url(page["url"])
-        for page in pages
-        if page.get("url")
-    }
 
     for priority_url in priority_urls:
-        if priority_url in inventory_urls:
-            continue
+        pages = [
+            page for page in pages
+            if not page.get("url") or normalize_url(page["url"]) != priority_url
+        ]
         fetched_page = _safe_fetch(fetcher, priority_url)
         final_url = normalize_url(fetched_page.get("final_url") or priority_url)
         redirected = final_url != priority_url
@@ -146,6 +144,9 @@ def run_technical_audit(
             fetch_error = fetched_page.get("error")
             if redirected:
                 fetch_error = f"Redirected to {final_url}"
+            elif 300 <= int(fetched_page.get("status_code") or 0) < 400:
+                location = fetched_page.get("redirect_location") or "an undisclosed location"
+                fetch_error = f"Redirect response to {location}"
             pages.insert(
                 0,
                 {
