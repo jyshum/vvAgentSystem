@@ -3,7 +3,7 @@
 ## Active Development — Simplified Technical Audit V1
 
 - **Rollout:** development only; `TECHNICAL_AUDIT_V1_ENABLED=true` requires `TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS` to explicitly list the client. An empty allowlist enables no clients; `*` is development/testing only.
-- **Check sets:** `TECHNICAL_AUDIT_CHECK_SETS=foundation`; `foundation` is the only implemented set. An unavailable set is a configuration error, not a partial audit.
+- **Check sets:** `TECHNICAL_AUDIT_CHECK_SETS=foundation`; `foundation` is the only implemented set. For an active V1 client (global flag enabled and client allowlisted), an unavailable or empty set fails closed before work; disabled or unallowlisted clients skip check-set validation and continue unchanged on the legacy route.
 - **Database:** additive migration `supabase/migrations/014_technical_audit_foundation.sql`; not applied to production.
 - **Implemented V1 path:** an allowlisted run writes immutable technical observations/results for deterministic `llms.txt`/title/description/canonical checks and uses the five-status audit contract.
 - **Legacy preservation:** disabled or unallowlisted clients use the legacy route. The Pages primary tab is hidden but its direct route remains available; run pages use technical or legacy presentation and preserve historical legacy evidence.

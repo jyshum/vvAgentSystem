@@ -24,7 +24,8 @@ TECHNICAL_AUDIT_CHECK_SETS=foundation
 - A true flag with an empty allowlist enables no clients.
 - A true flag with listed IDs enables V1 only for those clients.
 - `*` enables all clients and is for development/testing only.
-- An unavailable check-set name is a configuration error, never a silent partial audit.
+- For an active V1 client (global flag enabled and client allowlisted), an unavailable or empty `TECHNICAL_AUDIT_CHECK_SETS` fails closed before work; it is never a silent partial audit.
+- When the global flag is disabled or a client is not allowlisted, check-set validation does not block that client and the legacy route continues unchanged.
 - A technical-audit runtime error is reported by the V1 run and does not fall back to legacy heuristic content work.
 
 Removing a client ID from the allowlist rolls that client back to the legacy route on its next run. Setting the global flag false rolls every client back to the legacy route:
