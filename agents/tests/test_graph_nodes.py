@@ -48,6 +48,10 @@ def test_tracker_run_insert_includes_thread_id(mock_sb):
     """tracker_runs insert must carry the pipeline thread_id so the approvals
     inbox and run-detail page can join back to the originating thread."""
     mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.gte.return_value.order.return_value.limit.return_value.execute.return_value = \
+        MagicMock(data=[])
+    mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = \
+        MagicMock(data=[])
     mock_table.insert.return_value.execute.return_value = MagicMock(data=[{"id": "run-1"}])
     mock_sb.return_value.table.return_value = mock_table
 
@@ -77,6 +81,8 @@ def test_tracker_run_insert_includes_thread_id(mock_sb):
 @patch("src.graph.nodes._get_supabase")
 def test_run_tracker_node_writes_drift_signature(mock_sb):
     mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.gte.return_value.order.return_value.limit.return_value.execute.return_value = \
+        MagicMock(data=[])
     mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = \
         MagicMock(data=[{"query_set_signature": "previous-signature"}])
     mock_table.insert.return_value.execute.return_value = MagicMock(data=[{"id": "run-1"}])
