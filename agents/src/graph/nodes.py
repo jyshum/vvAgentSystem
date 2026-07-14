@@ -200,6 +200,10 @@ def run_improvement_pipeline_node(state: GEOState) -> dict:
         print(f"  Improvement pipeline failed: {e}")
         return {
             "improvement_run_id": None,
+            "technical_audit_run_id": None,
+            "technical_audit_summary": {},
+            "technical_audit_results": [],
+            "technical_audit_error": None,
             "crawlability_report": {},
             "page_inventory": [],
             "query_matches": [],

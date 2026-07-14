@@ -22,11 +22,103 @@ from src.improvement.auto_approve import (
     apply_auto_approve,
     HISTORY_ELIGIBLE_TYPES,
 )
+from src.technical_audit.runner import run_technical_audit
 
 
 def _get_supabase():
     from supabase import create_client
     return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+
+
+def _run_and_persist_technical_audit(
+    sb,
+    state: dict,
+    improvement_run_id: str,
+    inventory: list[dict],
+) -> dict:
+    client_id = state["client_id"]
+    config = state["client_config"]
+    profile_resp = sb.table("client_site_profiles") \
+        .select("*") \
+        .eq("client_id", client_id) \
+        .maybe_single() \
+        .execute()
+    profile = profile_resp.data or {}
+
+    pipeline_run_id = None
+    thread_id = state.get("thread_id")
+    if thread_id:
+        pipeline_resp = sb.table("pipeline_runs") \
+            .select("id") \
+            .eq("client_id", client_id) \
+            .eq("thread_id", thread_id) \
+            .maybe_single() \
+            .execute()
+        if pipeline_resp.data:
+            pipeline_run_id = pipeline_resp.data["id"]
+
+    run_resp = sb.table("technical_audit_runs").insert({
+        "client_id": client_id,
+        "improvement_run_id": improvement_run_id,
+        "pipeline_run_id": pipeline_run_id,
+        "audit_version": 1,
+        "status": "running",
+        "scope": {"inventory_pages": len(inventory)},
+    }).execute()
+    audit_run_id = run_resp.data[0]["id"]
+
+    try:
+        report = run_technical_audit(
+            client_id=client_id,
+            domain=config["website_domain"],
+            inventory=inventory,
+            profile=profile,
+        )
+
+        observations = [{
+            "audit_run_id": audit_run_id,
+            "observation_ref": observation["id"],
+            "kind": observation["kind"],
+            "subject": observation["subject"],
+            "retrieved_at": observation["retrieved_at"],
+            "fingerprint": observation["fingerprint"],
+            "data": observation["data"],
+        } for observation in report["observations"]]
+        if observations:
+            sb.table("technical_audit_observations").insert(observations).execute()
+
+        result_rows = [{"audit_run_id": audit_run_id, **result}
+                       for result in report["results"]]
+        if result_rows:
+            sb.table("technical_audit_results").insert(result_rows).execute()
+
+        sb.table("technical_audit_runs").update({
+            "status": "completed",
+            "scope": {
+                "inventory_pages": len(inventory),
+                "observations": len(observations),
+            },
+            "summary": report["summary"],
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_run_id).execute()
+        return {
+            "run_id": audit_run_id,
+            "summary": report["summary"],
+            "results": report["results"],
+            "error": None,
+        }
+    except Exception as exc:
+        sb.table("technical_audit_runs").update({
+            "status": "error",
+            "error_message": str(exc)[:500],
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_run_id).execute()
+        return {
+            "run_id": audit_run_id,
+            "summary": {},
+            "results": [],
+            "error": str(exc),
+        }
 
 
 def run_improvement_pipeline(
@@ -46,6 +138,13 @@ def run_improvement_pipeline(
         "thread_id": state.get("thread_id"),
     }).execute()
     run_id = run_resp.data[0]["id"]
+    technical_audit_enabled = (
+        os.environ.get("TECHNICAL_AUDIT_V1_ENABLED", "false").lower() == "true"
+    )
+    technical_audit_run_id = None
+    technical_audit_summary = {}
+    technical_audit_results = []
+    technical_audit_error = None
 
     try:
         print("  Step 1: Crawlability gate...")
@@ -70,6 +169,20 @@ def run_improvement_pipeline(
             } for p in inventory]
             sb.table("page_inventory").insert(inv_rows).execute()
 
+        if technical_audit_enabled:
+            print("  Step 2b: Deterministic technical audit...")
+            try:
+                audit_output = _run_and_persist_technical_audit(
+                    sb, state, run_id, inventory
+                )
+                technical_audit_run_id = audit_output["run_id"]
+                technical_audit_summary = audit_output["summary"]
+                technical_audit_results = audit_output["results"]
+                technical_audit_error = audit_output["error"]
+            except Exception as exc:
+                technical_audit_error = str(exc)
+                print(f"  Technical audit initialization failed: {exc}")
+
         print("  Step 3: Query-page matching...")
         query_dicts = [{"query": q["prompt_text"], "query_id": q["id"], "bucket": q.get("bucket", "")} for q in queries]
         matches = match_queries_to_pages(inventory, query_dicts)
@@ -86,12 +199,16 @@ def run_improvement_pipeline(
             } for m in matches]
             sb.table("query_page_matches").insert(match_rows).execute()
 
-        print("  Step 4: Citation-readiness scoring...")
+        print(
+            "  Step 4: Legacy citation-readiness scoring skipped..."
+            if technical_audit_enabled
+            else "  Step 4: Citation-readiness scoring..."
+        )
         matched_pages = {m["matched_page_url"] for m in matches if m["match_type"] == "matched" and m["matched_page_url"]}
         page_by_url = {p["url"]: p for p in inventory}
 
         citation_scores = []
-        for page_url in matched_pages:
+        for page_url in matched_pages if not technical_audit_enabled else []:
             page = page_by_url.get(page_url)
             if not page:
                 continue
@@ -136,7 +253,7 @@ def run_improvement_pipeline(
         print("  Step 6: Generating action cards...")
         all_cards = []
 
-        if crawl_report.get("has_critical_blocker"):
+        if not technical_audit_enabled and crawl_report.get("has_critical_blocker"):
             crawl_card = build_crawlability_card(crawl_report, domain)
             crawl_card["run_id"] = run_id
             crawl_card["client_id"] = client_id
@@ -316,6 +433,10 @@ def run_improvement_pipeline(
 
         return {
             "improvement_run_id": run_id,
+            "technical_audit_run_id": technical_audit_run_id,
+            "technical_audit_summary": technical_audit_summary,
+            "technical_audit_results": technical_audit_results,
+            "technical_audit_error": technical_audit_error,
             "crawlability_report": crawl_report,
             "page_inventory": [{k: v for k, v in p.items() if k != "raw_html"} for p in inventory],
             "query_matches": matches,

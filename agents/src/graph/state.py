@@ -21,3 +21,9 @@ class GEOState(TypedDict):
     action_cards: list[dict]
     approved_card_ids: list[str]
     implementation_results: list[dict]
+
+    # Versioned, deterministic technical checklist fields
+    technical_audit_run_id: str | None
+    technical_audit_summary: dict
+    technical_audit_results: list[dict]
+    technical_audit_error: str | None

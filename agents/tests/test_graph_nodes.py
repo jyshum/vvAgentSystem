@@ -48,6 +48,10 @@ def test_tracker_run_insert_includes_thread_id(mock_sb):
     """tracker_runs insert must carry the pipeline thread_id so the approvals
     inbox and run-detail page can join back to the originating thread."""
     mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.gte.return_value.order.return_value.limit.return_value.execute.return_value = \
+        MagicMock(data=[])
+    mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = \
+        MagicMock(data=[])
     mock_table.insert.return_value.execute.return_value = MagicMock(data=[{"id": "run-1"}])
     mock_sb.return_value.table.return_value = mock_table
 
@@ -77,6 +81,8 @@ def test_tracker_run_insert_includes_thread_id(mock_sb):
 @patch("src.graph.nodes._get_supabase")
 def test_run_tracker_node_writes_drift_signature(mock_sb):
     mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.gte.return_value.order.return_value.limit.return_value.execute.return_value = \
+        MagicMock(data=[])
     mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = \
         MagicMock(data=[{"query_set_signature": "previous-signature"}])
     mock_table.insert.return_value.execute.return_value = MagicMock(data=[{"id": "run-1"}])
@@ -139,6 +145,31 @@ def test_improvement_node_fetches_gaps_without_tracker_results(mock_sb):
         # Third positional arg = competitive_gaps, must be the stored rows, not []
         passed_gaps = mock_run.call_args[0][2]
         assert passed_gaps == [{"query": "q1", "client_mention_rate": 0.1, "competitor_data": []}]
+
+
+@patch("src.graph.nodes._get_supabase")
+def test_improvement_node_returns_empty_technical_audit_state_on_pipeline_error(mock_sb):
+    mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+    mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = \
+        MagicMock(data=[])
+    mock_sb.return_value.table.return_value = mock_table
+
+    from src.graph.nodes import run_improvement_pipeline_node
+
+    with patch(
+        "src.improvement.pipeline.run_improvement_pipeline",
+        side_effect=RuntimeError("pipeline failed"),
+    ):
+        result = run_improvement_pipeline_node({
+            "client_id": "c1",
+            "client_config": {"website_domain": "x.com"},
+            "tracker_results": [],
+        })
+
+    assert result["technical_audit_run_id"] is None
+    assert result["technical_audit_summary"] == {}
+    assert result["technical_audit_results"] == []
 
 
 @patch("src.graph.nodes._get_supabase")
