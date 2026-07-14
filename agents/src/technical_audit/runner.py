@@ -119,7 +119,15 @@ def run_technical_audit(
     summary["total"] = len(results)
 
     observations = [observation.to_dict() for observation in page_observations]
-    observations.append(llms_observation.to_dict())
+    persisted_llms = llms_observation.to_dict()
+    persisted_llms["data"] = {
+        key: value
+        for key, value in persisted_llms["data"].items()
+        if key != "body"
+    }
+    persisted_llms["data"]["body_excerpt"] = llms_body[:4_000]
+    persisted_llms["data"]["body_bytes"] = len(llms_body.encode("utf-8"))
+    observations.append(persisted_llms)
     return {
         "audit_version": 1,
         "observations": observations,

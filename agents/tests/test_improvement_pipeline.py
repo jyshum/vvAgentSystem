@@ -524,3 +524,115 @@ class TestRunImprovementPipeline:
         # Content-changing type is ignored despite being in the allowlist
         assert cards_by_type["restructure_intro"]["status"] == "pending"
         assert "auto_approved" not in cards_by_type["restructure_intro"]
+
+
+def _chainable_table(data=None):
+    table = MagicMock()
+    for method in ("select", "eq", "order", "limit", "maybe_single", "single", "insert", "update"):
+        getattr(table, method).return_value = table
+    table.execute.return_value = MagicMock(data=[] if data is None else data)
+    return table
+
+
+def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monkeypatch):
+    monkeypatch.setenv("TECHNICAL_AUDIT_V1_ENABLED", "true")
+    tables = {
+        "improvement_runs": _chainable_table([{"id": "improvement-run-1"}]),
+        "page_inventory": _chainable_table(),
+        "query_page_matches": _chainable_table(),
+        "client_site_profiles": _chainable_table({
+            "client_id": "client-1",
+            "llms_txt_enabled": False,
+            "priority_urls": ["https://x.com/p1"],
+        }),
+        "pipeline_runs": _chainable_table({"id": "pipeline-run-1"}),
+        "technical_audit_runs": _chainable_table([{"id": "audit-run-1"}]),
+        "technical_audit_observations": _chainable_table(),
+        "technical_audit_results": _chainable_table(),
+        "action_cards": _chainable_table(),
+    }
+    sb = MagicMock()
+    sb.table.side_effect = lambda name: tables[name]
+    inventory = [{
+        "url": "https://x.com/p1",
+        "title": "Page 1",
+        "h1": "H1",
+        "first_paragraph": "text",
+        "raw_html": "<html><head><title>Page</title></head></html>",
+        "last_modified": None,
+        "word_count": 1,
+        "outbound_link_count": 0,
+        "has_faq_schema": False,
+        "has_comparison_table": False,
+        "schema_types": [],
+    }]
+    audit_report = {
+        "audit_version": 1,
+        "observations": [{
+            "id": "page:https://x.com/p1",
+            "kind": "page",
+            "subject": "https://x.com/p1",
+            "retrieved_at": "2026-07-14T10:00:00+00:00",
+            "fingerprint": "a" * 64,
+            "data": {"titles": []},
+        }],
+        "results": [{
+            "check_id": "meta_title.integrity",
+            "check_version": 1,
+            "section": "meta_title",
+            "subject": "https://x.com/p1",
+            "status": "fail",
+            "severity": "high",
+            "summary": "Title is missing",
+            "expected": "One title",
+            "observed": {"count": 0},
+            "evidence_refs": ["page:https://x.com/p1"],
+            "scope": {"sampled": False, "urls_checked": 1},
+            "applicability": {"applies": True, "reason": "HTML page"},
+            "confidence": "high",
+            "next_action": {"owner": "admin", "instruction": "Add a title"},
+            "remediation_id": "meta_title.correct",
+        }],
+        "summary": {
+            "pass": 0,
+            "fail": 1,
+            "review": 0,
+            "unknown": 0,
+            "not_applicable": 0,
+            "total": 1,
+        },
+    }
+
+    with patch("src.improvement.pipeline._get_supabase", return_value=sb), \
+         patch("src.improvement.pipeline.run_crawlability_gate", return_value={"has_critical_blocker": False}), \
+         patch("src.improvement.pipeline.build_inventory", return_value=inventory), \
+         patch("src.improvement.pipeline.match_queries_to_pages", return_value=[]), \
+         patch("src.improvement.pipeline.check_competitive_gaps", return_value=[]), \
+         patch("src.improvement.pipeline.compute_structural_score") as mock_score, \
+         patch("src.improvement.pipeline.generate_sonnet_quality") as mock_quality, \
+         patch("src.improvement.pipeline.classify_actions") as mock_classify, \
+         patch("src.improvement.pipeline.generate_sonnet_specifics") as mock_sonnet, \
+         patch("src.improvement.pipeline.run_technical_audit", return_value=audit_report, create=True):
+        result = run_improvement_pipeline(
+            {
+                "client_id": "client-1",
+                "thread_id": "thread-1",
+                "client_config": {
+                    "website_domain": "x.com",
+                    "brand_name": "BrandX",
+                    "competitors": [],
+                },
+            },
+            [],
+            [],
+        )
+
+    assert result["technical_audit_run_id"] == "audit-run-1"
+    assert result["technical_audit_summary"]["fail"] == 1
+    assert result["action_cards"] == []
+    mock_score.assert_not_called()
+    mock_quality.assert_not_called()
+    mock_classify.assert_not_called()
+    mock_sonnet.assert_not_called()
+    tables["technical_audit_observations"].insert.assert_called_once()
+    tables["technical_audit_results"].insert.assert_called_once()

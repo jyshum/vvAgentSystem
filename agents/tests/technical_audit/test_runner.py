@@ -75,3 +75,27 @@ def test_runner_fetches_a_missing_homepage_once_and_records_fetch_errors():
     assert calls == ["https://example.com/", "https://example.com/llms.txt"]
     assert report["summary"]["unknown"] == 1
     assert len(report["observations"]) == 2
+
+
+def test_runner_bounds_persisted_llms_txt_evidence():
+    report = run_technical_audit(
+        client_id="client-1",
+        domain="example.com",
+        inventory=[{
+            "url": "https://example.com/",
+            "raw_html": "<html><head><title>Home</title></head></html>",
+        }],
+        profile={"llms_txt_enabled": True, "priority_urls": []},
+        fetcher=lambda url: {
+            "status_code": 200,
+            "content_type": "text/plain",
+            "body": "x" * 10_000,
+            "final_url": url,
+            "error": None,
+        },
+    )
+
+    llms = next(item for item in report["observations"] if item["kind"] == "llms_txt")
+    assert "body" not in llms["data"]
+    assert len(llms["data"]["body_excerpt"]) == 4_000
+    assert llms["data"]["body_bytes"] == 10_000

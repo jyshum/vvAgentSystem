@@ -148,6 +148,31 @@ def test_improvement_node_fetches_gaps_without_tracker_results(mock_sb):
 
 
 @patch("src.graph.nodes._get_supabase")
+def test_improvement_node_returns_empty_technical_audit_state_on_pipeline_error(mock_sb):
+    mock_table = MagicMock()
+    mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+    mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = \
+        MagicMock(data=[])
+    mock_sb.return_value.table.return_value = mock_table
+
+    from src.graph.nodes import run_improvement_pipeline_node
+
+    with patch(
+        "src.improvement.pipeline.run_improvement_pipeline",
+        side_effect=RuntimeError("pipeline failed"),
+    ):
+        result = run_improvement_pipeline_node({
+            "client_id": "c1",
+            "client_config": {"website_domain": "x.com"},
+            "tracker_results": [],
+        })
+
+    assert result["technical_audit_run_id"] is None
+    assert result["technical_audit_summary"] == {}
+    assert result["technical_audit_results"] == []
+
+
+@patch("src.graph.nodes._get_supabase")
 def test_implementation_skips_auto_approved_card_without_id(mock_sb):
     """Id-less cards (partial insert) must never reach route_card — no audit trail."""
     mock_sb.return_value.table.return_value = MagicMock()
