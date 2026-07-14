@@ -8,6 +8,7 @@ __pycache__/
 # Local agent work artifacts
 .claude/worktrees/
 .superpowers/brainstorm/
+.worktrees/
 
 # Dashboard
 node_modules/
