@@ -9,6 +9,7 @@ from .models import (
     NextAction,
     Observation,
 )
+from .rollout import AVAILABLE_CHECK_SETS, AuditRolloutPolicy
 
 __all__ = [
     "Applicability",
@@ -18,4 +19,6 @@ __all__ = [
     "Confidence",
     "NextAction",
     "Observation",
+    "AuditRolloutPolicy",
+    "AVAILABLE_CHECK_SETS",
 ]
