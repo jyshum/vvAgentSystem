@@ -1,6 +1,6 @@
 # V1 Simplification and Technical Audit Expansion
 
-**Status:** Approved section by section; pending written-spec review
+**Status:** Approved
 
 **Date:** 2026-07-14
 
