@@ -8,8 +8,15 @@ from bs4 import BeautifulSoup
 from .models import Observation
 
 
+def _truncate_utf8(value: str, max_bytes: int) -> str:
+    encoded = value.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return value
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+
 def _bounded(values, *, count: int, length: int) -> list[str]:
-    return [value[:length] for value in values[:count]]
+    return [_truncate_utf8(value, length) for value in values[:count]]
 
 
 def normalize_url(url: str) -> str:
@@ -78,10 +85,10 @@ def extract_page_observation(page: dict, retrieved_at: str) -> Observation:
         retrieved_at=retrieved_at,
         fingerprint=sha256(raw_html.encode("utf-8")).hexdigest(),
         data={
-            "url": url,
+            "url": _truncate_utf8(url, 2_048),
             "available": page.get("available", True),
             "status_code": page.get("status_code", 200),
-            "fetch_error": page.get("fetch_error"),
+            "fetch_error": _truncate_utf8(str(page.get("fetch_error") or ""), 2_000) or None,
             "titles": titles,
             "meta_descriptions": descriptions,
             "canonicals": canonicals,

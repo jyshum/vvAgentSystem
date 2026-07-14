@@ -158,6 +158,54 @@ def test_unavailable_homepage_emits_unknown_page_results():
     assert report["summary"]["unknown"] == 3
 
 
+def test_missing_configured_priority_page_is_fetched_and_reported_unknown():
+    missing_priority = "https://example.com/important"
+
+    def fetcher(url):
+        if url == missing_priority:
+            return {
+                "status_code": 403,
+                "content_type": "text/html",
+                "body": "Forbidden",
+                "final_url": url,
+                "error": None,
+            }
+        if url == "https://example.com/":
+            return {
+                "status_code": 200,
+                "content_type": "text/html",
+                "body": "<html><head><title>Home</title></head></html>",
+                "final_url": url,
+                "error": None,
+            }
+        return {
+            "status_code": 404,
+            "content_type": "text/plain",
+            "body": "",
+            "final_url": url,
+            "error": None,
+        }
+
+    report = run_technical_audit(
+        client_id="client-1",
+        domain="example.com",
+        inventory=[],
+        profile={"llms_txt_enabled": False, "priority_urls": [missing_priority]},
+        fetcher=fetcher,
+    )
+
+    missing_results = [
+        result for result in report["results"] if result["subject"] == missing_priority
+    ]
+    assert len(missing_results) == 3
+    assert {result["status"] for result in missing_results} == {"unknown"}
+    assert any(
+        observation["subject"] == missing_priority
+        and observation["data"]["status_code"] == 403
+        for observation in report["observations"]
+    )
+
+
 def test_network_body_reader_stops_at_hard_byte_limit():
     body, truncated = _bounded_text([b"abc", b"def", b"ghi"], limit=5)
 

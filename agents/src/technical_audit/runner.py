@@ -86,8 +86,12 @@ def run_technical_audit(
     run_timestamp = datetime.now(timezone.utc).isoformat()
     homepage = normalize_url(f"https://{domain}/")
     effective_profile = dict(profile)
-    priority_urls = list(effective_profile.get("priority_urls") or [])
-    if homepage not in {normalize_url(url) for url in priority_urls}:
+    priority_urls = list(dict.fromkeys(
+        normalize_url(url)
+        for url in (effective_profile.get("priority_urls") or [])
+        if url
+    ))
+    if homepage not in priority_urls:
         priority_urls.append(homepage)
     effective_profile["priority_urls"] = priority_urls
     pages = [dict(page) for page in inventory]
@@ -97,27 +101,29 @@ def run_technical_audit(
         if page.get("url")
     }
 
-    if homepage not in inventory_urls:
-        fetched_homepage = _safe_fetch(fetcher, homepage)
-        if fetched_homepage.get("status_code") == 200:
+    for priority_url in priority_urls:
+        if priority_url in inventory_urls:
+            continue
+        fetched_page = _safe_fetch(fetcher, priority_url)
+        if fetched_page.get("status_code") == 200:
             pages.insert(
                 0,
                 {
-                    "url": fetched_homepage.get("final_url") or homepage,
-                    "raw_html": fetched_homepage.get("body") or "",
-                    "content_type": fetched_homepage.get("content_type") or "text/html",
+                    "url": priority_url,
+                    "raw_html": fetched_page.get("body") or "",
+                    "content_type": fetched_page.get("content_type") or "text/html",
                 },
             )
         else:
             pages.insert(
                 0,
                 {
-                    "url": fetched_homepage.get("final_url") or homepage,
+                    "url": priority_url,
                     "raw_html": "",
-                    "content_type": fetched_homepage.get("content_type") or "text/html",
+                    "content_type": fetched_page.get("content_type") or "text/html",
                     "available": False,
-                    "status_code": fetched_homepage.get("status_code") or 0,
-                    "fetch_error": fetched_homepage.get("error"),
+                    "status_code": fetched_page.get("status_code") or 0,
+                    "fetch_error": fetched_page.get("error"),
                 },
             )
 

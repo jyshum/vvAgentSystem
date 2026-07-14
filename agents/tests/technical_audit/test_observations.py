@@ -1,3 +1,5 @@
+import json
+
 from src.technical_audit.observations import extract_page_observation, normalize_url
 
 
@@ -85,3 +87,25 @@ def test_extracted_head_fields_have_count_and_length_bounds():
     assert max(map(len, observation.data["canonicals"])) <= 2_048
     assert len(observation.data["h1_texts"]) == 10
     assert max(map(len, observation.data["h1_texts"])) == 1_000
+
+
+def test_observation_bounds_are_measured_in_bytes_for_multibyte_text():
+    emoji = "🧪"
+    repeated = "".join(
+        f"<title>{emoji * 900}</title>"
+        f"<meta name='description' content='{emoji * 3000}'>"
+        f"<link rel='canonical' href='/{emoji * 3000}'>"
+        for _ in range(20)
+    )
+    headings = "".join(f"<h1>{emoji * 3000}</h1>" for _ in range(20))
+    observation = extract_page_observation(
+        {
+            "url": f"https://example.com/{emoji * 3000}",
+            "raw_html": f"<html><head>{repeated}</head><body>{headings}</body></html>",
+            "fetch_error": emoji * 3000,
+        },
+        "2026-07-14T10:00:00+00:00",
+    )
+
+    encoded = json.dumps(observation.data, ensure_ascii=False).encode("utf-8")
+    assert len(encoded) <= 60_000
