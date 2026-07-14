@@ -137,8 +137,10 @@ def run_improvement_pipeline(
     config = state["client_config"]
     domain = config["website_domain"]
     client_id = state["client_id"]
-    policy = AuditRolloutPolicy.from_environment()
+    policy = AuditRolloutPolicy.from_environment(validate_check_sets=False)
     technical_v1_active = policy.active_for(client_id)
+    if technical_v1_active:
+        policy.validate_check_sets()
 
     sb = _get_supabase()
 

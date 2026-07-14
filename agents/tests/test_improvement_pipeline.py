@@ -1,4 +1,6 @@
 from unittest.mock import patch, MagicMock
+
+import pytest
 from src.improvement.pipeline import run_improvement_pipeline
 
 
@@ -691,6 +693,7 @@ def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monke
 
 def test_v1_flag_disabled_preserves_legacy_route_without_audit_writes(monkeypatch):
     monkeypatch.setenv("TECHNICAL_AUDIT_V1_ENABLED", "false")
+    monkeypatch.setenv("TECHNICAL_AUDIT_CHECK_SETS", "unsupported")
     tables = {
         "improvement_runs": _chainable_table([{"id": "improvement-run-1"}]),
         "action_cards": _chainable_table(),
@@ -701,8 +704,8 @@ def test_v1_flag_disabled_preserves_legacy_route_without_audit_writes(monkeypatc
     with patch("src.improvement.pipeline._get_supabase", return_value=sb), \
          patch("src.improvement.pipeline.run_crawlability_gate", return_value={"has_critical_blocker": False}), \
          patch("src.improvement.pipeline.build_inventory", return_value=[]), \
-         patch("src.improvement.pipeline.match_queries_to_pages", return_value=[]), \
-         patch("src.improvement.pipeline.check_competitive_gaps", return_value=[]), \
+         patch("src.improvement.pipeline.match_queries_to_pages", return_value=[]) as mock_match, \
+         patch("src.improvement.pipeline.check_competitive_gaps", return_value=[]) as mock_gap_check, \
          patch("src.improvement.pipeline.run_technical_audit") as mock_audit:
         result = run_improvement_pipeline(
             {
@@ -719,6 +722,8 @@ def test_v1_flag_disabled_preserves_legacy_route_without_audit_writes(monkeypatc
 
     assert result["technical_audit_run_id"] is None
     assert result["technical_audit_summary"] == {}
+    mock_match.assert_called_once()
+    mock_gap_check.assert_called_once()
     mock_audit.assert_not_called()
     assert "technical_audit_runs" not in [call.args[0] for call in sb.table.call_args_list]
 
@@ -726,7 +731,7 @@ def test_v1_flag_disabled_preserves_legacy_route_without_audit_writes(monkeypatc
 def test_v1_non_allowlisted_client_preserves_legacy_route_without_audit_writes(monkeypatch):
     monkeypatch.setenv("TECHNICAL_AUDIT_V1_ENABLED", "true")
     monkeypatch.setenv("TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS", "client-2")
-    monkeypatch.setenv("TECHNICAL_AUDIT_CHECK_SETS", "foundation")
+    monkeypatch.setenv("TECHNICAL_AUDIT_CHECK_SETS", "unsupported")
     tables = {
         "improvement_runs": _chainable_table([{"id": "improvement-run-1"}]),
         "page_inventory": _chainable_table(),
@@ -790,6 +795,38 @@ def test_v1_non_allowlisted_client_preserves_legacy_route_without_audit_writes(m
     assert result["query_matches"] == legacy_matches
     assert result["competitive_gap_data"] == legacy_gaps
     assert "technical_audit_runs" not in [call.args[0] for call in sb.table.call_args_list]
+
+
+@pytest.mark.parametrize(
+    ("check_sets", "message"),
+    [
+        ("unsupported", "Unavailable technical audit check set"),
+        ("", "At least one technical audit check set is required"),
+    ],
+)
+def test_v1_active_client_rejects_invalid_check_sets_before_pipeline_work(
+    monkeypatch, check_sets, message
+):
+    monkeypatch.setenv("TECHNICAL_AUDIT_V1_ENABLED", "true")
+    monkeypatch.setenv("TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS", "client-1")
+    monkeypatch.setenv("TECHNICAL_AUDIT_CHECK_SETS", check_sets)
+
+    with patch("src.improvement.pipeline._get_supabase") as mock_supabase:
+        with pytest.raises(ValueError, match=message):
+            run_improvement_pipeline(
+                {
+                    "client_id": "client-1",
+                    "client_config": {
+                        "website_domain": "x.com",
+                        "brand_name": "BrandX",
+                        "competitors": [],
+                    },
+                },
+                [],
+                [],
+            )
+
+    mock_supabase.assert_not_called()
 
 
 def test_v1_audit_initialization_failure_does_not_abort_query_pipeline(monkeypatch):
