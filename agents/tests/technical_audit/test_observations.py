@@ -62,3 +62,26 @@ def test_canonical_fragment_is_preserved_for_the_check_to_reject():
     )
 
     assert observation.data["canonicals"] == ["https://example.com/page#section"]
+
+
+def test_extracted_head_fields_have_count_and_length_bounds():
+    repeated = "".join(
+        f"<title>{'T' * 900}</title><meta name='description' content='{'D' * 3000}'>"
+        f"<link rel='canonical' href='/{'c' * 3000}'>"
+        for _ in range(20)
+    )
+    headings = "".join(f"<h1>{'H' * 3000}</h1>" for _ in range(20))
+    html = f"<html><head>{repeated}</head><body>{headings}</body></html>"
+    observation = extract_page_observation(
+        {"url": "https://example.com/", "raw_html": html},
+        "2026-07-14T10:00:00+00:00",
+    )
+
+    assert len(observation.data["titles"]) == 10
+    assert max(map(len, observation.data["titles"])) == 500
+    assert len(observation.data["meta_descriptions"]) == 10
+    assert max(map(len, observation.data["meta_descriptions"])) == 1_000
+    assert len(observation.data["canonicals"]) == 10
+    assert max(map(len, observation.data["canonicals"])) <= 2_048
+    assert len(observation.data["h1_texts"]) == 10
+    assert max(map(len, observation.data["h1_texts"])) == 1_000

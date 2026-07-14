@@ -101,4 +101,34 @@ describe("TechnicalAuditChecklist", () => {
       ),
     ).toBeTruthy();
   });
+
+  it("renders an explicit bounded error state instead of undefined counts", () => {
+    render(
+      <TechnicalAuditChecklist
+        run={{
+          ...runFixture,
+          status: "error",
+          summary: {} as TechnicalAuditRun["summary"],
+          error_message: "audit storage failed",
+        }}
+        results={[]}
+      />,
+    );
+
+    expect(screen.getByText("Technical audit failed")).toBeTruthy();
+    expect(screen.getByText("audit storage failed")).toBeTruthy();
+    expect(screen.queryByText(/undefined/)).toBeNull();
+  });
+
+  it("renders an explicit running state without checklist counts", () => {
+    render(
+      <TechnicalAuditChecklist
+        run={{ ...runFixture, status: "running", summary: {} as TechnicalAuditRun["summary"] }}
+        results={[]}
+      />,
+    );
+
+    expect(screen.getByText("Technical audit running")).toBeTruthy();
+    expect(screen.queryByText(/undefined/)).toBeNull();
+  });
 });

@@ -9,29 +9,49 @@ from typing import Any
 import httpx
 
 from .checks import build_v1_registry
+from .checks.llms_txt import UNSAFE_CONTENT
 from .models import AuditContext, AuditStatus, Observation
 from .observations import extract_page_observation, normalize_url
 
 
 FetchResult = dict[str, Any]
 Fetcher = Callable[[str], FetchResult]
+MAX_NETWORK_BODY_BYTES = 512_000
+
+
+def _bounded_text(chunks, limit: int = MAX_NETWORK_BODY_BYTES) -> tuple[str, bool]:
+    collected = bytearray()
+    truncated = False
+    for chunk in chunks:
+        remaining = limit - len(collected)
+        if remaining <= 0:
+            truncated = True
+            break
+        collected.extend(chunk[:remaining])
+        if len(chunk) > remaining:
+            truncated = True
+            break
+    return collected.decode("utf-8", errors="replace"), truncated
 
 
 def _default_fetcher(url: str) -> FetchResult:
     try:
-        response = httpx.get(
+        with httpx.stream(
+            "GET",
             url,
             timeout=10,
             follow_redirects=True,
             headers={"User-Agent": "Mozilla/5.0 (compatible; VV-Audit/1.0)"},
-        )
-        return {
-            "status_code": response.status_code,
-            "content_type": response.headers.get("content-type", ""),
-            "body": response.text,
-            "final_url": str(response.url),
-            "error": None,
-        }
+        ) as response:
+            body, truncated = _bounded_text(response.iter_bytes())
+            return {
+                "status_code": response.status_code,
+                "content_type": response.headers.get("content-type", ""),
+                "body": body,
+                "body_truncated": truncated,
+                "final_url": str(response.url),
+                "error": None,
+            }
     except Exception as exc:
         return {
             "status_code": 0,
@@ -88,6 +108,18 @@ def run_technical_audit(
                     "content_type": fetched_homepage.get("content_type") or "text/html",
                 },
             )
+        else:
+            pages.insert(
+                0,
+                {
+                    "url": fetched_homepage.get("final_url") or homepage,
+                    "raw_html": "",
+                    "content_type": fetched_homepage.get("content_type") or "text/html",
+                    "available": False,
+                    "status_code": fetched_homepage.get("status_code") or 0,
+                    "fetch_error": fetched_homepage.get("error"),
+                },
+            )
 
     page_observations = tuple(
         extract_page_observation(page, run_timestamp)
@@ -130,7 +162,11 @@ def run_technical_audit(
         for key, value in persisted_llms["data"].items()
         if key != "body"
     }
-    persisted_llms["data"]["body_excerpt"] = llms_body[:4_000]
+    unsafe_content = bool(UNSAFE_CONTENT.search(llms_body))
+    persisted_llms["data"]["body_excerpt"] = (
+        "[REDACTED: unsafe content detected]" if unsafe_content else llms_body[:4_000]
+    )
+    persisted_llms["data"]["unsafe_content_detected"] = unsafe_content
     persisted_llms["data"]["body_bytes"] = len(llms_body.encode("utf-8"))
     observations.append(persisted_llms)
     return {

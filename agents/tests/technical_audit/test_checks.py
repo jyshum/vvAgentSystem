@@ -130,6 +130,8 @@ def test_cross_domain_canonical_requires_verified_allowlist():
 def test_non_html_and_noindex_pages_are_not_forced_to_have_metadata():
     assert _status(_context(is_html=False), "meta_title.integrity") == "not_applicable"
     assert _status(_context(robots=["noindex"]), "canonical.integrity") == "not_applicable"
+    assert _status(_context(robots=["none"]), "meta_title.integrity") == "not_applicable"
+    assert _status(_context(robots=["none"]), "canonical.integrity") == "not_applicable"
 
 
 def test_llms_txt_is_optional_until_profile_enables_it():
@@ -152,6 +154,10 @@ def test_llms_txt_distinguishes_integrity_review_and_access_unknown():
     ) == "review"
     assert _status(
         _context(llms_enabled=True, llms_status=403, llms_error="forbidden"),
+        "llms_txt.integrity",
+    ) == "unknown"
+    assert _status(
+        _context(llms_enabled=True, llms_status=503, llms_body="Service unavailable"),
         "llms_txt.integrity",
     ) == "unknown"
     assert _status(

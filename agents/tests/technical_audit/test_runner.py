@@ -1,4 +1,4 @@
-from src.technical_audit.runner import run_technical_audit
+from src.technical_audit.runner import _bounded_text, run_technical_audit
 
 
 def test_runner_returns_counts_and_never_a_score():
@@ -124,3 +124,63 @@ def test_homepage_is_a_priority_page_when_profile_has_no_priority_urls():
         if result["check_id"] == "meta_description.integrity"
     )
     assert description["status"] == "review"
+
+
+def test_unavailable_homepage_emits_unknown_page_results():
+    def fetcher(url):
+        if url == "https://example.com/":
+            return {
+                "status_code": 403,
+                "content_type": "text/html",
+                "body": "Forbidden",
+                "final_url": url,
+                "error": None,
+            }
+        return {
+            "status_code": 404,
+            "content_type": "text/plain",
+            "body": "",
+            "final_url": url,
+            "error": None,
+        }
+
+    report = run_technical_audit(
+        client_id="client-1",
+        domain="example.com",
+        inventory=[],
+        profile={"llms_txt_enabled": False},
+        fetcher=fetcher,
+    )
+
+    page_results = [result for result in report["results"] if result["section"] != "llms_txt"]
+    assert len(page_results) == 3
+    assert {result["status"] for result in page_results} == {"unknown"}
+    assert report["summary"]["unknown"] == 3
+
+
+def test_network_body_reader_stops_at_hard_byte_limit():
+    body, truncated = _bounded_text([b"abc", b"def", b"ghi"], limit=5)
+
+    assert body == "abcde"
+    assert truncated is True
+
+
+def test_unsafe_llms_txt_content_is_not_copied_into_persisted_excerpt():
+    report = run_technical_audit(
+        client_id="client-1",
+        domain="example.com",
+        inventory=[{"url": "https://example.com/", "raw_html": "<html></html>"}],
+        profile={"llms_txt_enabled": True},
+        fetcher=lambda url: {
+            "status_code": 200,
+            "content_type": "text/plain",
+            "body": "password=client-secret-value",
+            "final_url": url,
+            "error": None,
+        },
+    )
+
+    llms = next(item for item in report["observations"] if item["kind"] == "llms_txt")
+    assert llms["data"]["body_excerpt"] == "[REDACTED: unsafe content detected]"
+    assert llms["data"]["unsafe_content_detected"] is True
+    assert "client-secret-value" not in str(llms)

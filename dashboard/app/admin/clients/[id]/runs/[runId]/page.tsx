@@ -137,6 +137,14 @@ export default async function RunDetailPage({
     run: TechnicalAuditRun | null;
     results: TechnicalAuditResult[];
   };
+  const auditSummary = technicalAudit.run ? {
+    pass: technicalAudit.run.summary?.pass ?? 0,
+    fail: technicalAudit.run.summary?.fail ?? 0,
+    review: technicalAudit.run.summary?.review ?? 0,
+    unknown: technicalAudit.run.summary?.unknown ?? 0,
+    not_applicable: technicalAudit.run.summary?.not_applicable ?? 0,
+    total: technicalAudit.run.summary?.total ?? 0,
+  } : null;
 
   // Worst competitive gap
   let worstGap: { query: string; gap: number; competitorName: string } | null = null;
@@ -322,11 +330,15 @@ export default async function RunDetailPage({
             {technicalAudit.run ? "TECHNICAL AUDIT" : "LEGACY READINESS"}
           </div>
           <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
-            {technicalAudit.run ? technicalAudit.run.summary.total : avgScore != null ? Math.round(avgScore) : "—"}
+            {technicalAudit.run
+              ? technicalAudit.run.status === "completed" ? auditSummary?.total : technicalAudit.run.status.toUpperCase()
+              : avgScore != null ? Math.round(avgScore) : "—"}
           </div>
           <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--mute)" }}>
             {technicalAudit.run
-              ? `${technicalAudit.run.summary.fail} fail · ${technicalAudit.run.summary.review} review · ${technicalAudit.run.summary.unknown} unknown`
+              ? technicalAudit.run.status === "completed"
+                ? `${auditSummary?.fail} fail · ${auditSummary?.review} review · ${auditSummary?.unknown} unknown`
+                : technicalAudit.run.error_message || "Checklist not yet available"
               : avgScore != null
                 ? `legacy avg ${Math.round(avgScore)} · lowest ${minScore}`
                 : ""}
@@ -358,7 +370,9 @@ export default async function RunDetailPage({
           style={{ color: "var(--mute)" }}
         >
           {queryMatches.length} queries → {matchedCount} matched · {weakCount} weak · {gapsCount} content gaps → {technicalAudit.run
-            ? `${technicalAudit.run.summary.total} technical checks · ${technicalAudit.run.summary.fail} failures · ${technicalAudit.run.summary.review} reviews · ${technicalAudit.run.summary.unknown} unknown`
+            ? technicalAudit.run.status === "completed"
+              ? `${auditSummary?.total} technical checks · ${auditSummary?.fail} failures · ${auditSummary?.review} reviews · ${auditSummary?.unknown} unknown`
+              : `technical audit ${technicalAudit.run.status}`
             : `${citationScores.length} page${citationScores.length === 1 ? "" : "s"} scored`} → {improvementRun.competitive_gaps_found ?? 0} competitive gaps → {totalCards} cards → {autoCards} auto + {pendingCards} to you
         </div>
       )}

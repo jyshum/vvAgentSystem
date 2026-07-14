@@ -15,9 +15,35 @@ from ..observations import normalize_url
 def _not_indexable_reason(page: Observation) -> str | None:
     if not page.data.get("is_html", False):
         return "Page is not an HTML document"
-    if "noindex" in page.data.get("robots_directives", []):
+    robots_directives = set(page.data.get("robots_directives", []))
+    if "noindex" in robots_directives or "none" in robots_directives:
         return "Page is intentionally marked noindex"
     return None
+
+
+def _unknown_page_result(
+    page: Observation, check_id: str, section: str, expected: str
+) -> CheckResult:
+    return CheckResult(
+        check_id=check_id,
+        check_version=1,
+        section=section,
+        subject=page.subject,
+        status=AuditStatus.UNKNOWN,
+        severity="medium",
+        summary="Page could not be retrieved for this check",
+        expected=expected,
+        observed={
+            "status_code": page.data.get("status_code"),
+            "error": page.data.get("fetch_error"),
+        },
+        evidence_refs=(page.id,),
+        scope={"sampled": False, "urls_checked": 1},
+        applicability=Applicability(True, "Priority page retrieval was attempted"),
+        confidence=Confidence.HIGH,
+        next_action=NextAction("system", "Retry the page request or inspect host access controls"),
+        remediation_id=None,
+    )
 
 
 def _result(
@@ -57,6 +83,11 @@ def _result(
 def evaluate_meta_title(context: AuditContext) -> list[CheckResult]:
     results = []
     for page in context.pages:
+        if not page.data.get("available", True):
+            results.append(_unknown_page_result(
+                page, "meta_title.integrity", "meta_title", "One nonempty title tag"
+            ))
+            continue
         reason = _not_indexable_reason(page)
         if reason:
             results.append(
@@ -114,6 +145,14 @@ def evaluate_meta_description(context: AuditContext) -> list[CheckResult]:
     priority_urls = {normalize_url(url) for url in context.profile.get("priority_urls", [])}
     results = []
     for page in context.pages:
+        if not page.data.get("available", True):
+            results.append(_unknown_page_result(
+                page,
+                "meta_description.integrity",
+                "meta_description",
+                "An observable description state for the priority page",
+            ))
+            continue
         reason = _not_indexable_reason(page)
         if reason:
             results.append(

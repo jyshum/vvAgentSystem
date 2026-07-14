@@ -272,7 +272,8 @@ create table public.technical_audit_observations (
   subject text not null,
   retrieved_at timestamptz not null,
   fingerprint text not null check (char_length(fingerprint) = 64),
-  data jsonb not null default '{}'::jsonb,
+  data jsonb not null default '{}'::jsonb
+    check (octet_length(data::text) <= 65536),
   unique (audit_run_id, observation_ref)
 );
 

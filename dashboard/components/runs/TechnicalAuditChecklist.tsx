@@ -91,6 +91,22 @@ export function TechnicalAuditChecklist({
   run: TechnicalAuditRun;
   results: TechnicalAuditResult[];
 }) {
+  if (run.status !== "completed") {
+    const failed = run.status === "error";
+    return (
+      <section className="mb-8 border px-5 py-5" style={{ borderColor: failed ? "var(--neg)" : "var(--hair)" }}>
+        <h2 className="font-display text-[28px] font-light" style={{ color: failed ? "var(--neg)" : "var(--white)" }}>
+          Technical audit {failed ? "failed" : "running"}
+        </h2>
+        <p className="mt-2 font-serif text-[13px]" style={{ color: "var(--mute)" }}>
+          {failed
+            ? run.error_message || "The audit stopped before producing a valid checklist."
+            : "Evidence is still being collected. Checklist counts will appear after completion."}
+        </p>
+      </section>
+    );
+  }
+
   const sections = new Map<string, TechnicalAuditResult[]>();
   for (const result of results) {
     const sectionResults = sections.get(result.section) ?? [];

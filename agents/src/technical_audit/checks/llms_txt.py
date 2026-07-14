@@ -65,7 +65,7 @@ def evaluate_llms_txt(context: AuditContext) -> list[CheckResult]:
     instruction = "No action required"
     remediation_id = None
 
-    if status_code in {403, 429} or data.get("error"):
+    if status_code in {0, 401, 403, 429} or status_code >= 500 or data.get("error"):
         status = AuditStatus.UNKNOWN
         severity = "medium"
         summary = "llms.txt access could not be determined"

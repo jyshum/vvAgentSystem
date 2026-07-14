@@ -10,7 +10,7 @@ from ..models import (
     Confidence,
     NextAction,
 )
-from .metadata import _not_indexable_reason
+from .metadata import _not_indexable_reason, _unknown_page_result
 
 
 def evaluate_canonical(context: AuditContext) -> list[CheckResult]:
@@ -20,6 +20,14 @@ def evaluate_canonical(context: AuditContext) -> list[CheckResult]:
     )
     results = []
     for page in context.pages:
+        if not page.data.get("available", True):
+            results.append(_unknown_page_result(
+                page,
+                "canonical.integrity",
+                "canonical_url",
+                "An observable canonical declaration state",
+            ))
+            continue
         reason = _not_indexable_reason(page)
         if reason:
             results.append(

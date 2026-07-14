@@ -8,6 +8,10 @@ from bs4 import BeautifulSoup
 from .models import Observation
 
 
+def _bounded(values, *, count: int, length: int) -> list[str]:
+    return [value[:length] for value in values[:count]]
+
+
 def normalize_url(url: str) -> str:
     parts = urlsplit(url)
     scheme = parts.scheme.lower()
@@ -35,18 +39,22 @@ def extract_page_observation(page: dict, retrieved_at: str) -> Observation:
     robots_directives = []
 
     if head is not None:
-        titles = [title.get_text(strip=True) for title in head.find_all("title")]
-        descriptions = [
+        titles = _bounded(
+            [title.get_text(strip=True) for title in head.find_all("title")],
+            count=10,
+            length=500,
+        )
+        descriptions = _bounded([
             (meta.get("content") or "").strip()
             for meta in head.find_all("meta")
             if (meta.get("name") or "").strip().lower() == "description"
-        ]
-        canonicals = [
+        ], count=10, length=1_000)
+        canonicals = _bounded([
             urljoin(url, link.get("href") or "")
             for link in head.find_all("link")
             if "canonical" in [str(value).lower() for value in (link.get("rel") or [])]
             and (link.get("href") or "").strip()
-        ]
+        ], count=10, length=2_048)
         for meta in head.find_all("meta"):
             if (meta.get("name") or "").strip().lower() not in {
                 "robots",
@@ -58,6 +66,7 @@ def extract_page_observation(page: dict, retrieved_at: str) -> Observation:
                 for directive in (meta.get("content") or "").split(",")
                 if directive.strip()
             )
+        robots_directives = _bounded(robots_directives, count=50, length=100)
 
     content_type = (page.get("content_type") or "text/html").split(";", 1)[0].lower()
     is_html = content_type in {"text/html", "application/xhtml+xml"}
@@ -70,11 +79,18 @@ def extract_page_observation(page: dict, retrieved_at: str) -> Observation:
         fingerprint=sha256(raw_html.encode("utf-8")).hexdigest(),
         data={
             "url": url,
+            "available": page.get("available", True),
+            "status_code": page.get("status_code", 200),
+            "fetch_error": page.get("fetch_error"),
             "titles": titles,
             "meta_descriptions": descriptions,
             "canonicals": canonicals,
             "robots_directives": robots_directives,
-            "h1_texts": [h1.get_text(" ", strip=True) for h1 in soup.find_all("h1")],
+            "h1_texts": _bounded(
+                [h1.get_text(" ", strip=True) for h1 in soup.find_all("h1")],
+                count=10,
+                length=1_000,
+            ),
             "is_html": is_html,
         },
     )

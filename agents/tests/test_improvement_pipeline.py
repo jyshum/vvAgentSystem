@@ -603,10 +603,24 @@ def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monke
         },
     }
 
+    matched_queries = [{
+        "query": "q1",
+        "query_id": "id1",
+        "match_type": "matched",
+        "matched_page_url": "https://x.com/p1",
+        "similarity_score": 0.7,
+        "bucket": "awareness",
+    }]
+    queries = [{"id": "id1", "prompt_text": "q1", "bucket": "awareness"}]
+
     with patch("src.improvement.pipeline._get_supabase", return_value=sb), \
-         patch("src.improvement.pipeline.run_crawlability_gate", return_value={"has_critical_blocker": False}), \
+         patch("src.improvement.pipeline.run_crawlability_gate", return_value={
+             "has_critical_blocker": True,
+             "robots_txt": {"status": "fail", "detail": "blocked"},
+         }), \
+         patch("src.improvement.pipeline.build_crawlability_card") as mock_crawlability_card, \
          patch("src.improvement.pipeline.build_inventory", return_value=inventory), \
-         patch("src.improvement.pipeline.match_queries_to_pages", return_value=[]), \
+         patch("src.improvement.pipeline.match_queries_to_pages", return_value=matched_queries), \
          patch("src.improvement.pipeline.check_competitive_gaps", return_value=[]), \
          patch("src.improvement.pipeline.compute_structural_score") as mock_score, \
          patch("src.improvement.pipeline.generate_sonnet_quality") as mock_quality, \
@@ -623,7 +637,7 @@ def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monke
                     "competitors": [],
                 },
             },
-            [],
+            queries,
             [],
         )
 
@@ -634,6 +648,8 @@ def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monke
     mock_quality.assert_not_called()
     mock_classify.assert_not_called()
     mock_sonnet.assert_not_called()
+    mock_crawlability_card.assert_not_called()
+    assert "page_citation_scores" not in [call.args[0] for call in sb.table.call_args_list]
     tables["technical_audit_observations"].insert.assert_called_once()
     tables["technical_audit_results"].insert.assert_called_once()
 
