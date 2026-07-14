@@ -9,20 +9,13 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
   const admin = createAdminClient();
 
   // Batch 1: independent fetches keyed only by client id
-  const [{ data: runsDesc }, { data: latestImprovementRuns }, { data: queryRows }] =
-    await Promise.all([
+  const [{ data: runsDesc }, { data: queryRows }] = await Promise.all([
       admin
         .from("tracker_runs")
         .select("id, ran_at, query_set_changed")
         .eq("client_id", id)
         .order("ran_at", { ascending: false })
         .limit(6),
-      admin
-        .from("improvement_runs")
-        .select("id")
-        .eq("client_id", id)
-        .order("ran_at", { ascending: false })
-        .limit(1),
       admin.from("queries").select("id, prompt_text, bucket, paraphrases, version").eq("client_id", id),
     ]);
 
@@ -38,8 +31,6 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
 
   const runIds = runs.map((r) => r.id);
   const latestRun = runs[runs.length - 1];
-  const latestImprovementRunId = latestImprovementRuns?.[0]?.id ?? null;
-
   const queryMetaById = new Map<string, Pick<Query, "id" | "prompt_text" | "bucket" | "paraphrases" | "version">>();
   const queryIdByPromptText = new Map<string, string>();
   for (const q of queryRows ?? []) {
@@ -49,7 +40,7 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
   const queryIds = [...queryIdByPromptText.values()];
 
   // Batch 2: fetches dependent on batch-1 ids
-  const [{ data: promptScores }, { data: gaps }, { data: matches }, { data: pendingCards }] =
+  const [{ data: promptScores }, { data: gaps }, { data: pendingCards }] =
     await Promise.all([
       admin
         .from("prompt_scores")
@@ -59,12 +50,6 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
         .from("competitive_gaps")
         .select("query_id, query, competitor_data")
         .eq("run_id", latestRun.id),
-      latestImprovementRunId
-        ? admin
-            .from("query_page_matches")
-            .select("query_id, query_text, match_type, matched_page_url, similarity_score")
-            .eq("run_id", latestImprovementRunId)
-        : Promise.resolve({ data: null }),
       queryIds.length > 0
         ? admin
             .from("action_cards")
@@ -127,17 +112,6 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
   // citedPct from latest run's engine-averaged citation_rate
   const latestEngineAvg = engineAvgByRun.get(latestRun.id) ?? new Map();
 
-  // page matches from latest improvement run
-  const pageByQuery = new Map<string, { url: string; similarity: number; weak: boolean }>();
-  for (const m of matches ?? []) {
-    if (!m.matched_page_url) continue;
-    pageByQuery.set(m.query_id || m.query_text, {
-      url: m.matched_page_url,
-      similarity: m.similarity_score ?? 0,
-      weak: m.match_type === "weak",
-    });
-  }
-
   // top competitor from latest tracker run's competitive_gaps
   const topCompetitorByQuery = new Map<string, { name: string; rate: number }>();
   for (const g of gaps ?? []) {
@@ -169,7 +143,6 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
       cells: cellsByQuery.get(query) ?? [],
       stability: stabilityByQuery.get(query) ?? "absent",
       citedPct: citedAvg ? citedAvg.citation_rate : null,
-      page: pageByQuery.get(query) ?? null,
       topCompetitor: topCompetitorByQuery.get(query) ?? null,
       waiting,
     };

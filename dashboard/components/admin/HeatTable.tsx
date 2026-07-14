@@ -23,7 +23,6 @@ export interface HeatRow {
   cells: HeatCell[];
   stability: string;
   citedPct: number | null;
-  page: { url: string; similarity: number; weak: boolean } | null;
   topCompetitor: { name: string; rate: number } | null;
   waiting: number;
 }
@@ -53,14 +52,6 @@ const STABILITY_COLOR: Record<string, string> = {
   absent: "var(--faint)",
 };
 
-function pagePathname(url: string): string {
-  try {
-    return new URL(url).pathname;
-  } catch {
-    return url;
-  }
-}
-
 export function HeatTable({ rows, clientId }: HeatTableProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -71,7 +62,7 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
       changed: c.querySetChanged === true,
     })) ?? [];
 
-  const gridTemplate = `2fr repeat(${cycleCount}, 44px) 0.8fr 0.6fr 1.2fr 1fr 0.8fr`;
+  const gridTemplate = `2fr repeat(${cycleCount}, 44px) 0.8fr 0.6fr 1fr 0.8fr`;
   const groupedRows = [
     { bucket: "consideration", label: BUCKET_LABELS.consideration, rows: rows.filter((r) => (r.bucket ?? "consideration") === "consideration") },
     { bucket: "awareness", label: BUCKET_LABELS.awareness, rows: rows.filter((r) => r.bucket === "awareness") },
@@ -109,9 +100,6 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
           title="Of the responses that mentioned the brand, how many cited the site — averaged across engines"
         >
           CITED
-        </div>
-        <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
-          PAGE
         </div>
         <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
           TOP COMPETITOR
@@ -187,25 +175,6 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
 
                   <div className="font-mono text-[10px]" style={{ color: "var(--mute)" }}>
                     {row.citedPct === null ? "—" : formatRate(row.citedPct)}
-                  </div>
-
-                  <div className="font-mono text-[9px]" style={{ color: "var(--mute)" }}>
-                    {row.page ? (
-                      <>
-                        {pagePathname(row.page.url)} {row.page.similarity.toFixed(2)}
-                        {row.page.weak && (
-                          <span
-                            className="font-mono text-[8px] tracking-[0.08em] ml-1.5 px-1"
-                            style={{ color: "#d4a017", border: "1px solid #d4a017" }}
-                            title="Weak match (similarity 0.3–0.5): no page is close enough to this query to score or generate cards — consider new content for it"
-                          >
-                            WEAK
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      "—"
-                    )}
                   </div>
 
                   <div className="font-serif text-[12px]" style={{ color: "var(--mute)" }}>
