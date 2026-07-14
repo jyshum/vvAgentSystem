@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RunRail } from "@/components/runs/RunRail";
+import { TechnicalAuditChecklist } from "@/components/runs/TechnicalAuditChecklist";
 import { fetchSchedules } from "@/lib/schedules";
 import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatRate, formatDelta } from "@/lib/utils";
 import type { PipelineRun, ImprovementRun, PageCitationScore, QueryPageMatch, ActionCard, CrawlabilityReport } from "@/lib/improvement-types";
 import type { TrackerRun, CompetitiveGap } from "@/lib/types";
+import type { TechnicalAuditResult, TechnicalAuditRun } from "@/lib/technical-audit-types";
 import { PIPELINE_STATUS_COLOR } from "@/lib/run-status";
 
 function formatDuration(startedAt: string, completedAt: string | null): string {
@@ -62,6 +64,7 @@ export default async function RunDetailPage({
     { data: actionCardsData },
     { data: competitiveGapsData },
     nextTrackerAndSchedules,
+    technicalAuditBundle,
   ] = await Promise.all([
     trackerRun
       ? supabase
@@ -103,6 +106,25 @@ export default async function RunDetailPage({
       }
       return { nextTrackerRun: null, nextScheduledRun: null };
     })(),
+    (async () => {
+      if (!improvementRun) return { run: null, results: [] };
+      const { data: auditRun } = await supabase
+        .from("technical_audit_runs")
+        .select("*")
+        .eq("improvement_run_id", improvementRun.id)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!auditRun) return { run: null, results: [] };
+      const { data: auditResults } = await supabase
+        .from("technical_audit_results")
+        .select("*")
+        .eq("audit_run_id", auditRun.id)
+        .order("section")
+        .order("check_id")
+        .order("subject");
+      return { run: auditRun, results: auditResults ?? [] };
+    })(),
   ]);
 
   const previousTrackerRun = previousTrackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores"> | null;
@@ -111,6 +133,10 @@ export default async function RunDetailPage({
   const actionCards = (actionCardsData as Pick<ActionCard, "id" | "auto_approved" | "status" | "action_type">[]) || [];
   const competitiveGaps = (competitiveGapsData as Pick<CompetitiveGap, "query_id" | "query" | "bucket" | "client_mention_rate" | "competitor_data">[]) || [];
   const { nextTrackerRun, nextScheduledRun } = nextTrackerAndSchedules as { nextTrackerRun: { id: string; ran_at: string } | null; nextScheduledRun: string | null };
+  const technicalAudit = technicalAuditBundle as {
+    run: TechnicalAuditRun | null;
+    results: TechnicalAuditResult[];
+  };
 
   // Worst competitive gap
   let worstGap: { query: string; gap: number; competitorName: string } | null = null;
@@ -290,16 +316,20 @@ export default async function RunDetailPage({
           </div>
         </div>
 
-        {/* READINESS */}
+        {/* TECHNICAL AUDIT / LEGACY READINESS */}
         <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
           <div className="font-mono text-[8px] tracking-[0.14em] mb-1.5" style={{ color: "var(--faint)" }}>
-            READINESS
+            {technicalAudit.run ? "TECHNICAL AUDIT" : "LEGACY READINESS"}
           </div>
           <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
-            {avgScore != null ? Math.round(avgScore) : "—"}
+            {technicalAudit.run ? technicalAudit.run.summary.total : avgScore != null ? Math.round(avgScore) : "—"}
           </div>
           <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--mute)" }}>
-            {avgScore != null ? `avg ${Math.round(avgScore)} · lowest ${minScore}` : ""}
+            {technicalAudit.run
+              ? `${technicalAudit.run.summary.fail} fail · ${technicalAudit.run.summary.review} review · ${technicalAudit.run.summary.unknown} unknown`
+              : avgScore != null
+                ? `legacy avg ${Math.round(avgScore)} · lowest ${minScore}`
+                : ""}
           </div>
         </div>
 
@@ -317,13 +347,19 @@ export default async function RunDetailPage({
         </div>
       </div>
 
+      {technicalAudit.run && (
+        <TechnicalAuditChecklist run={technicalAudit.run} results={technicalAudit.results} />
+      )}
+
       {/* Funnel */}
       {improvementRun && (
         <div
           className="font-mono text-[10px] tracking-[0.06em] mb-8"
           style={{ color: "var(--mute)" }}
         >
-          {queryMatches.length} queries → {matchedCount} matched · {weakCount} weak · {gapsCount} content gaps → {citationScores.length} page{citationScores.length === 1 ? "" : "s"} scored → {improvementRun.competitive_gaps_found ?? 0} competitive gaps → {totalCards} cards → {autoCards} auto + {pendingCards} to you
+          {queryMatches.length} queries → {matchedCount} matched · {weakCount} weak · {gapsCount} content gaps → {technicalAudit.run
+            ? `${technicalAudit.run.summary.total} technical checks · ${technicalAudit.run.summary.fail} failures · ${technicalAudit.run.summary.review} reviews · ${technicalAudit.run.summary.unknown} unknown`
+            : `${citationScores.length} page${citationScores.length === 1 ? "" : "s"} scored`} → {improvementRun.competitive_gaps_found ?? 0} competitive gaps → {totalCards} cards → {autoCards} auto + {pendingCards} to you
         </div>
       )}
 
