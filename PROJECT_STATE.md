@@ -1,17 +1,25 @@
 # VV Agent System — Project State
 
-## Active Development — Deterministic Technical Audit Foundation
+## Active Development — Simplified Technical Audit V1
 
-- **Branch:** `feature/deterministic-technical-audit`
-- **Rollout:** development only; default off with `TECHNICAL_AUDIT_V1_ENABLED=false`
-- **Database:** additive migration `supabase/migrations/014_technical_audit_foundation.sql`; not applied to production by this branch
-- **Implemented slice:** immutable five-status audit contract, bounded evidence observations, versioned registry, deterministic `llms.txt`/title/description/canonical checks, persisted runs/results, and no-score run checklist
-- **Safety boundary:** when enabled, legacy structural scoring and AI-generated technical cards are skipped; the new findings cannot create or publish remediation
-- **Agent verification:** `cd agents && .venv/bin/python -m pytest -q`
-- **Dashboard verification:** `cd dashboard && npm test && npm run build`
+- **Rollout:** development only; `TECHNICAL_AUDIT_V1_ENABLED=true` requires `TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS` to explicitly list the client. An empty allowlist enables no clients; `*` is development/testing only.
+- **Check sets:** `TECHNICAL_AUDIT_CHECK_SETS=foundation`; `foundation` is the only implemented set. An unavailable set is a configuration error, not a partial audit.
+- **Database:** additive migration `supabase/migrations/014_technical_audit_foundation.sql`; not applied to production.
+- **Implemented V1 path:** an allowlisted run writes immutable technical observations/results for deterministic `llms.txt`/title/description/canonical checks and uses the five-status audit contract.
+- **Legacy preservation:** disabled or unallowlisted clients use the legacy route. The Pages primary tab is hidden but its direct route remains available; run pages use technical or legacy presentation and preserve historical legacy evidence.
+- **Manual community selection:** V1 bypasses matching, scoring, briefs, and AI fixes, then directly selects at most five manual `community_check` cards from positive tracker competitor leads.
+- **Current product boundary:** V1 writes no `query_page_matches` or `page_citation_scores`, has no technical remediation cards, and cannot approve or publish a client-site change. Technical result/action composition is next.
 - **Operator guide:** `docs/technical-audit-operations.md`
 
-The approved remaining sections and remediation adapters are sequenced in `docs/superpowers/plans/2026-07-14-technical-audit-foundation.md`. Historical readiness scores remain readable as legacy data.
+### Ordered follow-on roadmap
+
+1. **Unified technical audit cards and workflow** — linked immutable result evidence plus editable workflow records; Fail/Review/Unknown inbox behavior; Pass/Not applicable audit-page behavior; grouping, lifecycle, stale-state guard, and fresh re-audit verification.
+2. **Protocol check set** — robots.txt, sitemap, TLS/HTTPS, and schema integrity/coverage with bounded evidence and five-state outcomes.
+3. **Site-integrity check set** — broken links, image integrity/appropriateness review boundaries, freshness consistency, and existing source-support verification with bounded crawling.
+4. **Performance and connected-service check set** — CrUX, Lighthouse lab context, Google Search Console, and Bing Webmaster Tools; disconnected integrations become explicit Unknown with owner/unblock instructions.
+5. **Platform remediation adapters** — universal cards with Squarespace guided instructions, GitHub pull requests, guarded WordPress/Webflow staging/API paths, and copy/paste fallback. No adapter may publish without approval, stale-state validation, rollback, and re-audit.
+
+Every follow-on plan must expand `AVAILABLE_CHECK_SETS`, add registry-level tests, update stored scope/check versions, and pass the same internal allowlist gate. Configuration alone must not enable an empty or partially implemented set. Historical readiness scores remain readable as legacy data.
 
 ## What This Is
 GEO (Generative Engine Optimization) platform for Victory Velocity agency. Tracks how often client brands appear in AI responses, audits client websites for GEO health, and generates actionable fixes.

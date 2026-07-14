@@ -2,30 +2,44 @@
 
 ## Current rollout state
 
-The technical-audit foundation is **development only** on branch `feature/deterministic-technical-audit`.
+The technical-audit foundation is **development only** and is protected by a global flag, client allowlist, and check-set configuration.
 
 - The feature defaults off.
-- Migration `014_technical_audit_foundation.sql` has not been applied to production by this branch.
-- No result can create an action card, approve a change, or publish to a client website.
-- This first slice checks `llms.txt`, meta titles, meta descriptions, and canonical declarations. The remaining approved sections are delivered through the follow-on plans listed in the foundation plan.
+- Migration `014_technical_audit_foundation.sql` has not been applied to production.
+- No technical audit result can approve a change or publish to a client website.
+- The only implemented check set is `foundation`: `llms.txt`, meta titles, meta descriptions, and canonical declarations.
+- Technical result/action composition and technical remediation cards are the next plan; this tranche creates only bounded manual community cards.
 
 ## Enable or disable
 
-Set the agent environment variable:
+Set all rollout controls in the agent environment:
 
 ```bash
 TECHNICAL_AUDIT_V1_ENABLED=true
+TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS=demo-client-id-1,demo-client-id-2
+TECHNICAL_AUDIT_CHECK_SETS=foundation
 ```
 
-When true, a new improvement run uses the versioned checklist and skips the legacy structural scorer and its technical-card generator. Query matching, competitive gaps, content-gap cards, and community-check cards remain independent.
+- A false or missing global flag uses the legacy route.
+- A true flag with an empty allowlist enables no clients.
+- A true flag with listed IDs enables V1 only for those clients.
+- `*` enables all clients and is for development/testing only.
+- An unavailable check-set name is a configuration error, never a silent partial audit.
+- A technical-audit runtime error is reported by the V1 run and does not fall back to legacy heuristic content work.
 
-To use the rollback route:
+Removing a client ID from the allowlist rolls that client back to the legacy route on its next run. Setting the global flag false rolls every client back to the legacy route:
 
 ```bash
 TECHNICAL_AUDIT_V1_ENABLED=false
 ```
 
-False is the default. It does not delete stored checklist runs; it only prevents new checklist invocation and preserves the legacy run path.
+Neither rollback option deletes stored V1 evidence or results.
+
+## V1 run boundary and preserved legacy views
+
+For an allowlisted V1 client, the improvement pipeline bypasses legacy query matching, structural scoring, briefs, and AI fixes. It writes technical observations/results for `foundation` and directly selects at most five manual `community_check` cards from positive tracker competitor leads. It does not write `query_page_matches` or `page_citation_scores`, and it does not create technical remediation cards in this tranche.
+
+The Pages primary tab is hidden, but the direct Pages route remains available for legacy data. Run pages use technical presentation when a technical audit is present and preserve the legacy badge, matching evidence, and legacy content for older runs.
 
 ## Status handling
 
@@ -68,24 +82,24 @@ The migration is additive. It creates:
 
 It does not drop or reinterpret `page_citation_scores`, `action_cards`, or historical improvement runs.
 
-## Validate a development run
+## Next operator validation gate: validate a development/staging run
 
-1. Apply migration 014 to the development/staging project.
-2. Insert or update a `client_site_profiles` row for the test client.
-3. Set `TECHNICAL_AUDIT_V1_ENABLED=true` in the agent environment.
-4. Run an improvement cycle against a nonproduction test client/site.
-5. Confirm one `technical_audit_runs` row links to the improvement run.
-6. Confirm every result has applicability, scope, confidence, next action, and evidence references.
-7. Confirm each evidence reference resolves to `technical_audit_observations.observation_ref` in the same run.
-8. Confirm `page_citation_scores` receives no new row and no technical `action_cards` are created for the enabled run.
-9. Open the run page and inspect the five status counts and section details.
-10. Set the flag false and confirm the rollback route creates no new technical-audit run.
+This manual fixture validation has not been run as part of this documentation tranche. On a development/staging Supabase project only:
+
+1. Enable one demo client by ID with `foundation`.
+2. Run the improvement pipeline with at least seven positive tracker competitor leads.
+3. Confirm the run writes technical observations/results and at most five `community_check` cards.
+4. Confirm it writes no `query_page_matches` or `page_citation_scores` rows.
+5. Confirm the query page has no PAGE, similarity, or WEAK column.
+6. Confirm the run page has no matching, content-gap, or readiness-score claims.
+7. Open an older run URL and confirm the legacy badge, matching evidence, and direct Pages route still render.
+8. Remove the client ID from the allowlist and confirm the next run follows the legacy route.
 
 ## Failure handling
 
 - A check-level access problem becomes Unknown with a next action.
-- A technical-audit runner exception marks only `technical_audit_runs.status=error`; the query/content pipeline may continue.
-- A whole improvement-pipeline exception returns empty technical-audit state and follows the existing improvement error handling.
+- A technical-audit runtime error is reported by the V1 run and does not invoke legacy heuristic content work as a fallback.
+- A whole improvement-pipeline exception follows the existing improvement error handling.
 - Stored `llms.txt` evidence excludes the full body. It keeps a maximum 4,000-character excerpt, byte count, fingerprint, response metadata, and retrieval provenance.
 
 ## Verification commands
@@ -96,11 +110,20 @@ cd agents
 
 cd ../dashboard
 npm test
-npx eslint lib/technical-audit-types.ts components/runs/TechnicalAuditChecklist.tsx __tests__/components/technical-audit-checklist.test.tsx app/admin/clients/'[id]'/runs/'[runId]'/page.tsx
 npm run build
+npx eslint \
+  lib/client-tabs.ts \
+  lib/run-presentation.ts \
+  components/admin/HeatTable.tsx \
+  app/admin/clients/'[id]'/layout.tsx \
+  app/admin/clients/'[id]'/queries/page.tsx \
+  app/admin/clients/'[id]'/runs/'[runId]'/page.tsx \
+  __tests__/client-tabs.test.ts \
+  __tests__/run-presentation.test.ts \
+  __tests__/components/heat-table.test.tsx
 ```
 
-The repository-wide dashboard lint currently has a pre-existing error in `components/admin/TriggerRunButton.tsx`. Changed-file lint for this feature must remain clean until that unrelated baseline issue is repaired.
+The repository-wide dashboard lint still has a pre-existing error in `components/admin/TriggerRunButton.tsx` (`react-hooks/set-state-in-effect`); it also reports warnings in that file and `app/layout.tsx`. Changed-file lint for this feature must remain clean until the unrelated baseline issue is repaired.
 
 ## Production gate
 
@@ -110,5 +133,5 @@ Production migration and rollout require separate approval after:
 - a real development/staging run;
 - evidence/status review by the founders;
 - database backup/rollback confirmation;
-- confirmation that the default-off flag is present in the production environment;
+- confirmation that the default-off global flag, empty allowlist, and `foundation` check-set configuration are present in the production environment;
 - approval of the next protocol-integrity tranche.
