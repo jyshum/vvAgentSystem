@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from hashlib import sha256
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
@@ -8,15 +9,24 @@ from bs4 import BeautifulSoup
 from .models import Observation
 
 
-def _truncate_utf8(value: str, max_bytes: int) -> str:
-    encoded = value.encode("utf-8")
-    if len(encoded) <= max_bytes:
+def _truncate_json_string(value: str, max_bytes: int) -> str:
+    def encoded_size(candidate: str) -> int:
+        return len(json.dumps(candidate, ensure_ascii=False).encode("utf-8")) - 2
+
+    if encoded_size(value) <= max_bytes:
         return value
-    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+    low, high = 0, len(value)
+    while low < high:
+        midpoint = (low + high + 1) // 2
+        if encoded_size(value[:midpoint]) <= max_bytes:
+            low = midpoint
+        else:
+            high = midpoint - 1
+    return value[:low]
 
 
 def _bounded(values, *, count: int, length: int) -> list[str]:
-    return [_truncate_utf8(value, length) for value in values[:count]]
+    return [_truncate_json_string(value, length) for value in values[:count]]
 
 
 def normalize_url(url: str) -> str:
@@ -85,10 +95,12 @@ def extract_page_observation(page: dict, retrieved_at: str) -> Observation:
         retrieved_at=retrieved_at,
         fingerprint=sha256(raw_html.encode("utf-8")).hexdigest(),
         data={
-            "url": _truncate_utf8(url, 2_048),
+            "url": _truncate_json_string(url, 2_048),
             "available": page.get("available", True),
             "status_code": page.get("status_code", 200),
-            "fetch_error": _truncate_utf8(str(page.get("fetch_error") or ""), 2_000) or None,
+            "fetch_error": _truncate_json_string(
+                str(page.get("fetch_error") or ""), 2_000
+            ) or None,
             "titles": titles,
             "meta_descriptions": descriptions,
             "canonicals": canonicals,

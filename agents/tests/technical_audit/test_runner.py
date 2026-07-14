@@ -206,6 +206,75 @@ def test_missing_configured_priority_page_is_fetched_and_reported_unknown():
     )
 
 
+def test_priority_fetches_are_limited_to_same_site_https_urls():
+    fetched = []
+
+    def fetcher(url):
+        fetched.append(url)
+        return {
+            "status_code": 404,
+            "content_type": "text/plain",
+            "body": "",
+            "final_url": url,
+            "error": None,
+        }
+
+    configured = [f"https://example.com/page-{index}" for index in range(30)]
+    configured += ["http://example.com/insecure", "https://evil.example/internal"]
+    run_technical_audit(
+        client_id="client-1",
+        domain="example.com",
+        inventory=[],
+        profile={"llms_txt_enabled": False, "priority_urls": configured},
+        fetcher=fetcher,
+    )
+
+    page_fetches = [url for url in fetched if not url.endswith("/llms.txt")]
+    assert len(page_fetches) <= 20
+    assert all(url.startswith("https://example.com/") for url in page_fetches)
+    assert "http://example.com/insecure" not in fetched
+    assert "https://evil.example/internal" not in fetched
+
+
+def test_redirected_priority_page_is_unknown_not_destination_metadata():
+    priority_url = "https://example.com/important"
+
+    def fetcher(url):
+        if url == priority_url:
+            return {
+                "status_code": 200,
+                "content_type": "text/html",
+                "body": "<html><head><title>Login</title></head></html>",
+                "final_url": "https://example.com/login",
+                "error": None,
+            }
+        return {
+            "status_code": 404,
+            "content_type": "text/plain",
+            "body": "",
+            "final_url": url,
+            "error": None,
+        }
+
+    report = run_technical_audit(
+        client_id="client-1",
+        domain="example.com",
+        inventory=[{
+            "url": "https://example.com/",
+            "raw_html": "<html><head><title>Home</title></head></html>",
+        }],
+        profile={"llms_txt_enabled": False, "priority_urls": [priority_url]},
+        fetcher=fetcher,
+    )
+
+    priority_results = [
+        result for result in report["results"] if result["subject"] == priority_url
+    ]
+    assert len(priority_results) == 3
+    assert {result["status"] for result in priority_results} == {"unknown"}
+    assert all("redirect" in str(result["observed"]).lower() for result in priority_results)
+
+
 def test_network_body_reader_stops_at_hard_byte_limit():
     body, truncated = _bounded_text([b"abc", b"def", b"ghi"], limit=5)
 

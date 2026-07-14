@@ -5,6 +5,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -17,6 +18,21 @@ from .observations import extract_page_observation, normalize_url
 FetchResult = dict[str, Any]
 Fetcher = Callable[[str], FetchResult]
 MAX_NETWORK_BODY_BYTES = 512_000
+MAX_PRIORITY_URLS = 20
+
+
+def _is_safe_priority_url(url: str, allowed_hosts: set[str]) -> bool:
+    try:
+        parts = urlsplit(url)
+        return (
+            parts.scheme.lower() == "https"
+            and (parts.hostname or "").lower() in allowed_hosts
+            and parts.port in {None, 443}
+            and parts.username is None
+            and parts.password is None
+        )
+    except ValueError:
+        return False
 
 
 def _bounded_text(chunks, limit: int = MAX_NETWORK_BODY_BYTES) -> tuple[str, bool]:
@@ -86,13 +102,23 @@ def run_technical_audit(
     run_timestamp = datetime.now(timezone.utc).isoformat()
     homepage = normalize_url(f"https://{domain}/")
     effective_profile = dict(profile)
-    priority_urls = list(dict.fromkeys(
-        normalize_url(url)
-        for url in (effective_profile.get("priority_urls") or [])
-        if url
-    ))
-    if homepage not in priority_urls:
-        priority_urls.append(homepage)
+    domain_host = (urlsplit(homepage).hostname or "").lower()
+    allowed_hosts = {domain_host}
+    if domain_host.startswith("www."):
+        allowed_hosts.add(domain_host.removeprefix("www."))
+    else:
+        allowed_hosts.add(f"www.{domain_host}")
+    configured_priority_urls = []
+    for raw_url in effective_profile.get("priority_urls") or []:
+        if not raw_url or not _is_safe_priority_url(raw_url, allowed_hosts):
+            continue
+        normalized = normalize_url(raw_url)
+        if normalized == homepage or normalized in configured_priority_urls:
+            continue
+        configured_priority_urls.append(normalized)
+        if len(configured_priority_urls) >= MAX_PRIORITY_URLS - 1:
+            break
+    priority_urls = [*configured_priority_urls, homepage]
     effective_profile["priority_urls"] = priority_urls
     pages = [dict(page) for page in inventory]
     inventory_urls = {
@@ -105,7 +131,9 @@ def run_technical_audit(
         if priority_url in inventory_urls:
             continue
         fetched_page = _safe_fetch(fetcher, priority_url)
-        if fetched_page.get("status_code") == 200:
+        final_url = normalize_url(fetched_page.get("final_url") or priority_url)
+        redirected = final_url != priority_url
+        if fetched_page.get("status_code") == 200 and not redirected:
             pages.insert(
                 0,
                 {
@@ -115,6 +143,9 @@ def run_technical_audit(
                 },
             )
         else:
+            fetch_error = fetched_page.get("error")
+            if redirected:
+                fetch_error = f"Redirected to {final_url}"
             pages.insert(
                 0,
                 {
@@ -123,7 +154,7 @@ def run_technical_audit(
                     "content_type": fetched_page.get("content_type") or "text/html",
                     "available": False,
                     "status_code": fetched_page.get("status_code") or 0,
-                    "fetch_error": fetched_page.get("error"),
+                    "fetch_error": fetch_error,
                 },
             )
 

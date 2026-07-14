@@ -109,3 +109,26 @@ def test_observation_bounds_are_measured_in_bytes_for_multibyte_text():
 
     encoded = json.dumps(observation.data, ensure_ascii=False).encode("utf-8")
     assert len(encoded) <= 60_000
+
+
+def test_observation_bounds_include_json_escape_expansion():
+    escaped = '\\"' * 2_000
+    repeated = "".join(
+        f"<title>{escaped}</title>"
+        f"<meta name='description' content='{escaped}'>"
+        f"<link rel='canonical' href='/{escaped}'>"
+        f"<meta name='robots' content='{escaped}'>"
+        for _ in range(20)
+    )
+    headings = "".join(f"<h1>{escaped}</h1>" for _ in range(20))
+    observation = extract_page_observation(
+        {
+            "url": "https://example.com/" + ("\\" * 5_000),
+            "raw_html": f"<html><head>{repeated}</head><body>{headings}</body></html>",
+            "fetch_error": escaped,
+        },
+        "2026-07-14T10:00:00+00:00",
+    )
+
+    encoded = json.dumps(observation.data, ensure_ascii=False).encode("utf-8")
+    assert len(encoded) <= 60_000
