@@ -65,7 +65,7 @@ This plan proves the shared contract with four checks. Follow-on plans use the s
 
 ### Database
 
-- `supabase/migrations/014_technical_audit_foundation.sql` — additive run/result/profile tables, constraints, indexes, and admin RLS.
+- `supabase/migrations/014_technical_audit_foundation.sql` — additive run/observation/result/profile tables, constraints, indexes, and admin RLS.
 - `supabase/schema.sql` — fold the additive tables into the canonical fresh-install schema without changing legacy history.
 
 ### Dashboard
@@ -467,7 +467,7 @@ git commit -m "feat: run unscored technical audits"
 
 **Interfaces:**
 - Consumes: `clients`, `improvement_runs`, and `pipeline_runs` IDs.
-- Produces: `client_site_profiles`, `technical_audit_runs`, and `technical_audit_results`.
+- Produces: `client_site_profiles`, `technical_audit_runs`, `technical_audit_observations`, and `technical_audit_results`.
 
 - [ ] **Step 1: Write the additive migration**
 
@@ -524,6 +524,8 @@ create table public.technical_audit_results (
   unique (audit_run_id, check_id, check_version, subject)
 );
 ```
+
+Between the run and result tables, create `technical_audit_observations` with a UUID primary key, `audit_run_id` cascade foreign key, stable `observation_ref`, kind, subject, retrieval timestamp, SHA-256 fingerprint, bounded JSON data, and `unique (audit_run_id, observation_ref)`. Result `evidence_refs` values address `observation_ref` within the same run.
 
 Add indexes for run/client, result run/status/section, enable RLS, grant admin management using the existing `is_admin()` function, and grant authenticated client users select access only where `client_id = get_my_client_id()`. Do not add client write policies.
 
@@ -597,7 +599,7 @@ After inventory and before legacy scoring/card generation:
 1. Load `client_site_profiles` with `.eq("client_id", client_id).maybe_single()` behavior; use `{}` if absent.
 2. Insert a `technical_audit_runs` row linked to the improvement run and current pipeline thread's `pipeline_runs` row when available.
 3. Call `run_technical_audit` with inventory/profile.
-4. Insert each result with `audit_run_id`; update the audit run to completed with scope and summary.
+4. Insert each bounded observation and each result with `audit_run_id`; update the audit run to completed with scope and summary.
 5. On audit-only failure, mark that audit run `error`, include the error in pipeline output, and continue the existing query/content path. Do not fabricate unknown results for a runner crash.
 6. Return audit ID/summary/results in memory, but never pass them to `classify_actions` or `generate_sonnet_specifics`.
 
