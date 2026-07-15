@@ -3,6 +3,8 @@ from .canonical import evaluate_canonical
 from .llms_txt import evaluate_llms_txt
 from .metadata import evaluate_meta_description, evaluate_meta_title
 from .freshness import evaluate_freshness
+from .integrations import evaluate_bing, evaluate_gsc_sitemap
+from .performance import evaluate_crux, evaluate_lcp_image, evaluate_lighthouse
 from .images import evaluate_alt_text, evaluate_image_integrity
 from .links import evaluate_external_links, evaluate_internal_links
 from .robots import evaluate_robots_access, evaluate_robots_integrity
@@ -58,6 +60,16 @@ _CHECK_SETS: dict[str, tuple[CheckDefinition, ...]] = {
             "source_support.link_health", 1, "source_citations", "page",
             evaluate_source_support,
         ),
+    ),
+    "performance": (
+        CheckDefinition("performance.crux", 1, "page_speed", "page", evaluate_crux),
+        CheckDefinition("performance.lighthouse", 1, "page_speed", "page", evaluate_lighthouse),
+        CheckDefinition("performance.lcp_image", 1, "page_speed", "page", evaluate_lcp_image),
+        CheckDefinition(
+            "integration.gsc_sitemap", 1, "search_integrations", "site",
+            evaluate_gsc_sitemap,
+        ),
+        CheckDefinition("integration.bing", 1, "search_integrations", "site", evaluate_bing),
     ),
 }
 
