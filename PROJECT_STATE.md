@@ -1,11 +1,83 @@
 # VV Agent System — Project State
 
-## Current checkpoint — 2026-07-15
+## Current checkpoint — 2026-07-15 (Technical Audit V1 backend complete)
 
-The backend is now one manual deterministic runtime. Scheduling, approval-resume,
+The backend is one manual deterministic runtime. Scheduling, approval-resume,
 legacy matcher/scorer/readiness/card generation, implementation handlers, and
 legacy fallback behavior have been removed from the active Python application.
-Frontend cutover remains deliberately deferred.
+Frontend cutover remains deliberately deferred (the user's standing instruction).
+
+All four deterministic technical-audit check sets are now implemented, tested,
+and validated against the live BudgetYourMD site with a non-persisting smoke
+run. No production baseline has been created and no production rows have been
+written.
+
+### Technical Audit V1 — implemented check sets
+
+- **foundation:** llms.txt integrity, meta-title/description integrity, canonical
+  integrity.
+- **protocol:** robots.txt integrity/access (protego crawler registry),
+  sitemap discovery/integrity/coverage/entry-health, TLS certificate/https
+  redirect/mixed-content, JSON-LD schema integrity/coverage.
+- **site_integrity:** internal/external link health, image integrity/alt-text,
+  freshness dates, existing-source citation-link health.
+- **performance:** CrUX p75 field metrics, three-run PageSpeed Insights
+  Lighthouse median (external lab diagnostic), LCP lazy-load, GSC sitemap
+  submission, Bing submission behavior.
+
+Every check returns one of `pass | fail | review | unknown | not_applicable`
+with evidence, applicability, scope, confidence, and a single next action. No
+proprietary score, no matcher/similarity logic, and no LLM participates in the
+technical path (guaranteed by a subprocess import test). Missing integration
+API keys produce explicit `unknown`, never fabricated data.
+
+### Finding lifecycle, grouping, and unified workflow
+
+- Deterministic finding keys and run-over-run
+  `new/continuing/changed/resolved/regressed` lifecycle classification.
+- Identical-cause grouping (no similarity logic).
+- Migration 018 adds `technical_audit_finding_groups`,
+  `technical_audit_action_cards`, and `technical_audit_card_results` plus a
+  `finding_key` column, all additive and RLS-protected. **Not yet applied to
+  production.**
+- Remediation catalogue emits platform-native Squarespace guided instructions
+  (native SEO/domain/crawler settings; never edits generated sitemap XML,
+  never fabricates file-editor access).
+- Workflow state machine: `observed → draft_prepared → approved → applied →
+  verified / still_failing`, with a stale-state guard that refuses to apply a
+  draft whose audited precondition fingerprint no longer matches production, and
+  deterministic re-audit verification that only marks `verified` when the exact
+  originating checks pass on fresh evidence. No card publishes automatically.
+- Authenticated FastAPI endpoints: `GET /api/technical-audit/runs`,
+  `/runs/{id}`, `/cards`, and card `approve`/`reject`/`mark-applied`/`verify`
+  (409 on illegal transitions, 404 on missing cards). Schedule/approval-resume
+  endpoints still return 404.
+
+### Validation evidence (2026-07-15)
+
+- **Backend tests:** 354 passed (one pre-existing Starlette/httpx deprecation
+  warning).
+- **Live full-set smoke:** `cli smoke --domain budgetyourmd.ca --platform
+  squarespace --check-sets foundation,protocol,site_integrity,performance`
+  produced 216 results (132 pass, 3 fail, 36 review, 14 unknown, 31 N/A). The
+  bare→www redirect was accepted, Squarespace `llms.txt` was Not Applicable, the
+  TLS certificate passed, page-speed checks were Unknown (no CrUX/PSI keys in the
+  smoke environment), and Bing was Unknown with an integration owner. Every
+  result carried complete contract fields. No Supabase rows were written.
+- **Production re-verified zero:** 1 client, 8 queries, 0 tracker/pipeline/
+  improvement/technical-audit runs. Migration 018 tables are absent in
+  production (not applied).
+
+### Remaining gates before a production baseline
+
+- **Local Supabase persistence validation is not run.** It requires Docker,
+  which is not installed on the current machine, so the persisted demo run and
+  local migration 001–018 apply could not be executed here. The persistence,
+  lifecycle, grouping, and card-creation logic is covered by fake-Supabase unit
+  tests. This live local run remains a gate before any production baseline.
+- Migration 018 must be applied to production (schema only, empty tables) after
+  review.
+- Frontend cutover (Phase 8) is deferred per the standing instruction.
 
 ### Production infrastructure
 

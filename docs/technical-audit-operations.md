@@ -62,19 +62,42 @@ approved paraphrases. BudgetYourMD currently has:
 
 Do not describe this as “8 queries.” Use “8 intents / 47 wordings.”
 
-## Foundation checks
+## Check sets
 
-Only `foundation` is implemented:
+All four deterministic check sets are implemented and tested:
 
-- `llms_txt.integrity`;
-- meta-title integrity;
-- meta-description integrity;
-- canonical integrity.
+- **foundation:** `llms_txt.integrity`, meta-title/description integrity,
+  canonical integrity.
+- **protocol:** `robots_txt.integrity`/`.access`, `sitemap.discovery`/
+  `.integrity`/`.coverage`/`.entry_health`, `tls.certificate`/
+  `.https_redirect`/`.mixed_content`, `schema.integrity`/`.coverage`.
+- **site_integrity:** `links.internal_health`/`.external_health`,
+  `images.integrity`/`.alt_text`, `freshness.dates`,
+  `source_support.link_health`.
+- **performance:** `performance.crux`/`.lighthouse`/`.lcp_image`,
+  `integration.gsc_sitemap`, `integration.bing`.
 
-The collector is bounded by page, redirect, response-size, and timeout limits.
-It records request URL, redirect chain, final URL, status, MIME type, retrieval
-time, fingerprint, truncation, and safe error details. Bare and `www` production
+The collector is bounded by page, redirect, response-size, timeout, external-
+probe (50), and image-probe (40) limits. It records request URL, redirect chain,
+final URL, status, MIME type, retrieval time, fingerprint, truncation, and safe
+error details, plus robots.txt, sitemap documents, TLS certificate facts, a
+plain-HTTP probe, and bounded external/image probes. Bare and `www` production
 hosts are treated as one approved site identity after observed redirection.
+
+Performance API keys drive real calls only when present: `CRUX_API_KEY`,
+`PAGESPEED_API_KEY`, and `BING_WEBMASTER_API_KEY`. Absent keys produce explicit
+`unknown` results, never fabricated data. No LLM participates in the technical
+path.
+
+### Finding lifecycle and unified workflow
+
+Persisted runs classify each finding as `new`, `continuing`, `changed`,
+`resolved`, or `regressed` against the previous completed run, group
+identical-cause findings, and create unified action cards over immutable
+results. Cards follow `observed → draft_prepared → approved → applied →
+verified/still_failing`, with a stale-state guard on apply and deterministic
+re-audit verification. No card publishes automatically. Migration 018 adds the
+workflow tables; it is not yet applied to production.
 
 ## Status handling
 
@@ -96,19 +119,26 @@ The Railway service exposes:
 - `GET /health`;
 - authenticated `POST /api/run`;
 - authenticated `GET /api/status/{thread_id}`;
-- authenticated `POST /api/run-all`.
+- authenticated `POST /api/run-all`;
+- authenticated `GET /api/technical-audit/runs?client_id=`;
+- authenticated `GET /api/technical-audit/runs/{run_id}`;
+- authenticated `GET /api/technical-audit/cards?client_id=&status=`;
+- authenticated `POST /api/technical-audit/cards/{card_id}/approve`
+  (body `{"approved_by": "<name>"}`), `/reject`, `/mark-applied`, `/verify`.
 
-Schedule and approval endpoints must return 404.
+Card endpoints return 409 for an illegal state transition and 404 for a missing
+card. Schedule and approval-resume endpoints must return 404.
 
 The explicit audit CLI supports:
 
 ```bash
 cd agents
 
-# Non-persisting website smoke artifact
+# Non-persisting website smoke artifact (defaults to all four check sets)
 .venv/bin/python -m src.technical_audit.cli smoke \
   --domain example.com \
   --platform other \
+  --check-sets foundation,protocol,site_integrity,performance \
   --output ../.artifacts/technical-audit/example-smoke.json
 
 # Persisted run: use only against an approved development/staging database
