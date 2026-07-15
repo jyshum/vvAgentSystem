@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Put BudgetYourMD on one manual deterministic runtime, remove scheduling and legacy audit/card paths, reset all generated data safely, repair Foundation collection, and prove the resulting slice in development before any production baseline is created.
+**Goal:** Put BudgetYourMD on one manual deterministic runtime, remove scheduling and legacy backend audit/card paths, reset all generated data safely, repair Foundation collection, and prove the resulting slice in development before any production baseline is created. Frontend changes are deferred.
 
-**Architecture:** Add the unified client fields before changing readers, then deploy a scheduler-free manual graph that writes tracker evidence and immutable technical-audit evidence only. Replace the profile-driven Foundation collector with a bounded site/platform collector, remove legacy tables and UI after a verified client-scoped reset, and validate with fixtures, a local Supabase demo run, and a non-persisting BudgetYourMD smoke run.
+**Architecture:** Add the unified client fields for backend use, then deploy a scheduler-free manual graph that writes tracker evidence and immutable technical-audit evidence only. Replace the profile-driven Foundation collector with a bounded site/platform collector, remove legacy backend code and tables after a verified client-scoped reset, and validate with fixtures, a local Supabase demo run, and a non-persisting BudgetYourMD smoke run. The existing dashboard is not updated in this tranche and may remain stale against the cleaned schema.
 
 **Tech Stack:** Python 3.11, FastAPI, LangGraph, psycopg 3, httpx, BeautifulSoup, pytest, Next.js/React/TypeScript, Vitest, Supabase PostgreSQL, Railway.
 
@@ -22,6 +22,7 @@
 - No audit result can publish or mutate a production site.
 - Every network collector is bounded and records redirects, final URL, status, MIME type, retrieval time, fingerprint, truncation, and errors.
 - Use TDD for every code task and commit each task independently.
+- Defer all dashboard code, configuration, navigation, presentation, and compatibility work; this does not defer migration 017 or any backend/reset/deployment/validation requirement.
 
 ---
 
@@ -40,7 +41,6 @@
 - `agents/tests/test_reset_client_data.py` — reset selection, transaction, and preservation contract.
 - `agents/tests/technical_audit/test_site.py` — host/platform rules.
 - `agents/tests/technical_audit/test_collector.py` — redirects, bounds, truncation, and safe failures.
-- `dashboard/__tests__/manual-client-config.test.tsx` — user-facing manual config contract.
 
 ### Modified files
 
@@ -55,15 +55,6 @@
 - `agents/src/technical_audit/observations.py` — response provenance and bounded extraction.
 - `agents/tests/test_server.py`, `agents/tests/test_pipeline.py`, `agents/tests/test_improvement_pipeline.py`, and `agents/tests/technical_audit/*` — new manual deterministic contracts.
 - `agents/pyproject.toml` and `agents/requirements.txt` — remove APScheduler and legacy matcher dependency when unused.
-- `dashboard/lib/types.ts` — unified client fields.
-- `dashboard/components/admin/ConfigForm.tsx` — platform and implementation mode; no schedule/profile controls.
-- `dashboard/app/api/admin/clients/[id]/route.ts` — unified writable fields.
-- `dashboard/app/admin/clients/[id]/layout.tsx` — manual-only header.
-- `dashboard/app/admin/page.tsx` and `dashboard/components/board/BoardRow.tsx` — no schedule or legacy-card queries/copy.
-- `dashboard/app/admin/clients/[id]/queries/page.tsx` — visibility evidence only.
-- `dashboard/app/admin/clients/[id]/runs/[runId]/page.tsx` — tracker plus technical evidence only.
-- `dashboard/lib/client-tabs.ts` — remove Cards.
-- `dashboard/lib/run-presentation.ts` and `dashboard/lib/improvement-types.ts` — one technical presentation.
 - `supabase/schema.sql`, `PROJECT_STATE.md`, and `docs/technical-audit-operations.md` — canonical schema and current manual-only operations.
 
 ### Deleted files and surfaces
@@ -82,18 +73,6 @@
 - `agents/audit.py`, `agents/recommend.py`, `agents/implement.py`, and `agents/scout.py`
 - `agents/src/auditor.py`, `agents/src/recommender.py`, `agents/src/reddit_scout.py`, `agents/src/parsers.py`, and `agents/src/scorers.py`
 - legacy-only tests: `test_matcher.py`, `test_scorer.py`, `test_scorers.py`, `test_parsers.py`, `test_auditor.py`, `test_recommender.py`, `test_gap_check.py`, `test_crawlability.py`, `test_card_generator.py`, `test_card_qa.py`, `test_auto_approve.py`, `test_verifier.py`, `test_github_impl.py`, and implementation-only cases in `test_graph_nodes.py`
-- `dashboard/lib/schedules.ts`
-- `dashboard/app/api/runs/reload-schedules/route.ts`
-- `dashboard/app/api/admin/approve/route.ts`
-- `dashboard/app/admin/approvals/`
-- `dashboard/app/admin/clients/[id]/cards/`
-- `dashboard/app/mock-current/`
-- `dashboard/components/approvals/`
-- legacy Pages readers/components after their database tables are removed
-- `dashboard/components/admin/HeatTable.tsx` card/waiting column and approval links
-- `dashboard/components/runs/RunRail.tsx` card/approval/implementation segments
-- `dashboard/components/admin/NavLinks.tsx` approval navigation entry
-- `dashboard/__tests__/components/approval-cards.test.tsx` and `dashboard/__tests__/components/card-highlighter.test.tsx`
 
 ---
 
@@ -245,129 +224,9 @@ git commit -m "refactor: remove automatic scheduling"
 
 ---
 
-### Task 3: Make the dashboard configuration manual and unified
+### Task 3: Defer frontend configuration
 
-**Files:**
-- Modify: `dashboard/lib/types.ts`
-- Modify: `dashboard/components/admin/ConfigForm.tsx`
-- Modify: `dashboard/app/api/admin/clients/[id]/route.ts`
-- Modify: `dashboard/__tests__/client-config-save.test.ts`
-- Create: `dashboard/__tests__/manual-client-config.test.tsx`
-- Delete: `dashboard/lib/schedules.ts`
-- Delete: `dashboard/app/api/runs/reload-schedules/route.ts`
-
-**Interfaces:**
-- `Client.site_platform`: platform selector.
-- `Client.implementation_mode`: delivery selector.
-- PATCH accepts these two fields and rejects schedule/profile fields by omission from `UPDATABLE_FIELDS`.
-
-- [ ] **Step 1: Write failing API and form tests**
-
-Add to `client-config-save.test.ts`:
-
-```typescript
-it("writes platform and implementation mode but ignores schedule fields", async () => {
-  const res = await callPatch({
-    site_platform: "squarespace",
-    implementation_mode: "copy_paste",
-    cycle_frequency: "weekly",
-    cycle_day: 1,
-  });
-  expect(res.status).toBe(200);
-  expect(clientsUpdate).toHaveBeenCalledWith({
-    site_platform: "squarespace",
-    implementation_mode: "copy_paste",
-  });
-});
-```
-
-Create `manual-client-config.test.tsx`:
-
-```tsx
-import { render, screen } from "@testing-library/react";
-import { ConfigForm } from "@/components/admin/ConfigForm";
-
-it("shows site platform and no scheduler controls", () => {
-  render(<ConfigForm client={{
-    id: "c1", name: "Christian", brand_name: "BudgetYourMD",
-    website_domain: "budgetyourmd.ca", brand_variations: [], target_queries: [],
-    competitors: [], gsc_site_url: "https://www.budgetyourmd.ca/",
-    site_platform: "squarespace", implementation_mode: "copy_paste",
-    created_at: "2026-07-15T00:00:00Z",
-  }} />);
-  expect(screen.getByLabelText("Site platform")).toHaveValue("squarespace");
-  expect(screen.queryByText("Pipeline Schedule")).toBeNull();
-  expect(screen.queryByText("Frequency")).toBeNull();
-});
-```
-
-- [ ] **Step 2: Run the tests and verify they fail on the old contract**
-
-Run: `cd dashboard && npm test -- __tests__/client-config-save.test.ts __tests__/manual-client-config.test.tsx`
-
-Expected: FAIL because the new fields are absent and schedule controls still render.
-
-- [ ] **Step 3: Update the client type and PATCH allowlist**
-
-Replace the legacy config fields in `Client` with:
-
-```typescript
-site_platform: "unknown" | "squarespace" | "wordpress" | "webflow" | "shopify" | "repository" | "other";
-implementation_mode: "copy_paste" | "guided" | "github_pr" | "staged_api";
-gsc_site_url: string;
-```
-
-The API allowlist becomes:
-
-```typescript
-const UPDATABLE_FIELDS = [
-  "name", "brand_name", "website_domain", "brand_variations", "competitors",
-  "gsc_site_url", "site_platform", "implementation_mode",
-] as const;
-```
-
-- [ ] **Step 4: Replace the schedule/CMS sections in `ConfigForm`**
-
-Use labelled selects so the test and browser accessibility contract are stable:
-
-```tsx
-<label htmlFor="site-platform">Site platform</label>
-<select id="site-platform" value={sitePlatform} onChange={(event) => setSitePlatform(event.target.value)}>
-  <option value="squarespace">Squarespace</option>
-  <option value="wordpress">WordPress</option>
-  <option value="webflow">Webflow</option>
-  <option value="shopify">Shopify</option>
-  <option value="repository">Repository-managed</option>
-  <option value="other">Other</option>
-</select>
-
-<label htmlFor="implementation-mode">Implementation mode</label>
-<select id="implementation-mode" value={implementationMode} onChange={(event) => setImplementationMode(event.target.value)}>
-  <option value="copy_paste">Copy and paste</option>
-  <option value="guided">Guided instructions</option>
-  <option value="github_pr">GitHub pull request</option>
-  <option value="staged_api">Staged API</option>
-</select>
-```
-
-The save body includes `site_platform` and `implementation_mode` and makes no reload-schedules request.
-
-- [ ] **Step 5: Delete schedule helpers and run tests**
-
-```bash
-git rm dashboard/lib/schedules.ts dashboard/app/api/runs/reload-schedules/route.ts
-cd dashboard
-npm test -- __tests__/client-config-save.test.ts __tests__/manual-client-config.test.tsx
-```
-
-Expected: both test files pass.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add dashboard/lib/types.ts dashboard/components/admin/ConfigForm.tsx dashboard/app/api/admin/clients/'[id]'/route.ts dashboard/__tests__
-git commit -m "feat: unify manual client configuration"
-```
+No implementation is performed in this tranche. The frontend continues using its existing contract until the separate frontend cutover. Migration 016 remains the backend source for `site_platform` and `implementation_mode`.
 
 ---
 
@@ -497,44 +356,27 @@ git commit -m "refactor: use one manual evidence graph"
 
 ---
 
-### Task 5: Remove legacy code and frontend readers
+### Task 5: Remove legacy backend code
 
 **Files:**
-- Delete the legacy agent/dashboard files listed in File Structure.
-- Modify: `dashboard/lib/client-tabs.ts`
-- Modify: `dashboard/app/admin/page.tsx`
-- Modify: `dashboard/components/board/BoardRow.tsx`
-- Modify: `dashboard/app/admin/clients/[id]/layout.tsx`
-- Modify: `dashboard/app/admin/clients/[id]/queries/page.tsx`
-- Modify: `dashboard/app/admin/clients/[id]/runs/[runId]/page.tsx`
-- Modify: `dashboard/lib/run-presentation.ts`
-- Modify: `dashboard/lib/improvement-types.ts`
-- Modify: dashboard tests that assert legacy/scheduled/card behavior.
+- Delete the legacy agent files listed in File Structure.
+- Modify: agent tests that assert legacy matcher/scorer/card/implementation behavior.
 
 **Interfaces:**
-- Primary navigation: Overview, Queries, Runs, Config, Reports.
-- Run detail: visibility evidence, technical audit evidence, and measured community-opportunity count only.
-- Board first-run copy: `first manual run pending`.
+- Active Python runtime contains tracker, GSC, community selection, and deterministic technical-audit evidence only.
+- No matcher, proprietary score, crawlability score, action-card, approval, or implementation runtime remains.
 
-- [ ] **Step 1: Write failing navigation and copy tests**
+- [ ] **Step 1: Run the legacy backend reference scan before deletion**
 
-Update `dashboard/__tests__/client-tabs.test.ts`:
+Run:
 
-```typescript
-expect(clientTabs("c1").map((tab) => tab.label)).toEqual([
-  "OVERVIEW", "QUERIES", "RUNS", "CONFIG", "REPORTS",
-]);
+```bash
+rg -n "matcher|structural_score|citation-readiness|await_approval|run_implementation|auto_approve" agents/src agents/server.py
 ```
 
-Update the BoardRow component test to assert `first manual run pending` and reject `scheduled`.
+Expected: active legacy backend references remain before deletion.
 
-- [ ] **Step 2: Run the focused tests and verify old surfaces remain**
-
-Run: `cd dashboard && npm test -- __tests__/client-tabs.test.ts __tests__/components/smoke.test.tsx __tests__/run-presentation.test.ts`
-
-Expected: FAIL on Cards/schedule/legacy presentation assertions.
-
-- [ ] **Step 3: Remove legacy agent modules**
+- [ ] **Step 2: Remove legacy agent modules**
 
 ```bash
 git rm agents/src/improvement/matcher.py agents/src/improvement/scorer.py agents/src/improvement/gap_check.py agents/src/improvement/crawlability.py agents/src/improvement/card_generator.py agents/src/improvement/card_qa.py agents/src/improvement/auto_approve.py agents/src/improvement/verifier.py
@@ -544,47 +386,24 @@ git rm agents/src/auditor.py agents/src/recommender.py agents/src/reddit_scout.p
 git rm agents/tests/test_matcher.py agents/tests/test_scorer.py agents/tests/test_scorers.py agents/tests/test_parsers.py agents/tests/test_auditor.py agents/tests/test_recommender.py agents/tests/test_gap_check.py agents/tests/test_crawlability.py agents/tests/test_card_generator.py agents/tests/test_card_qa.py agents/tests/test_auto_approve.py agents/tests/test_verifier.py agents/tests/test_github_impl.py
 ```
 
-Delete implementation-only cases from `agents/tests/test_graph_nodes.py`. Rewrite `agents/tests/test_community_check.py` to import and assert `select_community_opportunities` directly; it must not build an action card. Remove `sentence-transformers>=3.0.0` from `agents/pyproject.toml`; no remaining runtime imports it. Run `rg -n "matcher|structural_score|citation-readiness|await_approval|run_implementation|auto_approve" agents/src agents/server.py` and delete every remaining active-runtime reference. Expected afterward: no matches outside comments describing prohibited behavior.
+Delete implementation-only cases from `agents/tests/test_graph_nodes.py`. Rewrite `agents/tests/test_community_check.py` to import and assert `select_community_opportunities` directly; it must not build an action card. Remove `sentence-transformers>=3.0.0` from `agents/pyproject.toml`; no remaining runtime imports it.
 
-- [ ] **Step 4: Remove legacy dashboard routes/components**
-
-```bash
-git rm -r dashboard/app/admin/approvals dashboard/app/admin/clients/'[id]'/cards dashboard/components/approvals
-git rm -r dashboard/app/admin/clients/'[id]'/pages dashboard/components/pages-tab
-git rm -r dashboard/app/mock-current
-git rm dashboard/app/api/admin/approve/route.ts
-git rm dashboard/__tests__/components/approval-cards.test.tsx dashboard/__tests__/components/card-highlighter.test.tsx
-```
-
-Delete the hidden Pages route and `dashboard/components/pages-tab/` because migration 017 removes its storage. Remove the APPROVALS entry from `NavLinks`; remove card/waiting cells and links from `HeatTable`; replace `RunRail` segments with `MEASURE`, `COLLECT`, `AUDIT`, `COMPLETE`. Remove action-card and schedule queries from Board, Queries, client layout, runs list, and run detail. Remove legacy matching/readiness/crawlability tiles and the legacy/technical presentation branch. Keep `TechnicalAuditChecklist` as the only technical evidence component.
-
-- [ ] **Step 5: Remove Cards navigation and use manual copy**
-
-`clientTabs` returns only the five approved tabs. `BoardRow` renders:
-
-```tsx
-<div className="font-serif italic text-[13px]" style={{ color: "var(--mute)" }}>
-  first manual run pending
-</div>
-```
-
-- [ ] **Step 6: Run static reference checks and dashboard tests**
+- [ ] **Step 3: Run static reference checks and agent tests**
 
 Run:
 
 ```bash
-rg -n "from\(\"action_cards\"\)|fetchSchedules|next scheduled|legacy readiness|query_page_matches|page_citation_scores|/admin/approvals" dashboard --glob '!node_modules'
-cd dashboard
-npm test
-npm run build
+rg -n "matcher|structural_score|citation-readiness|await_approval|run_implementation|auto_approve" agents/src agents/server.py
+cd agents
+.venv/bin/python -m pytest -q
 ```
 
-Expected: the reference scan has no active-code matches; all tests and the production build pass.
+Expected: the reference scan has no active-code matches outside comments describing prohibited behavior; all agent tests pass.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add agents dashboard
+git add agents
 git commit -m "refactor: remove legacy audit and card surfaces"
 ```
 
@@ -892,10 +711,10 @@ Run:
 cd agents
 .venv/bin/python -m pytest tests/test_unified_manual_config_migration.py tests/test_improvement_run_migration.py -q
 cd ..
-rg -n "client_site_profiles|action_cards|query_page_matches|page_citation_scores|cycle_frequency|cycle_day" agents dashboard --glob '!node_modules'
+rg -n "client_site_profiles|action_cards|query_page_matches|page_citation_scores|cycle_frequency|cycle_day" agents --glob '!node_modules'
 ```
 
-Expected: migration tests pass; active-code reference scan is empty.
+Expected: migration tests pass; active backend-code reference scan is empty. Deferred dashboard references do not block migration 017.
 
 - [ ] **Step 5: Commit**
 
@@ -1028,7 +847,7 @@ Expected: `cronSchedule` is null, logs contain no `[Scheduler]`, the health endp
 
 - [ ] **Step 6: Update operations documentation and commit**
 
-Document that migrations 014–016 are applied, runs are manual, scheduling is removed, production baseline remains absent, and reset/017 are the next gate.
+Document that migrations 014–016 are applied, runs are manual, scheduling is removed, frontend work is deferred, production baseline remains absent, and reset/017 are the next gate.
 
 ```bash
 git add PROJECT_STATE.md docs/technical-audit-operations.md
@@ -1172,7 +991,7 @@ SQL
 cd agents
 .venv/bin/python -m pytest tests/technical_audit tests/test_pipeline.py tests/test_server.py tests/test_reset_client_data.py -q
 cd ../dashboard
-npm test -- __tests__/components/technical-audit-checklist.test.tsx __tests__/components/run-technical-audit-evidence.test.tsx __tests__/run-presentation.test.ts __tests__/manual-client-config.test.tsx
+npm test -- __tests__/components/technical-audit-checklist.test.tsx __tests__/components/run-technical-audit-evidence.test.tsx __tests__/run-presentation.test.ts
 npm run build
 ```
 
