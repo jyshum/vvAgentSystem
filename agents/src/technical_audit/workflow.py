@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any
 
-from .collector import Fetcher, HttpEvidence, _fetch
-from .models import AuditContext, Observation
+from .collector import Fetcher, _fetch
 from .remediation import build_guidance
-from .runner import _page_observation
 from .site import SiteIdentity
 
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
@@ -225,11 +223,18 @@ def verify_card(
     card_id: str,
     *,
     fetcher: Fetcher | None = None,
-    site_observations: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Deterministic re-audit: re-fetch the linked subjects, re-run the exact
-    originating checks, and mark verified only when every one passes."""
+    """Deterministic re-audit: re-collect the site the same way the audit did,
+    re-run the exact originating checks, and mark verified only when every
+    linked (check_id, subject) pair passes on fresh evidence.
+
+    Re-collecting the whole site (not just the linked pages) is what lets
+    site-level findings — robots, sitemap, TLS, schema — actually verify; a
+    page-only re-fetch leaves their evidence empty and they can never pass.
+    """
     from .checks import build_v1_registry, registered_check_sets
+    from .collector import collect_site
+    from .runner import run_technical_audit
 
     card = _load_card(sb, card_id)
     if card["status"] != "applied":
@@ -238,44 +243,26 @@ def verify_card(
     if not linked:
         raise WorkflowError("card has no linked results to verify")
     identity = _client_identity(sb, card["client_id"])
-    effective_fetcher = fetcher or _live_fetcher(identity)
 
-    subjects = sorted({item["subject"] for item in linked})
+    linked_pairs = {(item["check_id"], item["subject"].rstrip("/").lower()) for item in linked}
     check_ids = {item["check_id"] for item in linked}
-    pages: list[Observation] = []
-    try:
-        for subject in subjects:
-            evidence = _fetch(effective_fetcher, identity, subject)
-            pages.append(_page_observation(evidence, identity))
-    finally:
-        close = getattr(effective_fetcher, "close", None)
-        if fetcher is None and callable(close):
-            close()
-
-    context = AuditContext(
-        client_id=card["client_id"],
-        domain=identity.configured_domain,
-        site_identity=identity,
-        pages=tuple(pages),
-        site_observations=site_observations or {},
-        run_timestamp=_now(),
+    # Verification never depends on live performance integrations; those checks
+    # are excluded so an unconfigured key cannot leave a card unverifiable.
+    verify_sets = tuple(
+        name for name in registered_check_sets() if name != "performance"
     )
-    registry = build_v1_registry(registered_check_sets())
-    fresh: list[dict[str, Any]] = []
-    for definition in registry.definitions():
-        if definition.id not in check_ids:
-            continue
-        for result in definition.evaluator(context):
-            payload = result.to_dict()
-            if payload["subject"] in subjects:
-                fresh.append(payload)
+
+    collected = collect_site(identity, fetcher=fetcher)
+    report = run_technical_audit(
+        card["client_id"], collected.identity, collected,
+        enabled_check_sets=verify_sets,
+    )
 
     relevant = [
-        item for item in fresh
-        if any(
-            item["check_id"] == link["check_id"] and item["subject"] == link["subject"]
-            for link in linked
-        )
+        result
+        for result in report["results"]
+        if result["check_id"] in check_ids
+        and (result["check_id"], result["subject"].rstrip("/").lower()) in linked_pairs
     ]
     verified = bool(relevant) and all(item["status"] == "pass" for item in relevant)
     verification = {

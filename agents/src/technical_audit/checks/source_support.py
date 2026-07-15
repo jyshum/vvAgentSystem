@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..models import AuditContext, AuditStatus, CheckResult
-from ._common import build_result, unknown_result
+from ._common import build_result, probe_disposition, unknown_result
 
 _SECTION = "source_citations"
 _EXPECTED = (
@@ -56,13 +56,15 @@ def evaluate_source_support(context: AuditContext) -> list[CheckResult]:
             probe_data = probe.data
             status_code = int(probe_data.get("status_code") or 0)
             error = probe_data.get("error")
-            if status_code in {404, 410} or status_code >= 500 or (error and "redirect" not in str(error)):
+            probe_error = None if error and "redirect" in str(error) else error
+            disposition = probe_disposition(status_code, probe_error)
+            if disposition == "fail":
                 failures.append({
                     "url": link["url"],
                     "anchor": link.get("text", "")[:100],
                     "defect": f"status {status_code}" if status_code else str(error)[:200],
                 })
-            elif status_code in {403, 429, 0}:
+            elif disposition == "unknown":
                 unknowns.append({"url": link["url"], "status": status_code})
             else:
                 healthy.append({

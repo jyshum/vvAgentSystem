@@ -101,6 +101,41 @@ def test_external_links_dead_fails_blocked_unknown_none_na():
     assert evaluate_external_links(healthy)[0].status is AuditStatus.PASS
 
 
+def test_external_link_timeout_is_unknown_not_fail():
+    page = page_observation(links=[_link("https://slow.example/x", kind="external")])
+    timed_out = site_observation(
+        "external_probe", "https://slow.example/x",
+        request_url="https://slow.example/x", final_url="https://slow.example/x",
+        status_code=0, content_type="", error="ConnectTimeout",
+    )
+    context = make_context(pages=(page,), site_observations={"external_probes": (timed_out,)})
+    assert evaluate_external_links(context)[0].status is AuditStatus.UNKNOWN
+
+
+def test_external_link_dns_failure_is_fail():
+    page = page_observation(links=[_link("https://gone.example/x", kind="external")])
+    dns_dead = site_observation(
+        "external_probe", "https://gone.example/x",
+        request_url="https://gone.example/x", final_url="https://gone.example/x",
+        status_code=0, content_type="", error="DNS resolution failed for https://gone.example/x",
+    )
+    context = make_context(pages=(page,), site_observations={"external_probes": (dns_dead,)})
+    assert evaluate_external_links(context)[0].status is AuditStatus.FAIL
+
+
+def test_source_citation_timeout_is_unknown_not_fail():
+    page = page_observation(links=[
+        _link("https://slow.example/study", kind="external", text="study"),
+    ])
+    timed_out = site_observation(
+        "external_probe", "https://slow.example/study",
+        request_url="https://slow.example/study", final_url="https://slow.example/study",
+        status_code=0, content_type="", error="ReadTimeout",
+    )
+    context = make_context(pages=(page,), site_observations={"external_probes": (timed_out,)})
+    assert evaluate_source_support(context)[0].status is AuditStatus.UNKNOWN
+
+
 # --- images ---
 
 def test_image_integrity_statuses():

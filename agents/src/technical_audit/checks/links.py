@@ -3,7 +3,7 @@ from __future__ import annotations
 from urllib.parse import urlsplit, urlunsplit
 
 from ..models import AuditContext, AuditStatus, CheckResult
-from ._common import build_result, unknown_result
+from ._common import build_result, probe_disposition, unknown_result
 
 _SECTION = "broken_links"
 _EXPECTED_INTERNAL = "Internal links resolve directly to healthy pages"
@@ -154,12 +154,16 @@ def evaluate_external_links(context: AuditContext) -> list[CheckResult]:
         data = probe.data
         status_code = int(data.get("status_code") or 0)
         error = data.get("error")
-        if status_code in {404, 410} or (error and "redirect" not in str(error)):
+        # A recorded redirect is not an error for link health; the final status
+        # of the followed chain is what the probe reports.
+        probe_error = None if error and "redirect" in str(error) else error
+        disposition = probe_disposition(status_code, probe_error)
+        if disposition == "fail":
             failures.append({
                 "url": data.get("request_url"),
                 "defect": f"status {status_code}" if status_code else str(error)[:200],
             })
-        elif status_code in {403, 429, 0} or status_code >= 500:
+        elif disposition == "unknown":
             unknowns.append({"url": data.get("request_url"), "status": status_code})
         else:
             healthy += 1

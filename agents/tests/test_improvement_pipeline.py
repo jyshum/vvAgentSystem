@@ -75,7 +75,14 @@ def _tables():
         "pipeline_runs": _chainable_table({"id": "pipeline-run-1"}),
         "technical_audit_runs": _chainable_table([{"id": "audit-run-1"}]),
         "technical_audit_observations": _chainable_table(),
-        "technical_audit_results": _chainable_table([{"id": "result-1"}]),
+        "technical_audit_results": _chainable_table([
+            {
+                "id": "result-1",
+                "check_id": "meta_title.integrity",
+                "check_version": 1,
+                "subject": "https://x.com/",
+            }
+        ]),
         "technical_audit_finding_groups": _chainable_table(),
         "technical_audit_action_cards": _chainable_table([{"id": "card-1"}]),
         "technical_audit_card_results": _chainable_table(),

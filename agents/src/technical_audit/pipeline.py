@@ -125,7 +125,19 @@ def _run_and_persist_technical_audit(
         result_ids: list[str] = []
         if result_rows:
             inserted = sb.table("technical_audit_results").insert(result_rows).execute()
-            result_ids = [row["id"] for row in (inserted.data or [])]
+            # (check_id, check_version, subject) is unique per run, so align the
+            # returned ids to the annotated order by key rather than assuming the
+            # insert returns rows in submission order.
+            by_key = {
+                (row["check_id"], row["check_version"], row["subject"]): row["id"]
+                for row in (inserted.data or [])
+            }
+            result_ids = [
+                by_key.get(
+                    (result["check_id"], result["check_version"], result["subject"])
+                )
+                for result in annotated
+            ]
 
         if groups:
             group_rows = [
@@ -142,7 +154,7 @@ def _run_and_persist_technical_audit(
             ]
             sb.table("technical_audit_finding_groups").insert(group_rows).execute()
 
-        if groups and len(result_ids) == len(annotated):
+        if groups and result_ids and all(rid is not None for rid in result_ids):
             fingerprints = {
                 observation["subject"]: observation["fingerprint"]
                 for observation in report["observations"]

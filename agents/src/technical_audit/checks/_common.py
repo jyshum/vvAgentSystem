@@ -51,6 +51,33 @@ def build_result(
     )
 
 
+def probe_disposition(status_code: int, error: str | None) -> str:
+    """Classify a bounded external probe as 'fail', 'unknown', or 'healthy'.
+
+    Errs toward 'unknown' for anything transient or ambiguous: only a confirmed
+    dead host (DNS resolution failure) or a definitive 404/410/5xx status fails.
+    A timeout, connection reset, TLS handshake error, or protocol error is
+    transient/blocked and must never be presented as a confirmed defect.
+    """
+    if error:
+        text = str(error).lower()
+        if (
+            "dns resolution failed" in text
+            or "name or service not known" in text
+            or "nodename nor servname" in text
+            or "no address" in text
+        ):
+            return "fail"
+        return "unknown"
+    if status_code in {404, 410}:
+        return "fail"
+    if status_code in {403, 429} or status_code == 0:
+        return "unknown"
+    if status_code >= 500:
+        return "fail"
+    return "healthy"
+
+
 def unknown_result(
     *,
     check_id: str,

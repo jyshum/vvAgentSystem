@@ -3,6 +3,7 @@ from __future__ import annotations
 from urllib.parse import urlsplit
 
 from ..models import AuditContext, AuditStatus, CheckResult
+from ..observations import normalize_url
 from ._common import build_result, unknown_result
 
 _SECTION = "image_optimization"
@@ -32,8 +33,14 @@ def _alt_is_stuffed(alt: str) -> bool:
 
 
 def evaluate_image_integrity(context: AuditContext) -> list[CheckResult]:
+    def _key(url: str) -> str:
+        try:
+            return normalize_url(url)
+        except Exception:
+            return url
+
     probes = {
-        probe.data.get("request_url"): probe
+        _key(probe.data.get("request_url") or ""): probe
         for probe in tuple(context.site_observations.get("image_probes") or ())
     }
     results = []
@@ -64,7 +71,7 @@ def evaluate_image_integrity(context: AuditContext) -> list[CheckResult]:
         failures, unknowns, checked = [], [], 0
         refs = [page.id]
         for image in images:
-            probe = probes.get(image["src"])
+            probe = probes.get(_key(image["src"]))
             if probe is None:
                 continue
             checked += 1
