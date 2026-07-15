@@ -23,6 +23,10 @@ MAX_BODY_BYTES = 512_000
 MAX_REDIRECTS = 5
 MAX_PAGES = 20
 MAX_SITEMAPS = 3
+MAX_EXTERNAL_PROBES = 50
+MAX_IMAGE_PROBES = 40
+EXTERNAL_BODY_BYTES = 65_536
+HTTP_PROBE_BODY_BYTES = 4_096
 TIMEOUT_SECONDS = 10
 RESOLVER_TIMEOUT_SECONDS = 10
 
@@ -48,6 +52,12 @@ class CollectedSite:
     pages: tuple[HttpEvidence, ...]
     llms_txt: HttpEvidence
     scope: dict[str, Any]
+    robots_txt: HttpEvidence | None = None
+    sitemaps: tuple[HttpEvidence, ...] = ()
+    tls: dict[str, Any] | None = None
+    http_probe: HttpEvidence | None = None
+    external_probes: tuple[HttpEvidence, ...] = ()
+    image_probes: tuple[HttpEvidence, ...] = ()
 
 
 FetchResult = HttpEvidence | dict[str, Any]
@@ -504,12 +514,259 @@ def _sitemap_locations(body: str) -> list[str]:
     ]
 
 
+def _robots_sitemap_declarations(body: str) -> list[str]:
+    declared = []
+    for line in body.splitlines():
+        key, _, value = line.partition(":")
+        if key.strip().lower() == "sitemap" and value.strip():
+            declared.append(value.strip())
+    return declared
+
+
+def _html_assets(body: str, base_url: str) -> tuple[list[str], list[str]]:
+    """Absolute external link targets and image sources from raw HTML."""
+    soup = BeautifulSoup(body, "html.parser")
+    links = [
+        urljoin(base_url, anchor.get("href") or "")
+        for anchor in soup.find_all("a")
+        if (anchor.get("href") or "").strip()
+    ]
+    images = [
+        urljoin(base_url, image.get("src") or "")
+        for image in soup.find_all("img")
+        if (image.get("src") or "").strip()
+    ]
+    return links, images
+
+
+def _probe_candidate(url: str) -> str | None:
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
+    if parts.scheme.lower() not in {"http", "https"}:
+        return None
+    if parts.username is not None or parts.password is not None:
+        return None
+    if not parts.hostname:
+        return None
+    try:
+        return _normalize_url(url)
+    except ValueError:
+        return None
+
+
+def _fetch_unrestricted(fetcher: Fetcher, request_url: str) -> HttpEvidence:
+    """Bounded fetch for external/off-site targets: no same-site rule, but the
+    credential/scheme policy already filtered candidates and the live fetcher
+    revalidates public resolution per hop."""
+    try:
+        result = fetcher(request_url)
+    except Exception as exc:
+        return _make_evidence(
+            request_url=request_url,
+            final_url=request_url,
+            redirect_chain=(request_url,),
+            status_code=0,
+            content_type="",
+            body="",
+            body_truncated=False,
+            error=str(exc),
+        )
+    chain = tuple(_raw_value(result, "redirect_chain", ()) or ()) or (request_url,)
+    body, truncated = _bounded_body(_raw_value(result, "body", "") or "")
+    body = body[:EXTERNAL_BODY_BYTES]
+    try:
+        return _make_evidence(
+            request_url=request_url,
+            final_url=str(_raw_value(result, "final_url", request_url) or request_url),
+            redirect_chain=chain,
+            status_code=_raw_value(result, "status_code", 0),
+            content_type=_raw_value(result, "content_type", ""),
+            body=body,
+            body_truncated=truncated or bool(_raw_value(result, "body_truncated", False)),
+            error=_raw_value(result, "error"),
+            retrieved_at=_raw_value(result, "retrieved_at") or None,
+        )
+    except ValueError as exc:
+        return _make_evidence(
+            request_url=request_url,
+            final_url=request_url,
+            redirect_chain=(request_url,),
+            status_code=0,
+            content_type="",
+            body="",
+            body_truncated=False,
+            error=str(exc),
+        )
+
+
+class _ExternalHttpxFetcher:
+    """Live fetcher for external link/image probes: public-resolution checks on
+    every hop, bounded bodies, no same-site restriction."""
+
+    def __init__(
+        self,
+        *,
+        resolver: Resolver = _system_resolver,
+        resolver_timeout_seconds: float = RESOLVER_TIMEOUT_SECONDS,
+    ) -> None:
+        self._resolver = resolver
+        self._resolver_timeout_seconds = resolver_timeout_seconds
+        self._client = httpx.Client(
+            follow_redirects=True,
+            timeout=TIMEOUT_SECONDS,
+            max_redirects=MAX_REDIRECTS,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; VV-Audit/1.0)"},
+            event_hooks={"response": [self._validate_redirect]},
+        )
+
+    def _validate_redirect(self, response: httpx.Response) -> None:
+        location = response.headers.get("location")
+        if not response.is_redirect or not location:
+            return
+        target = urljoin(str(response.url), location)
+        parts = urlsplit(target)
+        if parts.username is not None or parts.password is not None:
+            raise _UnsafeRedirect(
+                f"redirect target carries credentials: {_redacted_url(target)}"
+            )
+        if parts.scheme.lower() not in {"http", "https"}:
+            raise _UnsafeRedirect(
+                f"redirect target scheme is not http(s): {_redacted_url(target)}"
+            )
+        validate_public_resolution(
+            target, self._resolver, self._resolver_timeout_seconds
+        )
+
+    def __call__(self, url: str) -> FetchResult:
+        validate_public_resolution(url, self._resolver, self._resolver_timeout_seconds)
+        with self._client.stream("GET", url) as response:
+            body, truncated = _bounded_body(response.iter_bytes())
+            chain = tuple(str(item.url) for item in response.history) + (
+                str(response.url),
+            )
+            return {
+                "status_code": response.status_code,
+                "content_type": response.headers.get("content-type", ""),
+                "body": body[:EXTERNAL_BODY_BYTES],
+                "body_truncated": truncated,
+                "final_url": str(response.url),
+                "redirect_chain": chain,
+                "error": None,
+            }
+
+    def close(self) -> None:
+        self._client.close()
+
+
+def _live_http_probe(
+    url: str,
+    *,
+    resolver: Resolver = _system_resolver,
+    resolver_timeout_seconds: float = RESOLVER_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
+    """Observe plain-HTTP behavior for the configured domain without following
+    past the redirect cap; bodies are capped small because only the redirect
+    behavior is evidence."""
+    chain = [url]
+    current = url
+    with httpx.Client(
+        follow_redirects=False,
+        timeout=TIMEOUT_SECONDS,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; VV-Audit/1.0)"},
+    ) as client:
+        for _ in range(MAX_REDIRECTS + 1):
+            validate_public_resolution(current, resolver, resolver_timeout_seconds)
+            response = client.get(current)
+            if not response.is_redirect:
+                return {
+                    "status_code": response.status_code,
+                    "content_type": response.headers.get("content-type", ""),
+                    "body": response.text[:HTTP_PROBE_BODY_BYTES],
+                    "final_url": current,
+                    "redirect_chain": tuple(chain),
+                    "error": None,
+                }
+            location = response.headers.get("location", "")
+            target = urljoin(current, location)
+            parts = urlsplit(target)
+            if (
+                parts.scheme.lower() not in {"http", "https"}
+                or parts.username is not None
+                or parts.password is not None
+            ):
+                return {
+                    "status_code": response.status_code,
+                    "content_type": "",
+                    "body": "",
+                    "final_url": current,
+                    "redirect_chain": tuple(chain),
+                    "error": f"unsafe redirect target: {_redacted_url(target)}",
+                }
+            chain.append(target)
+            current = target
+    return {
+        "status_code": 0,
+        "content_type": "",
+        "body": "",
+        "final_url": current,
+        "redirect_chain": tuple(chain),
+        "error": f"redirect limit exceeded ({MAX_REDIRECTS})",
+    }
+
+
 def collect_foundation(
     identity: SiteIdentity,
     max_pages: int = MAX_PAGES,
     fetcher: Fetcher | None = None,
     resolver: Resolver = _system_resolver,
     resolver_timeout_seconds: float = RESOLVER_TIMEOUT_SECONDS,
+) -> CollectedSite:
+    return _collect(
+        identity,
+        max_pages=max_pages,
+        fetcher=fetcher,
+        resolver=resolver,
+        resolver_timeout_seconds=resolver_timeout_seconds,
+        extended=False,
+    )
+
+
+def collect_site(
+    identity: SiteIdentity,
+    max_pages: int = MAX_PAGES,
+    fetcher: Fetcher | None = None,
+    resolver: Resolver = _system_resolver,
+    resolver_timeout_seconds: float = RESOLVER_TIMEOUT_SECONDS,
+    tls_inspector: Callable[[str], dict[str, Any]] | None = None,
+    http_prober: Callable[[str], dict[str, Any]] | None = None,
+    external_fetcher: Fetcher | None = None,
+) -> CollectedSite:
+    return _collect(
+        identity,
+        max_pages=max_pages,
+        fetcher=fetcher,
+        resolver=resolver,
+        resolver_timeout_seconds=resolver_timeout_seconds,
+        extended=True,
+        tls_inspector=tls_inspector,
+        http_prober=http_prober,
+        external_fetcher=external_fetcher,
+    )
+
+
+def _collect(
+    identity: SiteIdentity,
+    *,
+    max_pages: int,
+    fetcher: Fetcher | None,
+    resolver: Resolver,
+    resolver_timeout_seconds: float,
+    extended: bool,
+    tls_inspector: Callable[[str], dict[str, Any]] | None = None,
+    http_prober: Callable[[str], dict[str, Any]] | None = None,
+    external_fetcher: Fetcher | None = None,
 ) -> CollectedSite:
     if not 1 <= max_pages <= MAX_PAGES:
         raise ValueError(f"max_pages must be between 1 and {MAX_PAGES}")
@@ -540,6 +797,31 @@ def collect_foundation(
         queued_set: set[str] = set()
         visited = {homepage.request_url, homepage.final_url}
         sitemap_queue: list[str] = []
+        external_candidates: list[str] = []
+        external_seen: set[str] = set()
+        image_candidates: list[str] = []
+        image_seen: set[str] = set()
+
+        def note_assets(body: str, base_url: str) -> None:
+            if not extended:
+                return
+            link_urls, image_urls = _html_assets(body, base_url)
+            for url in link_urls:
+                candidate = _probe_candidate(url)
+                candidate_host = urlsplit(candidate).hostname if candidate else None
+                if (
+                    candidate
+                    and candidate_host
+                    and candidate_host not in effective_identity.allowed_hosts
+                    and candidate not in external_seen
+                ):
+                    external_seen.add(candidate)
+                    external_candidates.append(candidate)
+            for url in image_urls:
+                candidate = _probe_candidate(url)
+                if candidate and candidate not in image_seen:
+                    image_seen.add(candidate)
+                    image_candidates.append(candidate)
 
         def queue_page(url: str) -> None:
             try:
@@ -565,7 +847,33 @@ def collect_foundation(
                 for url in discovered_sitemaps
                 if effective_identity.allows(url)
             )
+            note_assets(homepage.body, homepage.final_url)
 
+        canonical_root = (
+            homepage.final_url
+            if effective_identity.allows(homepage.final_url)
+            else homepage_url
+        )
+
+        robots_txt: HttpEvidence | None = None
+        if extended:
+            robots_txt = _fetch(
+                effective_fetcher,
+                effective_identity,
+                urljoin(canonical_root, "/robots.txt"),
+            )
+            if robots_txt.status_code == 200 and robots_txt.error is None:
+                declared = [
+                    _normalize_url(url)
+                    for url in _robots_sitemap_declarations(robots_txt.body)
+                    if effective_identity.allows(url)
+                ]
+                sitemap_queue[:0] = declared
+            conventional = urljoin(canonical_root, "/sitemap.xml")
+            if conventional not in sitemap_queue:
+                sitemap_queue.append(conventional)
+
+        sitemap_documents: list[HttpEvidence] = []
         sitemaps_fetched = 0
         sitemap_seen: set[str] = set()
         while sitemap_queue and sitemaps_fetched < MAX_SITEMAPS:
@@ -575,6 +883,7 @@ def collect_foundation(
             sitemap_seen.add(sitemap_url)
             sitemap = _fetch(effective_fetcher, effective_identity, sitemap_url)
             sitemaps_fetched += 1
+            sitemap_documents.append(sitemap)
             for url in _sitemap_locations(sitemap.body):
                 try:
                     normalized = _normalize_url(url)
@@ -597,8 +906,8 @@ def collect_foundation(
                 discovered_pages, _ = _html_discovery(page.body, page.final_url)
                 for url in discovered_pages:
                     queue_page(url)
+                note_assets(page.body, page.final_url)
 
-        canonical_root = homepage.final_url if effective_identity.allows(homepage.final_url) else homepage_url
         llms_url = urljoin(canonical_root, "/llms.txt")
         llms_txt = _fetch(effective_fetcher, effective_identity, llms_url)
         truncated = bool(queued or sitemap_queue)
@@ -615,12 +924,114 @@ def collect_foundation(
             "same_site_https": True,
             "concurrency_limit": 1,
         }
+        if not extended:
+            return CollectedSite(
+                identity=effective_identity,
+                homepage=homepage,
+                pages=tuple(pages),
+                llms_txt=llms_txt,
+                scope=scope,
+            )
+
+        default_external = (
+            _ExternalHttpxFetcher(
+                resolver=resolver,
+                resolver_timeout_seconds=resolver_timeout_seconds,
+            )
+            if external_fetcher is None and fetcher is None
+            else None
+        )
+        effective_external = external_fetcher or default_external or effective_fetcher
+        try:
+            external_probes = tuple(
+                _fetch_unrestricted(effective_external, url)
+                for url in external_candidates[:MAX_EXTERNAL_PROBES]
+            )
+            image_probes = tuple(
+                _fetch_unrestricted(effective_external, url)
+                for url in image_candidates[:MAX_IMAGE_PROBES]
+            )
+        finally:
+            if default_external is not None:
+                default_external.close()
+
+        tls_evidence: dict[str, Any] | None = None
+        if tls_inspector is not None:
+            tls_evidence = tls_inspector(
+                (urlsplit(canonical_root).hostname or identity.configured_domain)
+            )
+        elif fetcher is None:
+            from .evidence.tls import inspect_tls
+
+            tls_evidence = inspect_tls(
+                (urlsplit(canonical_root).hostname or identity.configured_domain)
+            )
+
+        http_probe_evidence: HttpEvidence | None = None
+        bare_host = min(identity.allowed_hosts, key=len)
+        http_url = f"http://{bare_host}/"
+        prober = http_prober
+        if prober is None and fetcher is None:
+            prober = lambda url: _live_http_probe(
+                url,
+                resolver=resolver,
+                resolver_timeout_seconds=resolver_timeout_seconds,
+            )
+        if prober is not None:
+            try:
+                probe_result = prober(http_url)
+                http_probe_evidence = _make_evidence(
+                    request_url=http_url,
+                    final_url=str(
+                        probe_result.get("final_url", http_url) or http_url
+                    ),
+                    redirect_chain=tuple(
+                        probe_result.get("redirect_chain", (http_url,)) or (http_url,)
+                    ),
+                    status_code=probe_result.get("status_code", 0),
+                    content_type=probe_result.get("content_type", ""),
+                    body=probe_result.get("body", ""),
+                    body_truncated=bool(probe_result.get("body_truncated", False)),
+                    error=probe_result.get("error"),
+                )
+            except Exception as exc:
+                http_probe_evidence = _make_evidence(
+                    request_url=http_url,
+                    final_url=http_url,
+                    redirect_chain=(http_url,),
+                    status_code=0,
+                    content_type="",
+                    body="",
+                    body_truncated=False,
+                    error=str(exc),
+                )
+
+        scope.update(
+            {
+                "extended": True,
+                "robots_fetched": robots_txt is not None,
+                "external_probe_limit": MAX_EXTERNAL_PROBES,
+                "external_probes": len(external_probes),
+                "external_probes_truncated": len(external_candidates)
+                > MAX_EXTERNAL_PROBES,
+                "image_probe_limit": MAX_IMAGE_PROBES,
+                "image_probes": len(image_probes),
+                "image_probes_truncated": len(image_candidates) > MAX_IMAGE_PROBES,
+                "external_body_byte_limit": EXTERNAL_BODY_BYTES,
+            }
+        )
         return CollectedSite(
             identity=effective_identity,
             homepage=homepage,
             pages=tuple(pages),
             llms_txt=llms_txt,
             scope=scope,
+            robots_txt=robots_txt,
+            sitemaps=tuple(sitemap_documents),
+            tls=tls_evidence,
+            http_probe=http_probe_evidence,
+            external_probes=external_probes,
+            image_probes=image_probes,
         )
     finally:
         if default_fetcher is not None:
