@@ -138,8 +138,6 @@ def run_technical_pipeline(
             "client_id": client_id,
             "status": "running",
             "thread_id": state.get("thread_id"),
-            "run_mode": "technical_v1",
-            "effective_check_sets": list(FOUNDATION_CHECK_SETS),
         }
     ).execute()
     improvement_run_id = run_resp.data[0]["id"]
@@ -155,7 +153,6 @@ def run_technical_pipeline(
     completion = {
         "status": "error" if audit["error"] else "completed",
         "competitive_gaps_found": selection.competitor_lead_count,
-        "cards_generated": 0,
         "completed_at": completed_at,
     }
     if audit["error"]:

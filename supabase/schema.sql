@@ -1,9 +1,9 @@
 -- ============================================================================
 -- Victory Velocity — consolidated schema (current version, 2026-07-15)
 -- ============================================================================
--- Single canonical baseline that includes migrations 001–015. Paste the whole
+-- Single canonical baseline that includes migrations 001–017. Paste the whole
 -- file into the Supabase SQL editor and run once. Do not replay migrations
--- 001–015 after applying this schema.
+-- 001–017 after applying this schema.
 --
 -- WARNING: the DROP block below DELETES ALL DATA in these tables (clients,
 -- tracker history, reports, cards, etc.). Only run on a database you intend to
@@ -12,8 +12,7 @@
 -- What this keeps vs. drops relative to the old migrations:
 --   KEPT:    clients, client_users, tracker_runs, tracker_results (+view),
 --            reports, pipeline_runs, prompt_scores, competitive_gaps, queries,
---            improvement_runs, page_inventory, query_page_matches,
---            page_citation_scores, action_cards.
+--            improvement_runs, and deterministic technical-audit evidence.
 --   DROPPED: audit_runs, page_scores (legacy audit pipeline — no longer written
 --            or shown), reddit_opportunities (automated Reddit scout scrapped;
 --            community-check data now lives in action_cards.reddit_data).
@@ -22,8 +21,6 @@
 --     * action_cards.page_url is now nullable (brief/community-check cards
 --       legitimately have no page).
 --     * pipeline_runs now has admin-only RLS (migration 003 omitted it).
---     * clients.cms_type check now includes 'shopify' (the implementor router
---       supports Shopify; the old check rejected it).
 --   DROPPED column: tracker_runs.aggregate_citation_rate (never written by the
 --     current tracker; the UI uses per_engine_scores / prompt_scores instead).
 --
@@ -80,13 +77,7 @@ create table public.clients (
     check (site_platform in ('unknown', 'squarespace', 'wordpress', 'webflow', 'shopify', 'repository', 'other')),
   implementation_mode text not null default 'copy_paste'
     check (implementation_mode in ('copy_paste', 'guided', 'github_pr', 'staged_api')),
-  cms_type text default 'copy_paste'
-    check (cms_type in ('github', 'wordpress', 'webflow', 'shopify', 'copy_paste')),
-  cms_config jsonb default '{}'::jsonb,
-  cycle_frequency text default 'weekly',
-  cycle_day integer default 1,
   gsc_site_url text default '',
-  auto_approve_action_types text[] default '{}',
   created_at timestamptz default now()
 );
 
@@ -162,7 +153,7 @@ create table public.pipeline_runs (
   thread_id text not null,
   run_type text not null default 'full',
   status text not null default 'running'
-    check (status in ('running', 'awaiting_approval', 'implementing', 'completed', 'error')),
+    check (status in ('running', 'completed', 'error')),
   started_at timestamptz default now(),
   completed_at timestamptz,
   error_message text
@@ -230,63 +221,11 @@ create table public.improvement_runs (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references public.clients(id) on delete cascade,
   ran_at timestamptz default now(),
-  crawlability_report jsonb default '{}'::jsonb,
-  pages_inventoried int default 0,
-  queries_matched int default 0,
-  content_gaps_found int default 0,
   competitive_gaps_found int default 0,
-  cards_generated int default 0,
   status text default 'running' check (status in ('running', 'completed', 'error')),
   error_message text,
   completed_at timestamptz,
-  thread_id text,
-  run_mode text not null default 'legacy'
-    constraint improvement_runs_run_mode_check
-    check (run_mode in ('legacy', 'technical_v1')),
-  effective_check_sets text[] not null default '{}'::text[],
-  constraint improvement_runs_check_sets_match_mode_check
-    check (
-      (run_mode = 'legacy' and cardinality(effective_check_sets) = 0)
-      or
-      (run_mode = 'technical_v1' and cardinality(effective_check_sets) > 0)
-    )
-);
-
-create or replace function public.prevent_improvement_run_route_mutation()
-returns trigger
-language plpgsql
-as $$
-begin
-  if old.run_mode is distinct from new.run_mode
-    or old.effective_check_sets is distinct from new.effective_check_sets then
-    raise exception 'improvement run route controls are immutable';
-  end if;
-  return new;
-end;
-$$;
-
-create trigger improvement_runs_route_controls_immutable
-  before update of run_mode, effective_check_sets
-  on public.improvement_runs
-  for each row
-  execute function public.prevent_improvement_run_route_mutation();
-
-comment on column public.improvement_runs.run_mode is
-  'Immutable route selected when the improvement run was inserted.';
-comment on column public.improvement_runs.effective_check_sets is
-  'Immutable technical check sets selected when the improvement run was inserted.';
-
--- Versioned technical checklist. Legacy page_citation_scores remain historical.
-create table public.client_site_profiles (
-  client_id uuid primary key references public.clients(id) on delete cascade,
-  audit_version integer not null default 1 check (audit_version > 0),
-  llms_txt_enabled boolean not null default false,
-  priority_urls text[] not null default '{}',
-  platform text not null default 'unknown'
-    check (platform in ('unknown', 'github', 'wordpress', 'webflow', 'squarespace', 'other')),
-  integration_state jsonb not null default '{}'::jsonb,
-  verified_facts jsonb not null default '{}'::jsonb,
-  updated_at timestamptz not null default now()
+  thread_id text
 );
 
 create table public.technical_audit_runs (
@@ -340,77 +279,6 @@ create table public.technical_audit_results (
     check (lifecycle_state in ('new', 'continuing', 'changed', 'resolved', 'regressed')),
   created_at timestamptz not null default now(),
   unique (audit_run_id, check_id, check_version, subject)
-);
-
-create table public.page_inventory (
-  id uuid primary key default gen_random_uuid(),
-  run_id uuid not null references public.improvement_runs(id) on delete cascade,
-  url text not null,
-  title text default '',
-  h1 text default '',
-  first_paragraph text default '',
-  schema_types text[] default '{}',
-  word_count int default 0,
-  last_modified timestamptz,
-  outbound_link_count int default 0,
-  has_faq_schema boolean default false,
-  has_comparison_table boolean default false
-);
-
-create table public.query_page_matches (
-  id uuid primary key default gen_random_uuid(),
-  run_id uuid not null references public.improvement_runs(id) on delete cascade,
-  query_id uuid not null references public.queries(id) on delete cascade,
-  query_text text not null,
-  match_type text not null check (match_type in ('matched', 'weak', 'content_gap')),
-  matched_page_url text,
-  similarity_score float default 0,
-  bucket text
-);
-
-create table public.page_citation_scores (
-  id uuid primary key default gen_random_uuid(),
-  run_id uuid not null references public.improvement_runs(id) on delete cascade,
-  page_url text not null,
-  structural_score int default 0,
-  check_results jsonb default '{}'::jsonb,
-  sonnet_quality jsonb default '{}'::jsonb,
-  schema_status text default 'missing'
-    check (schema_status in ('missing', 'broken', 'valid_incomplete', 'valid_complete')),
-  schema_errors text[] default '{}'
-);
-
--- action_cards: run_id now references improvement_runs; page_url nullable.
--- pillar/score are legacy columns still written by the pipeline; the new UI
--- reads action_type / structural_score instead.
-create table public.action_cards (
-  id uuid primary key default gen_random_uuid(),
-  run_id uuid not null references public.improvement_runs(id) on delete cascade,
-  client_id uuid references public.clients(id),
-  query_id uuid references public.queries(id),
-  page_url text,
-  pillar text not null default 'general',
-  score int not null default 0,
-  action_type text default 'general',
-  track text default 'automated' check (track in ('automated', 'manual')),
-  priority int default 3,
-  competitive_gap float,
-  structural_score int,
-  validation_passed boolean default true,
-  issue text default '',
-  before_text text default '',
-  after_text text default '',
-  code_block text default '',
-  brief jsonb,
-  reddit_data jsonb,
-  preview_url text,
-  auto_approved boolean default false,
-  verification jsonb,
-  status text default 'pending'
-    check (status in ('pending', 'approved', 'rejected', 'implemented')),
-  cms_action text default 'copy_paste'
-    check (cms_action in ('none', 'github_pr', 'wordpress_api', 'webflow_staging', 'copy_paste')),
-  created_at timestamptz default now()
 );
 
 -- ─────────────────────────────────────────────

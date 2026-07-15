@@ -200,9 +200,9 @@ def test_run_technical_pipeline_persists_only_evidence_and_community_opportuniti
         "client_id": "client-1",
         "status": "running",
         "thread_id": "thread-1",
-        "run_mode": "technical_v1",
-        "effective_check_sets": ["foundation"],
     }
+    completion = tables["improvement_runs"].update.call_args.args[0]
+    assert "cards_generated" not in completion
     assert tables["technical_audit_runs"].insert.call_args.args[0][
         "pipeline_run_id"
     ] == "pipeline-run-1"

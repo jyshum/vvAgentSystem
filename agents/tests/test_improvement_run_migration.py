@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "supabase" / "migrations" / "015_improvement_run_mode.sql"
@@ -18,10 +16,8 @@ def test_migration_remains_additive_for_existing_improvement_runs():
     ) in sql
 
 
-@pytest.mark.parametrize("sql_path", [MIGRATION, CANONICAL_SCHEMA])
-def test_sql_sources_define_immutable_historical_safe_run_routing(sql_path):
-    assert sql_path.exists(), f"missing SQL source: {sql_path}"
-    sql = " ".join(sql_path.read_text().lower().split())
+def test_historical_migration_defines_immutable_safe_run_routing():
+    sql = " ".join(MIGRATION.read_text().lower().split())
 
     assert "run_mode text not null default 'legacy'" in sql
     assert "constraint improvement_runs_run_mode_check" in sql
@@ -49,18 +45,57 @@ def test_sql_sources_define_immutable_historical_safe_run_routing(sql_path):
     )
 
 
-def test_canonical_schema_orders_route_contract_for_idempotent_fresh_install():
+def test_canonical_schema_reflects_post_cleanup_runtime():
     sql = " ".join(CANONICAL_SCHEMA.read_text().lower().split())
+    clients = sql.split("create table public.clients (", 1)[1].split(");", 1)[0]
+    pipeline_runs = sql.split("create table public.pipeline_runs (", 1)[1].split(");", 1)[0]
+    improvement_runs = sql.split("create table public.improvement_runs (", 1)[1].split(");", 1)[0]
 
-    assert (
-        "drop function if exists public.prevent_improvement_run_route_mutation() cascade"
-        in sql
-    )
-    table_position = sql.index("create table public.improvement_runs")
-    function_position = sql.index(
-        "create or replace function public.prevent_improvement_run_route_mutation()"
-    )
-    trigger_position = sql.index(
-        "create trigger improvement_runs_route_controls_immutable"
-    )
-    assert table_position < function_position < trigger_position
+    assert "site_platform text not null default 'unknown'" in clients
+    assert "implementation_mode text not null default 'copy_paste'" in clients
+    for column in (
+        "cycle_frequency",
+        "cycle_day",
+        "cms_type",
+        "cms_config",
+        "auto_approve_action_types",
+    ):
+        assert column not in clients
+
+    assert "check (status in ('running', 'completed', 'error'))" in pipeline_runs
+    assert "awaiting_approval" not in pipeline_runs
+    assert "implementing" not in pipeline_runs
+
+    for column in (
+        "crawlability_report",
+        "pages_inventoried",
+        "queries_matched",
+        "content_gaps_found",
+        "cards_generated",
+        "run_mode",
+        "effective_check_sets",
+    ):
+        assert column not in improvement_runs
+
+    for table in (
+        "action_cards",
+        "page_citation_scores",
+        "query_page_matches",
+        "page_inventory",
+        "client_site_profiles",
+    ):
+        assert f"create table public.{table}" not in sql
+
+    for preserved_table in (
+        "clients",
+        "client_users",
+        "queries",
+        "tracker_runs",
+        "pipeline_runs",
+        "improvement_runs",
+        "technical_audit_runs",
+    ):
+        assert f"create table public.{preserved_table}" in sql
+
+    assert "create or replace function public.prevent_improvement_run_route_mutation()" not in sql
+    assert "create trigger improvement_runs_route_controls_immutable" not in sql
