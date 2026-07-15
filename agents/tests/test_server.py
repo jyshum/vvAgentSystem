@@ -23,95 +23,8 @@ def test_schedule_routes_do_not_exist():
     assert client.post("/api/reload-schedules", headers=headers).status_code == 404
 
 
-def test_approve_marks_rejected_cards(monkeypatch):
-    """Rejected cards must be marked status='rejected' in Supabase, and only approved
-    ids should be sent to the graph resume."""
+def test_approve_route_does_not_exist():
     import server as server_mod
-
-    updates = []
-
-    class FakeQuery:
-        def __init__(self, table):
-            self.table = table
-            self._payload = None
-
-        def update(self, payload):
-            self._payload = payload
-            return self
-
-        def eq(self, col, val):
-            updates.append((self.table, self._payload, col, val))
-            return self
-
-        def execute(self):
-            return type("R", (), {"data": []})()
-
-    class FakeSB:
-        def table(self, name):
-            return FakeQuery(name)
-
-    resumed_with = {}
-
-    class FakeGraph:
-        def invoke(self, command, config=None):
-            resumed_with["resume"] = command.resume
-            return {"implementation_results": []}
-
-    monkeypatch.setattr(server_mod, "_get_supabase", lambda: FakeSB())
-    monkeypatch.setattr(server_mod, "graph", FakeGraph())
-
-    client = TestClient(server_mod.app)
-    resp = client.post(
-        "/api/approve",
-        json={
-            "thread_id": "t",
-            "approved_card_ids": ["a"],
-            "rejected_card_ids": ["r1", "r2"],
-        },
-        headers={"Authorization": f"Bearer {server_mod.API_KEY}"},
-    )
-
-    assert resp.status_code == 200
-    assert resumed_with["resume"] == ["a"]
-
-    rejected_updates = [
-        u for u in updates
-        if u[0] == "action_cards" and u[1] == {"status": "rejected"}
-    ]
-    rejected_ids = {u[3] for u in rejected_updates if u[2] == "id"}
-    assert rejected_ids == {"r1", "r2"}
-
-
-def test_approve_rejected_ids_default_empty(monkeypatch):
-    """rejected_card_ids should be optional for backward compatibility."""
-    import server as server_mod
-
-    class FakeQuery:
-        def __init__(self, table):
-            self.table = table
-
-        def update(self, payload):
-            return self
-
-        def eq(self, col, val):
-            return self
-
-        def execute(self):
-            return type("R", (), {"data": []})()
-
-    class FakeSB:
-        def table(self, name):
-            return FakeQuery(name)
-
-    resumed_with = {}
-
-    class FakeGraph:
-        def invoke(self, command, config=None):
-            resumed_with["resume"] = command.resume
-            return {"implementation_results": []}
-
-    monkeypatch.setattr(server_mod, "_get_supabase", lambda: FakeSB())
-    monkeypatch.setattr(server_mod, "graph", FakeGraph())
 
     client = TestClient(server_mod.app)
     resp = client.post(
@@ -120,8 +33,7 @@ def test_approve_rejected_ids_default_empty(monkeypatch):
         headers={"Authorization": f"Bearer {server_mod.API_KEY}"},
     )
 
-    assert resp.status_code == 200
-    assert resumed_with["resume"] == ["a"]
+    assert resp.status_code == 404
 
 
 def test_build_checkpointer_returns_none_without_database_url(monkeypatch):

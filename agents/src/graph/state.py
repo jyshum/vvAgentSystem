@@ -7,23 +7,13 @@ class GEOState(TypedDict):
     tracker_results: list[dict]
     tracker_scores: dict
     gsc_metrics: dict
+    competitive_gaps: list[dict]
     run_type: str
     thread_id: str
-    error: str | None
-
-    # Improvement pipeline fields
     improvement_run_id: str | None
-    crawlability_report: dict
-    page_inventory: list[dict]
-    query_matches: list[dict]
-    citation_scores: list[dict]
-    competitive_gap_data: list[dict]
-    action_cards: list[dict]
-    approved_card_ids: list[str]
-    implementation_results: list[dict]
-
-    # Versioned, deterministic technical checklist fields
     technical_audit_run_id: str | None
     technical_audit_summary: dict
     technical_audit_results: list[dict]
     technical_audit_error: str | None
+    community_opportunities: list[dict]
+    error: str | None

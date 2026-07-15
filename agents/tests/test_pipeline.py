@@ -7,37 +7,17 @@ def test_build_graph_returns_compiled_graph():
     assert hasattr(graph, "invoke")
 
 
-def test_build_graph_has_expected_nodes():
+def test_build_graph_has_only_manual_evidence_nodes():
     graph = build_graph()
-    node_names = set(graph.get_graph().nodes.keys())
-    assert "load_config" in node_names
-    assert "run_tracker" in node_names
-    assert "run_improvement_pipeline" in node_names
-    assert "await_approval" in node_names
-    assert "run_audit" not in node_names
-    assert "run_recommender" not in node_names
-    assert "run_implementation" in node_names
+    nodes = set(graph.get_graph().nodes)
+    assert {"load_config", "run_tracker", "run_gsc", "run_technical_pipeline"} <= nodes
+    assert "await_approval" not in nodes
+    assert "run_implementation" not in nodes
 
 
-def test_route_after_improvement_skips_approval_when_all_auto_approved():
-    from src.graph.pipeline import route_after_improvement
-    state = {"action_cards": [
-        {"status": "approved", "auto_approved": True},
-        {"status": "approved", "auto_approved": True},
-    ]}
-    assert route_after_improvement(state) == "run_implementation"
-
-
-def test_route_after_improvement_awaits_when_pending_cards_exist():
-    from src.graph.pipeline import route_after_improvement
-    state = {"action_cards": [
-        {"status": "approved", "auto_approved": True},
-        {"status": "pending"},
-    ]}
-    assert route_after_improvement(state) == "await_approval"
-
-
-def test_route_after_improvement_ends_when_no_cards():
+def test_full_run_ends_after_technical_pipeline():
     from langgraph.graph import END
-    from src.graph.pipeline import route_after_improvement
-    assert route_after_improvement({"action_cards": []}) == END
+    from src.graph.pipeline import route_after_gsc
+
+    assert route_after_gsc({"run_type": "full"}) == "run_technical_pipeline"
+    assert route_after_gsc({"run_type": "tracker_only"}) == END

@@ -9,12 +9,11 @@ load_dotenv()
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from src.graph.pipeline import build_graph
-from langgraph.types import Command
 
 API_KEY = os.environ.get("API_KEY", "dev-key")
 
 def _build_checkpointer():
-    """Postgres-backed checkpointer so paused approval threads survive restarts.
+    """Build the Postgres-backed graph checkpointer when configured.
 
     Requires DATABASE_URL (Supabase direct connection string, port 5432).
     Returns None when unset — build_graph falls back to MemorySaver (local dev).
@@ -72,12 +71,6 @@ class RunRequest(BaseModel):
     run_type: str = "full"
 
 
-class ApproveRequest(BaseModel):
-    thread_id: str
-    approved_card_ids: list[str]
-    rejected_card_ids: list[str] = []
-
-
 @app.get("/health")
 async def health():
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
@@ -104,15 +97,13 @@ def _run_graph_background(client_id: str, run_type: str, thread_id: str):
                 "tracker_results": [],
                 "tracker_scores": {},
                 "gsc_metrics": {},
+                "competitive_gaps": [],
                 "improvement_run_id": None,
-                "crawlability_report": {},
-                "page_inventory": [],
-                "query_matches": [],
-                "citation_scores": [],
-                "competitive_gap_data": [],
-                "action_cards": [],
-                "approved_card_ids": [],
-                "implementation_results": [],
+                "technical_audit_run_id": None,
+                "technical_audit_summary": {},
+                "technical_audit_results": [],
+                "technical_audit_error": None,
+                "community_opportunities": [],
                 "error": None,
             },
             config=config,
@@ -120,12 +111,7 @@ def _run_graph_background(client_id: str, run_type: str, thread_id: str):
 
         state = graph.get_state(config=config)
         state_error = (state.values or {}).get("error")
-        if state.next and "await_approval" in state.next:
-            sb.table("pipeline_runs").update({
-                "status": "awaiting_approval",
-            }).eq("thread_id", thread_id).execute()
-            print(f"  [Pipeline] Paused at approval for {client_id} (thread: {thread_id})")
-        elif state_error:
+        if state_error:
             sb.table("pipeline_runs").update({
                 "status": "error",
                 "error_message": str(state_error)[:500],
@@ -163,40 +149,6 @@ async def trigger_run(req: RunRequest, authorization: str | None = Header(None))
     return {"thread_id": thread_id, "status": "started"}
 
 
-@app.post("/api/approve")
-async def approve_cards(req: ApproveRequest, authorization: str | None = Header(None)):
-    verify_auth(authorization)
-    config = {"configurable": {"thread_id": req.thread_id}}
-
-    sb = _get_supabase()
-
-    for card_id in req.rejected_card_ids:
-        sb.table("action_cards").update({"status": "rejected"}).eq("id", card_id).execute()
-
-    sb.table("pipeline_runs").update({
-        "status": "implementing",
-    }).eq("thread_id", req.thread_id).execute()
-
-    try:
-        result = graph.invoke(
-            Command(resume=req.approved_card_ids),
-            config=config,
-        )
-        sb.table("pipeline_runs").update({
-            "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("thread_id", req.thread_id).execute()
-
-        return {"status": "implementation_complete", "results": result.get("implementation_results", [])}
-    except Exception as e:
-        sb.table("pipeline_runs").update({
-            "status": "error",
-            "error_message": str(e)[:500],
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("thread_id", req.thread_id).execute()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/api/status/{thread_id}")
 async def get_status(thread_id: str, authorization: str | None = Header(None)):
     verify_auth(authorization)
@@ -206,7 +158,7 @@ async def get_status(thread_id: str, authorization: str | None = Header(None)):
         state = graph.get_state(config=config)
         return {
             "next": list(state.next) if state.next else [],
-            "has_pending_approval": "await_approval" in (state.next or []),
+            "has_pending_approval": False,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

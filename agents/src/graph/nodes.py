@@ -27,9 +27,6 @@ def load_config(state: GEOState) -> dict:
         "target_queries": target_queries,
         "competitors": row["competitors"] or [],
         "gsc_site_url": row.get("gsc_site_url", ""),
-        "cms_type": row.get("cms_type", "copy_paste"),
-        "cms_config": row.get("cms_config", {}),
-        "auto_approve_action_types": row.get("auto_approve_action_types") or [],
     }
     return {"client_config": config}
 
@@ -171,8 +168,9 @@ def run_gsc_node(state: GEOState) -> dict:
         return {"gsc_metrics": {}}
 
 
-def run_improvement_pipeline_node(state: GEOState) -> dict:
-    from src.improvement.pipeline import run_improvement_pipeline
+def run_technical_pipeline_node(state: GEOState) -> dict:
+    from src.technical_audit.pipeline import run_technical_pipeline
+
     sb = _get_supabase()
 
     queries_resp = sb.table("queries").select("*").eq("client_id", state["client_id"]).eq("status", "active").execute()
@@ -194,85 +192,16 @@ def run_improvement_pipeline_node(state: GEOState) -> dict:
         competitive_gaps = gaps_resp.data or []
 
     try:
-        result = run_improvement_pipeline(state, queries, competitive_gaps)
+        result = run_technical_pipeline(state, queries, competitive_gaps)
         return result
     except Exception as e:
-        print(f"  Improvement pipeline failed: {e}")
+        print(f"  Technical pipeline failed: {e}")
         return {
             "improvement_run_id": None,
             "technical_audit_run_id": None,
             "technical_audit_summary": {},
             "technical_audit_results": [],
-            "technical_audit_error": None,
-            "crawlability_report": {},
-            "page_inventory": [],
-            "query_matches": [],
-            "citation_scores": [],
-            "competitive_gap_data": [],
-            "action_cards": [],
+            "technical_audit_error": str(e),
+            "community_opportunities": [],
             "error": str(e),
         }
-
-
-def await_approval(state: GEOState) -> dict:
-    from langgraph.types import interrupt
-    approved = interrupt({
-        "action": "approve_cards",
-        "pending_cards": state["action_cards"],
-    })
-    return {"approved_card_ids": approved}
-
-
-def run_implementation_node(state: GEOState) -> dict:
-    from src.implementors.router import route_card
-
-    cms_type = state["client_config"].get("cms_type", "copy_paste")
-    cms_config = state["client_config"].get("cms_config", {})
-    sb = _get_supabase()
-
-    results = []
-    approved_ids = set(state.get("approved_card_ids") or [])
-    for card in state["action_cards"]:
-        card_id = card.get("id", "")
-        if not card_id:
-            print(f"    Skipping card with no id (insert may have partially failed): {card.get('action_type')}")
-            continue
-        if not (card.get("auto_approved") or card_id in approved_ids):
-            continue
-
-        print(f"  Implementing card {card_id} via {cms_type}...")
-        try:
-            result = route_card(card, cms_type, cms_config)
-            result["card_id"] = card_id
-
-            new_status = "implemented" if result.get("status") == "implemented" else "approved"
-
-            verification = None
-            if result.get("status") == "implemented":
-                from src.improvement.verifier import verify_implementation
-                verification = verify_implementation(card)
-                result["verification"] = verification
-                if verification["verified"]:
-                    print(f"    Verified live: {card.get('page_url')}")
-                else:
-                    print(f"    NOT verified: {verification.get('error') or verification['checks']}")
-
-            update_fields = {"status": new_status}
-            preview = result.get("preview_url") or result.get("pr_url")
-            if preview:
-                update_fields["preview_url"] = preview
-            if verification is not None:
-                update_fields["verification"] = verification
-            sb.table("action_cards").update(update_fields).eq("id", card_id).execute()
-
-            if result.get("status") == "error":
-                print(f"    Failed: {result.get('error')}")
-            else:
-                print(f"    Done: {result.get('status')}")
-
-            results.append(result)
-        except Exception as e:
-            print(f"    Exception: {e}")
-            results.append({"card_id": card_id, "status": "error", "error": str(e)})
-
-    return {"implementation_results": results}

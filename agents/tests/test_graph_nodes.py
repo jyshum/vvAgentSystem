@@ -9,14 +9,16 @@ def test_geo_state_has_required_keys():
         client_config={},
         tracker_results=[],
         tracker_scores={},
-        audit_pages=[],
-        audit_summary={},
-        action_cards=[],
-        approved_card_ids=[],
-        implementation_results=[],
-        reddit_posts=[],
+        gsc_metrics={},
+        competitive_gaps=[],
         run_type="full",
         thread_id="test-thread",
+        improvement_run_id=None,
+        technical_audit_run_id=None,
+        technical_audit_summary={},
+        technical_audit_results=[],
+        technical_audit_error=None,
+        community_opportunities=[],
         error=None,
     )
     assert state["client_id"] == "test-uuid"
@@ -29,14 +31,16 @@ def test_geo_state_accepts_partial_data():
         client_config={"brand_name": "Test"},
         tracker_results=[{"query": "test", "engine": "chatgpt"}],
         tracker_scores={"aggregate_mention_rate": 50},
-        audit_pages=[],
-        audit_summary={},
-        action_cards=[],
-        approved_card_ids=[],
-        implementation_results=[],
-        reddit_posts=[],
+        gsc_metrics={},
+        competitive_gaps=[],
         run_type="tracker_only",
         thread_id="thread-1",
+        improvement_run_id=None,
+        technical_audit_run_id=None,
+        technical_audit_summary={},
+        technical_audit_results=[],
+        technical_audit_error=None,
+        community_opportunities=[],
         error=None,
     )
     assert state["tracker_results"][0]["query"] == "test"
@@ -121,8 +125,8 @@ def test_run_tracker_node_writes_drift_signature(mock_sb):
 
 
 @patch("src.graph.nodes._get_supabase")
-def test_improvement_node_fetches_gaps_without_tracker_results(mock_sb):
-    """improvement_only runs (no tracker_results in state) must still load stored gaps."""
+def test_technical_node_fetches_gaps_without_tracker_results(mock_sb):
+    """Technical-only runs must still load the most recently stored gaps."""
     mock_table = MagicMock()
     # queries select: .select("*").eq(...).eq(...).execute()
     mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
@@ -134,13 +138,16 @@ def test_improvement_node_fetches_gaps_without_tracker_results(mock_sb):
         MagicMock(data=[{"query": "q1", "client_mention_rate": 0.1, "competitor_data": []}])
     mock_sb.return_value.table.return_value = mock_table
 
-    from src.graph.nodes import run_improvement_pipeline_node
+    from src.graph.nodes import run_technical_pipeline_node
 
-    with patch("src.improvement.pipeline.run_improvement_pipeline") as mock_run:
-        mock_run.return_value = {"improvement_run_id": "r1", "action_cards": []}
+    with patch("src.technical_audit.pipeline.run_technical_pipeline") as mock_run:
+        mock_run.return_value = {
+            "improvement_run_id": "r1",
+            "community_opportunities": [],
+        }
         state = {"client_id": "c1", "client_config": {"website_domain": "x.com"},
-                 "tracker_results": []}   # improvement_only: tracker never ran
-        run_improvement_pipeline_node(state)
+                 "tracker_results": []}
+        run_technical_pipeline_node(state)
 
         # Third positional arg = competitive_gaps, must be the stored rows, not []
         passed_gaps = mock_run.call_args[0][2]
@@ -148,20 +155,20 @@ def test_improvement_node_fetches_gaps_without_tracker_results(mock_sb):
 
 
 @patch("src.graph.nodes._get_supabase")
-def test_improvement_node_returns_empty_technical_audit_state_on_pipeline_error(mock_sb):
+def test_technical_node_returns_evidence_only_error_state(mock_sb):
     mock_table = MagicMock()
     mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
     mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = \
         MagicMock(data=[])
     mock_sb.return_value.table.return_value = mock_table
 
-    from src.graph.nodes import run_improvement_pipeline_node
+    from src.graph.nodes import run_technical_pipeline_node
 
     with patch(
-        "src.improvement.pipeline.run_improvement_pipeline",
+        "src.technical_audit.pipeline.run_technical_pipeline",
         side_effect=RuntimeError("pipeline failed"),
     ):
-        result = run_improvement_pipeline_node({
+        result = run_technical_pipeline_node({
             "client_id": "c1",
             "client_config": {"website_domain": "x.com"},
             "tracker_results": [],
@@ -170,174 +177,6 @@ def test_improvement_node_returns_empty_technical_audit_state_on_pipeline_error(
     assert result["technical_audit_run_id"] is None
     assert result["technical_audit_summary"] == {}
     assert result["technical_audit_results"] == []
-
-
-@patch("src.graph.nodes._get_supabase")
-def test_implementation_skips_auto_approved_card_without_id(mock_sb):
-    """Id-less cards (partial insert) must never reach route_card — no audit trail."""
-    mock_sb.return_value.table.return_value = MagicMock()
-
-    from src.graph.nodes import run_implementation_node
-
-    with patch("src.implementors.router.route_card") as mock_route:
-        state = {
-            "client_config": {"cms_type": "wordpress", "cms_config": {}},
-            "action_cards": [
-                {"action_type": "add_faq_schema", "status": "approved", "auto_approved": True},  # no id
-            ],
-            "approved_card_ids": [],
-        }
-        result = run_implementation_node(state)
-
-        mock_route.assert_not_called()
-        assert result["implementation_results"] == []
-
-
-@patch("src.graph.nodes._get_supabase")
-def test_implementation_runs_auto_approved_card_with_id(mock_sb):
-    mock_sb.return_value.table.return_value = MagicMock()
-
-    from src.graph.nodes import run_implementation_node
-
-    with patch("src.implementors.router.route_card") as mock_route:
-        mock_route.return_value = {"status": "implemented"}
-        state = {
-            "client_config": {"cms_type": "wordpress", "cms_config": {}},
-            "action_cards": [
-                {"id": "card-1", "action_type": "add_faq_schema", "status": "approved", "auto_approved": True},
-            ],
-            "approved_card_ids": [],
-        }
-        result = run_implementation_node(state)
-
-        mock_route.assert_called_once()
-        assert result["implementation_results"][0]["card_id"] == "card-1"
-
-
-@patch("src.improvement.verifier.verify_implementation")
-@patch("src.implementors.router.route_card")
-@patch("src.graph.nodes._get_supabase")
-def test_implementation_node_verifies_implemented_cards(mock_sb, mock_route, mock_verify):
-    mock_table = MagicMock()
-    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
-    mock_sb.return_value.table.return_value = mock_table
-
-    mock_route.return_value = {"status": "implemented"}
-    mock_verify.return_value = {"verified": True, "skipped": False,
-                                "checks": {"page_renders": True, "change_present": True},
-                                "error": None, "checked_at": "2026-07-04T00:00:00Z"}
-
-    from src.graph.nodes import run_implementation_node
-    state = {
-        "client_config": {"cms_type": "wordpress", "cms_config": {}},
-        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
-                          "action_type": "add_faq_schema", "code_block": "{}", "after_text": ""}],
-        "approved_card_ids": ["card-1"],
-    }
-    result = run_implementation_node(state)
-
-    mock_verify.assert_called_once()
-    assert result["implementation_results"][0]["verification"]["verified"] is True
-    # verification persisted to the card row
-    update_payload = mock_table.update.call_args[0][0]
-    assert "verification" in update_payload
-
-
-@patch("src.improvement.verifier.verify_implementation")
-@patch("src.implementors.router.route_card")
-@patch("src.graph.nodes._get_supabase")
-def test_implementation_node_skips_verification_for_non_implemented_status(mock_sb, mock_route, mock_verify):
-    mock_table = MagicMock()
-    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
-    mock_sb.return_value.table.return_value = mock_table
-
-    mock_route.return_value = {"status": "approved"}
-
-    from src.graph.nodes import run_implementation_node
-    state = {
-        "client_config": {"cms_type": "copy_paste", "cms_config": {}},
-        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
-                          "action_type": "restructure_intro", "code_block": "", "after_text": "x"}],
-        "approved_card_ids": ["card-1"],
-    }
-    result = run_implementation_node(state)
-
-    mock_verify.assert_not_called()
-    assert "verification" not in result["implementation_results"][0]
-    update_payload = mock_table.update.call_args[0][0]
-    assert "verification" not in update_payload
-
-
-@patch("src.improvement.verifier.verify_implementation")
-@patch("src.implementors.router.route_card")
-@patch("src.graph.nodes._get_supabase")
-def test_implementation_persists_pr_url(mock_sb, mock_route, mock_verify):
-    mock_table = MagicMock()
-    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
-    mock_sb.return_value.table.return_value = mock_table
-
-    mock_route.return_value = {"status": "implemented", "pr_url": "https://github.com/x/y/pull/1"}
-    mock_verify.return_value = {"verified": True, "skipped": False,
-                                "checks": {}, "error": None, "checked_at": "2026-07-04T00:00:00Z"}
-
-    from src.graph.nodes import run_implementation_node
-    state = {
-        "client_config": {"cms_type": "github", "cms_config": {}},
-        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
-                          "action_type": "add_faq_schema", "code_block": "{}", "after_text": ""}],
-        "approved_card_ids": ["card-1"],
-    }
-    run_implementation_node(state)
-
-    update_payload = mock_table.update.call_args[0][0]
-    assert update_payload["preview_url"] == "https://github.com/x/y/pull/1"
-
-
-@patch("src.improvement.verifier.verify_implementation")
-@patch("src.implementors.router.route_card")
-@patch("src.graph.nodes._get_supabase")
-def test_implementation_persists_webflow_preview_url(mock_sb, mock_route, mock_verify):
-    mock_table = MagicMock()
-    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
-    mock_sb.return_value.table.return_value = mock_table
-
-    mock_route.return_value = {"status": "implemented", "preview_url": "https://site.webflow.io/page"}
-    mock_verify.return_value = {"verified": True, "skipped": False,
-                                "checks": {}, "error": None, "checked_at": "2026-07-04T00:00:00Z"}
-
-    from src.graph.nodes import run_implementation_node
-    state = {
-        "client_config": {"cms_type": "webflow", "cms_config": {}},
-        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
-                          "action_type": "add_faq_schema", "code_block": "{}", "after_text": ""}],
-        "approved_card_ids": ["card-1"],
-    }
-    run_implementation_node(state)
-
-    update_payload = mock_table.update.call_args[0][0]
-    assert update_payload["preview_url"] == "https://site.webflow.io/page"
-
-
-@patch("src.improvement.verifier.verify_implementation")
-@patch("src.implementors.router.route_card")
-@patch("src.graph.nodes._get_supabase")
-def test_no_preview_url_key_when_absent(mock_sb, mock_route, mock_verify):
-    mock_table = MagicMock()
-    mock_table.update.return_value.eq.return_value.execute.return_value = MagicMock()
-    mock_sb.return_value.table.return_value = mock_table
-
-    mock_route.return_value = {"status": "implemented"}
-    mock_verify.return_value = {"verified": True, "skipped": False,
-                                "checks": {}, "error": None, "checked_at": "2026-07-04T00:00:00Z"}
-
-    from src.graph.nodes import run_implementation_node
-    state = {
-        "client_config": {"cms_type": "copy_paste", "cms_config": {}},
-        "action_cards": [{"id": "card-1", "page_url": "https://x.com/p1",
-                          "action_type": "add_faq_schema", "code_block": "{}", "after_text": ""}],
-        "approved_card_ids": ["card-1"],
-    }
-    run_implementation_node(state)
-
-    update_payload = mock_table.update.call_args[0][0]
-    assert "preview_url" not in update_payload
+    assert result["technical_audit_error"] == "pipeline failed"
+    assert result["community_opportunities"] == []
+    assert result["error"] == "pipeline failed"
