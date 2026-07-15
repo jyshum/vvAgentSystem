@@ -10,8 +10,6 @@ from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from src.graph.pipeline import build_graph
 from langgraph.types import Command
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 
 API_KEY = os.environ.get("API_KEY", "dev-key")
 
@@ -44,7 +42,6 @@ def _build_checkpointer():
 
 
 graph = build_graph(checkpointer=_build_checkpointer())
-scheduler = BackgroundScheduler()
 
 
 def _get_supabase():
@@ -52,139 +49,14 @@ def _get_supabase():
     return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 
 
-def trigger_scheduled_run(client_id: str):
-    thread_id = f"{client_id}-scheduled-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-    config = {"configurable": {"thread_id": thread_id}}
-    sb = _get_supabase()
-    print(f"  [Scheduler] Starting pipeline for {client_id} (thread: {thread_id})")
-
-    sb.table("pipeline_runs").insert({
-        "client_id": client_id,
-        "thread_id": thread_id,
-        "run_type": "full",
-        "status": "running",
-    }).execute()
-
-    try:
-        graph.invoke(
-            {
-                "client_id": client_id,
-                "run_type": "full",
-                "thread_id": thread_id,
-                "client_config": {},
-                "tracker_results": [],
-                "tracker_scores": {},
-                "gsc_metrics": {},
-                "improvement_run_id": None,
-                "crawlability_report": {},
-                "page_inventory": [],
-                "query_matches": [],
-                "citation_scores": [],
-                "competitive_gap_data": [],
-                "action_cards": [],
-                "approved_card_ids": [],
-                "implementation_results": [],
-                "error": None,
-            },
-            config=config,
-        )
-
-        state = graph.get_state(config=config)
-        state_error = (state.values or {}).get("error")
-        if state.next and "await_approval" in state.next:
-            sb.table("pipeline_runs").update({
-                "status": "awaiting_approval",
-            }).eq("thread_id", thread_id).execute()
-            print(f"  [Scheduler] Pipeline paused at approval for {client_id}")
-        elif state_error:
-            sb.table("pipeline_runs").update({
-                "status": "error",
-                "error_message": str(state_error)[:500],
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("thread_id", thread_id).execute()
-            print(f"  [Scheduler] Pipeline finished with error for {client_id}: {state_error}")
-        else:
-            sb.table("pipeline_runs").update({
-                "status": "completed",
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("thread_id", thread_id).execute()
-            print(f"  [Scheduler] Pipeline completed for {client_id}")
-    except Exception as e:
-        sb.table("pipeline_runs").update({
-            "status": "error",
-            "error_message": str(e)[:500],
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("thread_id", thread_id).execute()
-        print(f"  [Scheduler] Pipeline failed for {client_id}: {e}")
-
-
-def _add_client_schedule(sb, client_id: str, frequency: str, cycle_day_num: int):
-    """Add a single client to the scheduler. Idempotent (replace_existing)."""
-    day_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
-    cycle_day = day_map.get(cycle_day_num, "tue")
-
-    existing_jobs = [j for j in scheduler.get_jobs() if j.id.startswith("cycle-")]
-    offset_minutes = len(existing_jobs) * 15
-
-    if frequency == "monthly":
-        trigger = CronTrigger(day="1", hour=2, minute=offset_minutes)
-    elif frequency == "biweekly":
-        trigger = CronTrigger(day_of_week=cycle_day, hour=2, minute=offset_minutes, week="*/2")
-    else:
-        trigger = CronTrigger(day_of_week=cycle_day, hour=2, minute=offset_minutes)
-
-    scheduler.add_job(
-        trigger_scheduled_run,
-        trigger=trigger,
-        args=[client_id],
-        id=f"cycle-{client_id}",
-        replace_existing=True,
-    )
-    label = f"{cycle_day} 02:{offset_minutes:02d}" if frequency != "monthly" else f"1st of month 02:{offset_minutes:02d}"
-    print(f"  [Scheduler] Scheduled {client_id} ({frequency}) for {label}")
-
-
-def load_schedules():
-    try:
-        from supabase import create_client
-        sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
-        result = sb.table("clients").select("id, cycle_frequency, cycle_day").execute()
-
-        # Only schedule clients that have completed at least one run
-        runs_resp = sb.table("pipeline_runs").select("client_id").execute()
-        clients_with_runs = {r["client_id"] for r in runs_resp.data}
-
-        # Remove all existing cycle jobs before re-adding
-        for job in scheduler.get_jobs():
-            if job.id.startswith("cycle-"):
-                scheduler.remove_job(job.id)
-
-        for client in result.data:
-            client_id = client["id"]
-            if client_id not in clients_with_runs:
-                print(f"  [Scheduler] Skipping {client_id} — no runs yet")
-                continue
-            _add_client_schedule(
-                sb,
-                client_id,
-                client.get("cycle_frequency", "weekly"),
-                client.get("cycle_day", 1),
-            )
-
-    except Exception as e:
-        print(f"  [Scheduler] Failed to load schedules: {e}")
-
-
 @asynccontextmanager
 async def lifespan(app):
     if os.environ.get("LANGCHAIN_TRACING_V2") == "true":
-        print(f"  [Tracing] LangSmith enabled — project: {os.environ.get('LANGCHAIN_PROJECT', 'default')}")
-    load_schedules()
-    scheduler.start()
-    print("  [Scheduler] Started")
+        print(
+            "  [Tracing] LangSmith enabled — project: "
+            f"{os.environ.get('LANGCHAIN_PROJECT', 'default')}"
+        )
     yield
-    scheduler.shutdown()
-    print("  [Scheduler] Stopped")
 
 
 app = FastAPI(title="GEO Agent API", lifespan=lifespan)
@@ -267,17 +139,6 @@ def _run_graph_background(client_id: str, run_type: str, thread_id: str):
             }).eq("thread_id", thread_id).execute()
             print(f"  [Pipeline] Completed {run_type} for {client_id} (thread: {thread_id})")
 
-        # After first successful run, ensure recurring schedule exists
-        if not any(j.id == f"cycle-{client_id}" for j in scheduler.get_jobs()):
-            client_resp = sb.table("clients").select("cycle_frequency, cycle_day").eq("id", client_id).single().execute()
-            if client_resp.data:
-                _add_client_schedule(
-                    sb,
-                    client_id,
-                    client_resp.data.get("cycle_frequency", "weekly"),
-                    client_resp.data.get("cycle_day", 1),
-                )
-                print(f"  [Scheduler] Activated recurring schedule for {client_id} after first run")
     except Exception as e:
         sb.table("pipeline_runs").update({
             "status": "error",
@@ -349,51 +210,6 @@ async def get_status(thread_id: str, authorization: str | None = Header(None)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/reload-schedules")
-async def reload_schedules(authorization: str | None = Header(None)):
-    verify_auth(authorization)
-    load_schedules()
-    jobs = [{"id": j.id, "next_run": j.next_run_time.isoformat() if j.next_run_time else None} for j in scheduler.get_jobs() if j.id.startswith("cycle-")]
-    return {"status": "reloaded", "jobs": jobs}
-
-
-@app.get("/api/schedules")
-async def get_schedules(authorization: str | None = Header(None)):
-    verify_auth(authorization)
-    sb = _get_supabase()
-
-    clients_resp = sb.table("clients").select("id, brand_name, cycle_frequency, cycle_day").execute()
-    client_map = {c["id"]: c for c in clients_resp.data}
-
-    runs_resp = sb.table("pipeline_runs").select("client_id, status, started_at").order("started_at", desc=True).execute()
-    latest_runs = {}
-    for run in runs_resp.data:
-        cid = run["client_id"]
-        if cid not in latest_runs:
-            latest_runs[cid] = run
-
-    day_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
-    schedules = []
-    for job in scheduler.get_jobs():
-        if not job.id.startswith("cycle-"):
-            continue
-        client_id = job.id.replace("cycle-", "")
-        client = client_map.get(client_id, {})
-        last_run = latest_runs.get(client_id)
-
-        schedules.append({
-            "client_id": client_id,
-            "client_name": client.get("brand_name", "Unknown"),
-            "cycle_frequency": client.get("cycle_frequency", "weekly"),
-            "cycle_day": day_map.get(client.get("cycle_day", 1), "tue"),
-            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-            "last_run_status": last_run["status"] if last_run else None,
-            "last_run_at": last_run["started_at"] if last_run else None,
-        })
-
-    return {"schedules": schedules}
 
 
 @app.post("/api/run-all")
