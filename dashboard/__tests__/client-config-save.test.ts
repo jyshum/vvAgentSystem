@@ -100,6 +100,32 @@ describe("PATCH /api/admin/clients/[id]", () => {
     expect(clientsUpdate).toHaveBeenCalledWith({ gsc_site_url: "https://www.x.com/" });
   });
 
+  test("writes platform and implementation mode but ignores schedule fields", async () => {
+    getUser.mockResolvedValue({
+      data: { user: { id: "u1", email: "admin@example.com" } },
+      error: null,
+    });
+
+    const clientsUpdate = vi.fn(() => ({ eq: updateEq }));
+    from.mockImplementation((table: string) => {
+      if (table === "client_users") return mockClientUsersLookup(null);
+      if (table === "clients") return { update: clientsUpdate };
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    const res = await callPatch({
+      site_platform: "squarespace",
+      implementation_mode: "copy_paste",
+      cycle_frequency: "weekly",
+      cycle_day: 1,
+    });
+    expect(res.status).toBe(200);
+    expect(clientsUpdate).toHaveBeenCalledWith({
+      site_platform: "squarespace",
+      implementation_mode: "copy_paste",
+    });
+  });
+
   test("empty payload gets 400", async () => {
     getUser.mockResolvedValue({
       data: { user: { id: "u1", email: "admin@example.com" } },

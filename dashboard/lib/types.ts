@@ -6,11 +6,9 @@ export interface Client {
   brand_variations: string[];
   target_queries: string[];
   competitors: string[];
-  cms_type: string;
-  cms_config: Record<string, string>;
+  site_platform: "unknown" | "squarespace" | "wordpress" | "webflow" | "shopify" | "repository" | "other";
+  implementation_mode: "copy_paste" | "guided" | "github_pr" | "staged_api";
   gsc_site_url: string;
-  cycle_frequency: string;
-  cycle_day: number;
   created_at: string;
 }
 
