@@ -12,6 +12,7 @@ def _chainable_table(data=None):
     for method in (
         "select",
         "eq",
+        "neq",
         "order",
         "limit",
         "maybe_single",
@@ -74,7 +75,10 @@ def _tables():
         "pipeline_runs": _chainable_table({"id": "pipeline-run-1"}),
         "technical_audit_runs": _chainable_table([{"id": "audit-run-1"}]),
         "technical_audit_observations": _chainable_table(),
-        "technical_audit_results": _chainable_table(),
+        "technical_audit_results": _chainable_table([{"id": "result-1"}]),
+        "technical_audit_finding_groups": _chainable_table(),
+        "technical_audit_action_cards": _chainable_table([{"id": "card-1"}]),
+        "technical_audit_card_results": _chainable_table(),
     }
 
 
@@ -153,19 +157,26 @@ def test_run_technical_pipeline_persists_only_evidence_and_community_opportuniti
     ]
 
     with patch("src.technical_audit.pipeline._get_supabase", return_value=sb), patch(
-        "src.technical_audit.pipeline.collect_foundation",
+        "src.technical_audit.pipeline.collect_site",
         return_value=collected,
     ) as mock_collect, patch(
+        "src.technical_audit.pipeline.collect_integrations",
+        return_value={"gsc": {"configured": False}, "bing": {"configured": False}},
+    ), patch(
         "src.technical_audit.pipeline.run_technical_audit",
         return_value=_audit_report(),
     ) as mock_audit:
         result = run_technical_pipeline(_state(), [], tracker_gaps)
 
+    returned_results = result["technical_audit_results"]
+    assert len(returned_results) == 1
+    assert returned_results[0]["lifecycle_state"] == "new"
+    assert len(returned_results[0]["finding_key"]) == 64
     assert result == {
         "improvement_run_id": "improvement-run-1",
         "technical_audit_run_id": "audit-run-1",
         "technical_audit_summary": _audit_report()["summary"],
-        "technical_audit_results": _audit_report()["results"],
+        "technical_audit_results": returned_results,
         "technical_audit_error": None,
         "community_opportunities": [
             {
@@ -183,7 +194,11 @@ def test_run_technical_pipeline_persists_only_evidence_and_community_opportuniti
     identity = SiteIdentity.from_domain("x.com", "squarespace")
     mock_collect.assert_called_once_with(identity)
     mock_audit.assert_called_once_with(
-        "client-1", identity, collected, enabled_check_sets=("foundation",)
+        "client-1",
+        identity,
+        collected,
+        enabled_check_sets=("foundation", "protocol", "site_integrity", "performance"),
+        integrations={"gsc": {"configured": False}, "bing": {"configured": False}},
     )
     assert "action_cards" not in result
     assert "query_page_matches" not in [call.args[0] for call in sb.table.call_args_list]
@@ -214,8 +229,11 @@ def test_run_technical_pipeline_returns_audit_error_without_action_cards(monkeyp
     sb.table.side_effect = lambda name: tables[name]
 
     with patch("src.technical_audit.pipeline._get_supabase", return_value=sb), patch(
-        "src.technical_audit.pipeline.collect_foundation",
+        "src.technical_audit.pipeline.collect_site",
         return_value=_collected(),
+    ), patch(
+        "src.technical_audit.pipeline.collect_integrations",
+        return_value={"gsc": {"configured": False}, "bing": {"configured": False}},
     ), patch(
         "src.technical_audit.pipeline.run_technical_audit",
         side_effect=RuntimeError("audit unavailable"),
@@ -246,7 +264,10 @@ def test_run_technical_pipeline_has_no_rollout_or_profile_controls(monkeypatch):
     sb.table.side_effect = lambda name: tables[name]
 
     with patch("src.technical_audit.pipeline._get_supabase", return_value=sb), patch(
-        "src.technical_audit.pipeline.collect_foundation", return_value=_collected()
+        "src.technical_audit.pipeline.collect_site", return_value=_collected()
+    ), patch(
+        "src.technical_audit.pipeline.collect_integrations",
+        return_value={"gsc": {"configured": False}, "bing": {"configured": False}},
     ), patch(
         "src.technical_audit.pipeline.run_technical_audit",
         return_value=_audit_report(),

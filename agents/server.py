@@ -163,6 +163,136 @@ async def get_status(thread_id: str, authorization: str | None = Header(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class ApproveCardRequest(BaseModel):
+    approved_by: str
+
+
+def _workflow_call(function, *args, **kwargs):
+    from src.technical_audit.workflow import WorkflowError
+
+    try:
+        return function(*args, **kwargs)
+    except WorkflowError as exc:
+        message = str(exc)
+        status_code = 404 if "not found" in message else 409
+        raise HTTPException(status_code=status_code, detail=message)
+
+
+@app.get("/api/technical-audit/runs")
+async def list_technical_audit_runs(
+    client_id: str, authorization: str | None = Header(None)
+):
+    verify_auth(authorization)
+    sb = _get_supabase()
+    runs = (
+        sb.table("technical_audit_runs")
+        .select("id,audit_version,status,scope,summary,started_at,completed_at")
+        .eq("client_id", client_id)
+        .order("started_at", desc=True)
+        .execute()
+    )
+    return {"runs": runs.data or []}
+
+
+@app.get("/api/technical-audit/runs/{run_id}")
+async def get_technical_audit_run(
+    run_id: str, authorization: str | None = Header(None)
+):
+    verify_auth(authorization)
+    sb = _get_supabase()
+    run = (
+        sb.table("technical_audit_runs")
+        .select("*")
+        .eq("id", run_id)
+        .maybe_single()
+        .execute()
+    )
+    if not run.data:
+        raise HTTPException(status_code=404, detail="audit run not found")
+    results = (
+        sb.table("technical_audit_results")
+        .select("*")
+        .eq("audit_run_id", run_id)
+        .execute()
+    )
+    groups = (
+        sb.table("technical_audit_finding_groups")
+        .select("*")
+        .eq("audit_run_id", run_id)
+        .execute()
+    )
+    return {
+        "run": run.data,
+        "results": results.data or [],
+        "groups": groups.data or [],
+    }
+
+
+@app.get("/api/technical-audit/cards")
+async def list_technical_audit_cards(
+    client_id: str,
+    status: str | None = None,
+    authorization: str | None = Header(None),
+):
+    verify_auth(authorization)
+    sb = _get_supabase()
+    query = (
+        sb.table("technical_audit_action_cards")
+        .select("*")
+        .eq("client_id", client_id)
+    )
+    if status:
+        query = query.eq("status", status)
+    cards = query.order("created_at", desc=True).execute()
+    return {"cards": cards.data or []}
+
+
+@app.post("/api/technical-audit/cards/{card_id}/approve")
+async def approve_technical_audit_card(
+    card_id: str,
+    req: ApproveCardRequest,
+    authorization: str | None = Header(None),
+):
+    verify_auth(authorization)
+    from src.technical_audit.workflow import approve_card
+
+    card = _workflow_call(approve_card, _get_supabase(), card_id, req.approved_by)
+    return {"card": card}
+
+
+@app.post("/api/technical-audit/cards/{card_id}/reject")
+async def reject_technical_audit_card(
+    card_id: str, authorization: str | None = Header(None)
+):
+    verify_auth(authorization)
+    from src.technical_audit.workflow import reject_card
+
+    card = _workflow_call(reject_card, _get_supabase(), card_id)
+    return {"card": card}
+
+
+@app.post("/api/technical-audit/cards/{card_id}/mark-applied")
+async def mark_technical_audit_card_applied(
+    card_id: str, authorization: str | None = Header(None)
+):
+    verify_auth(authorization)
+    from src.technical_audit.workflow import mark_applied
+
+    card = _workflow_call(mark_applied, _get_supabase(), card_id)
+    return {"card": card}
+
+
+@app.post("/api/technical-audit/cards/{card_id}/verify")
+async def verify_technical_audit_card(
+    card_id: str, authorization: str | None = Header(None)
+):
+    verify_auth(authorization)
+    from src.technical_audit.workflow import verify_card
+
+    card = _workflow_call(verify_card, _get_supabase(), card_id)
+    return {"card": card}
+
+
 @app.post("/api/run-all")
 async def run_all_clients(authorization: str | None = Header(None)):
     verify_auth(authorization)

@@ -2,12 +2,16 @@ import os
 from datetime import datetime, timezone
 
 from src.improvement.community import select_community_opportunities
-from src.technical_audit.collector import collect_foundation
+from src.technical_audit.collector import collect_site
+from src.technical_audit.evidence.performance import collect_integrations
+from src.technical_audit.lifecycle import classify_lifecycle, group_findings
 from src.technical_audit.runner import run_technical_audit
 from src.technical_audit.site import SiteIdentity
+from src.technical_audit.workflow import build_cards, persist_cards
 
 
 FOUNDATION_CHECK_SETS = ("foundation",)
+DEFAULT_CHECK_SETS = ("foundation", "protocol", "site_integrity", "performance")
 
 
 def _get_supabase():
@@ -16,6 +20,28 @@ def _get_supabase():
     return create_client(
         os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"]
     )
+
+
+def _previous_completed_results(sb, client_id: str, current_run_id: str) -> list[dict]:
+    runs = (
+        sb.table("technical_audit_runs")
+        .select("id")
+        .eq("client_id", client_id)
+        .eq("status", "completed")
+        .neq("id", current_run_id)
+        .order("started_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not runs.data or runs.data[0]["id"] == current_run_id:
+        return []
+    previous = (
+        sb.table("technical_audit_results")
+        .select("check_id,check_version,subject,status,observed")
+        .eq("audit_run_id", runs.data[0]["id"])
+        .execute()
+    )
+    return [row for row in (previous.data or []) if row.get("check_id")]
 
 
 def _run_and_persist_technical_audit(
@@ -60,12 +86,16 @@ def _run_and_persist_technical_audit(
         identity = SiteIdentity.from_domain(
             config["website_domain"], config.get("site_platform") or "other"
         )
-        collected = collect_foundation(identity)
+        collected = collect_site(identity)
+        integrations = collect_integrations(
+            collected, config.get("gsc_site_url") or ""
+        ) if "performance" in enabled_check_sets else None
         report = run_technical_audit(
             client_id,
             identity,
             collected,
             enabled_check_sets=enabled_check_sets,
+            integrations=integrations,
         )
 
         observations = [
@@ -83,12 +113,52 @@ def _run_and_persist_technical_audit(
         if observations:
             sb.table("technical_audit_observations").insert(observations).execute()
 
+        previous_results = _previous_completed_results(sb, client_id, audit_run_id)
+        annotated = classify_lifecycle(client_id, report["results"], previous_results)
+        report["results"] = annotated
+        groups = group_findings(annotated)
+
         result_rows = [
             {"audit_run_id": audit_run_id, **result}
-            for result in report["results"]
+            for result in annotated
         ]
+        result_ids: list[str] = []
         if result_rows:
-            sb.table("technical_audit_results").insert(result_rows).execute()
+            inserted = sb.table("technical_audit_results").insert(result_rows).execute()
+            result_ids = [row["id"] for row in (inserted.data or [])]
+
+        if groups:
+            group_rows = [
+                {
+                    "audit_run_id": audit_run_id,
+                    "group_key": group["group_key"],
+                    "check_id": group["check_id"],
+                    "remediation_id": group["remediation_id"],
+                    "summary": group["summary"],
+                    "status": group["status"],
+                    "subjects": group["subjects"],
+                }
+                for group in groups
+            ]
+            sb.table("technical_audit_finding_groups").insert(group_rows).execute()
+
+        if groups and len(result_ids) == len(annotated):
+            fingerprints = {
+                observation["subject"]: observation["fingerprint"]
+                for observation in report["observations"]
+                if observation["kind"] == "page"
+            }
+            cards = build_cards(
+                client_id=client_id,
+                audit_run_id=audit_run_id,
+                platform=config.get("site_platform") or "other",
+                implementation_mode=config.get("implementation_mode") or "copy_paste",
+                results=annotated,
+                groups=groups,
+                result_ids=result_ids,
+                observation_fingerprints=fingerprints,
+            )
+            persist_cards(sb, cards)
 
         sb.table("technical_audit_runs").update(
             {
@@ -128,6 +198,7 @@ def run_technical_pipeline(
     state: dict,
     queries: list[dict],
     competitive_gaps: list[dict],
+    check_sets: tuple[str, ...] = DEFAULT_CHECK_SETS,
 ) -> dict:
     del queries
     client_id = state["client_id"]
@@ -146,7 +217,7 @@ def run_technical_pipeline(
         sb,
         state,
         improvement_run_id,
-        FOUNDATION_CHECK_SETS,
+        check_sets,
     )
     selection = select_community_opportunities(competitive_gaps, limit=5)
     completed_at = datetime.now(timezone.utc).isoformat()

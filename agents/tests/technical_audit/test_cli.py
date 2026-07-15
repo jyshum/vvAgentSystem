@@ -87,14 +87,16 @@ def test_persisted_run_uses_loaded_client_context(monkeypatch):
     monkeypatch.setattr(cli, "_load_persisted_context", lambda client_id: context)
     calls = []
 
-    def run_pipeline(state, queries, gaps):
-        calls.append((state, queries, gaps))
+    def run_pipeline(state, queries, gaps, check_sets=None):
+        calls.append((state, queries, gaps, check_sets))
         return {"technical_audit_error": None, "technical_audit_summary": {"total": 4}}
 
     monkeypatch.setattr(cli, "run_technical_pipeline", run_pipeline)
 
     assert cli.main(["run", "--client-id", "client-1"]) == 0
-    assert calls == [context]
+    assert calls == [
+        (*context, ("foundation", "protocol", "site_integrity", "performance"))
+    ]
 
 
 def test_persisted_run_returns_nonzero_when_pipeline_errors(monkeypatch):
@@ -105,7 +107,7 @@ def test_persisted_run_returns_nonzero_when_pipeline_errors(monkeypatch):
     monkeypatch.setattr(
         cli,
         "run_technical_pipeline",
-        lambda state, queries, gaps: {
+        lambda state, queries, gaps, check_sets=None: {
             "technical_audit_error": "collection failed",
             "error": "collection failed",
         },

@@ -6,13 +6,20 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .collector import Fetcher, collect_foundation
-from .pipeline import run_technical_pipeline
+from .collector import Fetcher, collect_site
+from .evidence.performance import collect_integrations
+from .pipeline import DEFAULT_CHECK_SETS, run_technical_pipeline
 from .runner import run_technical_audit
 from .site import SiteIdentity
 
 
 MAX_ARTIFACT_BYTES = 2_000_000
+
+
+def _parse_check_sets(raw: str | None) -> tuple[str, ...]:
+    if not raw:
+        return DEFAULT_CHECK_SETS
+    return tuple(name.strip() for name in raw.split(",") if name.strip())
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -23,9 +30,19 @@ def _parser() -> argparse.ArgumentParser:
     smoke.add_argument("--domain", required=True)
     smoke.add_argument("--platform", required=True)
     smoke.add_argument("--output", type=Path, required=True)
+    smoke.add_argument(
+        "--check-sets",
+        default=None,
+        help="comma-separated check sets (default: all four)",
+    )
 
     persisted = commands.add_parser("run", help="persist an audit for a configured client")
     persisted.add_argument("--client-id", required=True)
+    persisted.add_argument(
+        "--check-sets",
+        default=None,
+        help="comma-separated check sets (default: all four)",
+    )
     return parser
 
 
@@ -111,16 +128,27 @@ def _load_persisted_context(client_id: str) -> tuple[dict, list[dict], list[dict
 
 
 def _smoke(args: argparse.Namespace, fetcher: Fetcher | None) -> int:
+    check_sets = _parse_check_sets(args.check_sets)
     identity = SiteIdentity.from_domain(args.domain, args.platform)
-    collected = collect_foundation(identity, fetcher=fetcher)
-    report = run_technical_audit("smoke", identity, collected)
+    collected = collect_site(identity, fetcher=fetcher)
+    integrations = None
+    if "performance" in check_sets and fetcher is None:
+        # Smoke has no configured GSC property; keys drive real API calls only
+        # when present, otherwise checks become explicit unknowns.
+        integrations = collect_integrations(collected, "")
+    report = run_technical_audit(
+        "smoke", identity, collected,
+        enabled_check_sets=check_sets, integrations=integrations,
+    )
     _write_report(args.output, report)
-    return 0
+    return 0 if report["summary"].get("total", 0) else 1
 
 
 def _run(args: argparse.Namespace) -> int:
     state, queries, competitive_gaps = _load_persisted_context(args.client_id)
-    result = run_technical_pipeline(state, queries, competitive_gaps)
+    result = run_technical_pipeline(
+        state, queries, competitive_gaps, check_sets=_parse_check_sets(args.check_sets)
+    )
     summary = {
         "improvement_run_id": result.get("improvement_run_id"),
         "technical_audit_run_id": result.get("technical_audit_run_id"),
