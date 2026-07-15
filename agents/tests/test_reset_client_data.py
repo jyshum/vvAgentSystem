@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from scripts.reset_client_data import (
+    AUTH_VERIFICATION_SQL,
     BACKUP_SQL,
     DELETE_ORDER,
     DELETE_SQL,
@@ -62,7 +63,11 @@ def test_preserved_tables_are_never_deleted():
 
 def test_every_query_is_client_scoped_and_parameterized():
     assert set(BACKUP_SQL) == set(PRESERVED_TABLES + GENERATED_TABLES)
-    for sql in (*BACKUP_SQL.values(), *DELETE_SQL.values()):
+    for sql in (
+        *BACKUP_SQL.values(),
+        AUTH_VERIFICATION_SQL,
+        *DELETE_SQL.values(),
+    ):
         assert "%(client_id)s" in sql
         assert CLIENT_ID not in sql
 
@@ -102,6 +107,15 @@ def test_auth_backup_projection_excludes_credentials_and_secret_values():
         assert secret_column not in sql
 
 
+def test_auth_verification_fingerprints_the_complete_database_row():
+    sql = AUTH_VERIFICATION_SQL.lower()
+    assert "to_jsonb(auth_users)" in sql
+    assert "digest" in sql
+    assert "sha256" in sql
+    assert "join public.client_users" in sql
+    assert "client_users.client_id = %(client_id)s" in sql
+
+
 class FakeCursor(AbstractContextManager):
     def __init__(self, connection):
         self.connection = connection
@@ -116,6 +130,8 @@ class FakeCursor(AbstractContextManager):
     def execute(self, sql, params):
         self.connection.calls.append((sql, params))
         table = self.connection.table_for_sql(sql)
+        if table == self.connection.fail_table:
+            raise RuntimeError("SQL failed with SQL_SECRET_MARKER")
         if sql.lstrip().lower().startswith("delete"):
             self.connection.deleted.add(table)
             self.rows = []
@@ -143,6 +159,8 @@ class FakeTransaction(AbstractContextManager):
 
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is None:
+            if self.connection.commit_error:
+                raise RuntimeError("commit failed with COMMIT_SECRET_MARKER")
             self.connection.commits += 1
         else:
             self.connection.rollbacks += 1
@@ -150,7 +168,14 @@ class FakeTransaction(AbstractContextManager):
 
 
 class FakeConnection(AbstractContextManager):
-    def __init__(self, rows=None, post_delete_rows=None):
+    def __init__(
+        self,
+        rows=None,
+        post_delete_rows=None,
+        *,
+        fail_table=None,
+        commit_error=False,
+    ):
         self.rows = rows or sample_rows()
         self.post_delete_rows = post_delete_rows or {}
         self.calls = []
@@ -160,6 +185,8 @@ class FakeConnection(AbstractContextManager):
         self.commits = 0
         self.rollbacks = 0
         self.closed = False
+        self.fail_table = fail_table
+        self.commit_error = commit_error
 
     def __enter__(self):
         return self
@@ -177,6 +204,8 @@ class FakeConnection(AbstractContextManager):
     @staticmethod
     def table_for_sql(sql):
         normalized = " ".join(sql.lower().split())
+        if normalized == " ".join(AUTH_VERIFICATION_SQL.lower().split()):
+            return "auth_users_complete"
         for table, query in BACKUP_SQL.items():
             if normalized == " ".join(query.lower().split()):
                 return table
@@ -204,6 +233,9 @@ def sample_rows():
             [{"id": "access-1", "client_id": CLIENT_ID, "user_id": "user-1"}]
         ],
         "auth_users": [[{"id": "user-1", "role": "authenticated"}]],
+        "auth_users_complete": [
+            [{"id": "user-1", "row_fingerprint": "auth-digest-a"}]
+        ],
     }
     for table in GENERATED_TABLES:
         rows[table] = [[{"id": f"{table}-1"}]]
@@ -222,6 +254,14 @@ def read_json_files(directory):
         path.name: json.loads(path.read_text())
         for path in Path(directory).glob("*.json")
     }
+
+
+def seed_reviewed_dry_run(tmp_path, rows=None):
+    run_reset(
+        parsed_args(tmp_path),
+        db_url="postgresql://not-a-secret",
+        connect=ConnectRecorder(FakeConnection(rows=rows)),
+    )
 
 
 def test_dry_run_exports_all_tables_without_write_transaction_or_deletes(tmp_path):
@@ -249,6 +289,7 @@ def test_dry_run_exports_all_tables_without_write_transaction_or_deletes(tmp_pat
 
 
 def test_execute_deletes_only_parent_ownership_in_one_transaction(tmp_path):
+    seed_reviewed_dry_run(tmp_path)
     connection = FakeConnection()
     connect = ConnectRecorder(connection)
 
@@ -278,6 +319,7 @@ def test_execute_deletes_only_parent_ownership_in_one_transaction(tmp_path):
 
 
 def test_missing_client_aborts_before_any_delete(tmp_path):
+    seed_reviewed_dry_run(tmp_path)
     rows = sample_rows()
     rows["clients"] = [[]]
     connection = FakeConnection(rows=rows)
@@ -295,6 +337,7 @@ def test_missing_client_aborts_before_any_delete(tmp_path):
 
 
 def test_generated_count_mismatch_rolls_back_transaction(tmp_path):
+    seed_reviewed_dry_run(tmp_path)
     connection = FakeConnection(
         post_delete_rows={"tracker_results": [{"id": "unexpected"}]}
     )
@@ -311,6 +354,7 @@ def test_generated_count_mismatch_rolls_back_transaction(tmp_path):
 
 
 def test_preserved_byte_mismatch_rolls_back_transaction(tmp_path):
+    seed_reviewed_dry_run(tmp_path)
     rows = sample_rows()
     rows["queries"] = [
         [{"id": "query-1", "client_id": CLIENT_ID}],
@@ -329,6 +373,173 @@ def test_preserved_byte_mismatch_rolls_back_transaction(tmp_path):
     assert connection.rollbacks == 1
 
 
+def test_complete_auth_row_digest_change_rolls_back_without_secret_artifacts(
+    tmp_path,
+):
+    seed_reviewed_dry_run(tmp_path)
+    rows = sample_rows()
+    rows["auth_users_complete"] = [
+        [{"id": "user-1", "row_fingerprint": "auth-digest-a"}],
+        [{"id": "user-1", "row_fingerprint": "auth-digest-b"}],
+    ]
+    connection = FakeConnection(rows=rows)
+
+    with pytest.raises(ResetVerificationError, match="auth_users"):
+        run_reset(
+            parsed_args(tmp_path, execute=True),
+            db_url="postgresql://not-a-secret",
+            connect=ConnectRecorder(connection),
+        )
+
+    assert connection.commits == 0
+    assert connection.rollbacks == 1
+    serialized = "\n".join(
+        path.read_text() for path in tmp_path.rglob("*.json")
+    )
+    assert "RAW_PASSWORD_MARKER" not in serialized
+    assert "raw_user_meta_data" not in serialized
+
+
+def test_generic_sql_failure_writes_sanitized_final_report(tmp_path):
+    seed_reviewed_dry_run(tmp_path)
+    connection = FakeConnection(fail_table="reports")
+
+    with pytest.raises(RuntimeError, match="SQL_SECRET_MARKER"):
+        run_reset(
+            parsed_args(tmp_path, execute=True),
+            db_url="postgresql://not-a-secret",
+            connect=ConnectRecorder(connection),
+        )
+
+    report = json.loads((tmp_path / "verification.json").read_text())
+    assert report["status"] in {"failed", "rolled_back"}
+    assert report["preservation_verified"] is False
+    assert "SQL_SECRET_MARKER" not in (tmp_path / "verification.json").read_text()
+    assert connection.rollbacks == 1
+
+
+def test_commit_failure_writes_sanitized_final_report(tmp_path):
+    seed_reviewed_dry_run(tmp_path)
+    connection = FakeConnection(commit_error=True)
+
+    with pytest.raises(RuntimeError, match="COMMIT_SECRET_MARKER"):
+        run_reset(
+            parsed_args(tmp_path, execute=True),
+            db_url="postgresql://not-a-secret",
+            connect=ConnectRecorder(connection),
+        )
+
+    report_text = (tmp_path / "verification.json").read_text()
+    report = json.loads(report_text)
+    assert report["status"] == "failed"
+    assert report["preservation_verified"] is False
+    assert "COMMIT_SECRET_MARKER" not in report_text
+
+
+def test_execute_preserves_reviewed_dry_run_artifacts(tmp_path):
+    seed_reviewed_dry_run(tmp_path)
+    reviewed = {
+        path.name: path.read_bytes()
+        for path in tmp_path.glob("*.json")
+        if path.name != "verification.json"
+    }
+
+    run_reset(
+        parsed_args(tmp_path, execute=True),
+        db_url="postgresql://not-a-secret",
+        connect=ConnectRecorder(FakeConnection()),
+    )
+
+    assert {
+        path.name: path.read_bytes()
+        for path in tmp_path.glob("*.json")
+        if path.name != "verification.json"
+    } == reviewed
+    execute_dir = tmp_path / "execute"
+    assert (execute_dir / "manifest.json").is_file()
+    assert {
+        path.name for path in execute_dir.glob("*.json")
+    } == {
+        *(f"{table}.json" for table in PRESERVED_TABLES + GENERATED_TABLES),
+        "manifest.json",
+    }
+
+
+def test_execute_rolls_back_if_preserved_rows_differ_from_reviewed_dry_run(
+    tmp_path,
+):
+    seed_reviewed_dry_run(tmp_path)
+    rows = sample_rows()
+    rows["queries"] = [
+        [{"id": "query-1", "client_id": CLIENT_ID, "status": "changed"}]
+    ]
+    connection = FakeConnection(rows=rows)
+
+    with pytest.raises(ResetVerificationError, match="reviewed dry-run"):
+        run_reset(
+            parsed_args(tmp_path, execute=True),
+            db_url="postgresql://not-a-secret",
+            connect=ConnectRecorder(connection),
+        )
+
+    assert connection.deleted == set()
+    assert connection.commits == 0
+    assert connection.rollbacks == 1
+
+
+def test_execute_requires_existing_reviewed_dry_run(tmp_path):
+    connection = FakeConnection()
+
+    with pytest.raises(ResetVerificationError, match="dry-run manifest"):
+        run_reset(
+            parsed_args(tmp_path, execute=True),
+            db_url="postgresql://not-a-secret",
+            connect=ConnectRecorder(connection),
+        )
+
+    assert connection.deleted == set()
+
+
+def test_reviewed_fingerprint_covers_redacted_preserved_values(tmp_path):
+    dry_rows = sample_rows()
+    dry_rows["clients"] = [
+        [
+            {
+                "id": CLIENT_ID,
+                "name": "Example",
+                "cms_config": {"access_token": "DRY_CONFIG_SECRET_MARKER"},
+            }
+        ]
+    ]
+    seed_reviewed_dry_run(tmp_path, rows=dry_rows)
+
+    execute_rows = sample_rows()
+    execute_rows["clients"] = [
+        [
+            {
+                "id": CLIENT_ID,
+                "name": "Example",
+                "cms_config": {"access_token": "NEW_CONFIG_SECRET_MARKER"},
+            }
+        ]
+    ]
+    connection = FakeConnection(rows=execute_rows)
+
+    with pytest.raises(ResetVerificationError, match="reviewed dry-run"):
+        run_reset(
+            parsed_args(tmp_path, execute=True),
+            db_url="postgresql://not-a-secret",
+            connect=ConnectRecorder(connection),
+        )
+
+    serialized = "\n".join(
+        path.read_text() for path in tmp_path.rglob("*.json")
+    )
+    assert "DRY_CONFIG_SECRET_MARKER" not in serialized
+    assert "NEW_CONFIG_SECRET_MARKER" not in serialized
+    assert connection.deleted == set()
+
+
 def test_artifacts_never_serialize_database_url_or_secret_marker(tmp_path):
     rows = sample_rows()
     rows["auth_users"] = [[{"id": "user-1", "role": "authenticated"}]]
@@ -343,3 +554,73 @@ def test_artifacts_never_serialize_database_url_or_secret_marker(tmp_path):
     serialized = "\n".join(path.read_text() for path in tmp_path.glob("*.json"))
     assert database_url not in serialized
     assert "SECRET_MARKER" not in serialized
+
+
+def test_artifact_redaction_covers_sensitive_keys_and_secret_shaped_values(
+    tmp_path,
+):
+    rows = sample_rows()
+    rows["clients"] = [
+        [
+            {
+                "id": CLIENT_ID,
+                "name": "Useful client name",
+                "settings": {
+                    "databaseUrl": "postgresql://user:DB_KEY_MARKER@db/x",
+                    "DSN": "host=db password=DSN_MARKER user=service",
+                    "authorization": "Bearer AUTH_MARKER",
+                    "cookie": "session=COOKIE_MARKER; HttpOnly",
+                    "password": "PASSWORD_MARKER",
+                    "access_token": "TOKEN_MARKER",
+                    "client-secret": "SECRET_MARKER",
+                    "credential": "CREDENTIAL_MARKER",
+                    "privateKey": "PRIVATE_KEY_MARKER",
+                    "public_note": "retain this useful note",
+                    "endpoint": "postgresql://user:URL_MARKER@db/x",
+                    "header": "Basic HEADER_MARKER",
+                    "browser_state": "session=BROWSER_COOKIE_MARKER; Path=/",
+                    "cookies": {"opaque": "COOKIE_CONTAINER_MARKER"},
+                    "auth_line": (
+                        "Authorization: Bearer PREFIX_AUTH_MARKER"
+                    ),
+                    "browser_blob": (
+                        "opaque=GENERIC_COOKIE_MARKER; HttpOnly"
+                    ),
+                },
+            }
+        ]
+    ]
+
+    run_reset(
+        parsed_args(tmp_path),
+        db_url="postgresql://connector-secret-not-exported",
+        connect=ConnectRecorder(FakeConnection(rows=rows)),
+    )
+
+    serialized = "\n".join(
+        path.read_text() for path in tmp_path.rglob("*.json")
+    )
+    for marker in (
+        "DB_KEY_MARKER",
+        "DSN_MARKER",
+        "AUTH_MARKER",
+        "COOKIE_MARKER",
+        "PASSWORD_MARKER",
+        "TOKEN_MARKER",
+        "SECRET_MARKER",
+        "CREDENTIAL_MARKER",
+        "PRIVATE_KEY_MARKER",
+        "URL_MARKER",
+        "HEADER_MARKER",
+        "BROWSER_COOKIE_MARKER",
+        "COOKIE_CONTAINER_MARKER",
+        "PREFIX_AUTH_MARKER",
+        "GENERIC_COOKIE_MARKER",
+    ):
+        assert marker not in serialized
+
+    exported_client = json.loads((tmp_path / "clients.json").read_text())[0]
+    assert exported_client["name"] == "Useful client name"
+    assert exported_client["settings"]["public_note"] == (
+        "retain this useful note"
+    )

@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -186,15 +187,82 @@ BACKUP_SQL = {
     ),
 }
 
-_SECRET_KEY_PARTS = (
-    "api_key",
-    "apikey",
-    "credential",
-    "password",
-    "private_key",
-    "secret",
-    "token",
+# Verification-only: the database hashes the complete auth row so password,
+# token, and metadata values never cross the database boundary.
+AUTH_VERIFICATION_SQL = (
+    "select auth_users.id, "
+    "encode(extensions.digest("
+    "convert_to(to_jsonb(auth_users)::text, 'UTF8'), 'sha256'"
+    "), 'hex') as row_fingerprint "
+    "from auth.users as auth_users "
+    "join public.client_users as client_users "
+    "on client_users.user_id = auth_users.id "
+    "where client_users.client_id = %(client_id)s "
+    "order by auth_users.id"
 )
+
+_SENSITIVE_KEY_WORDS = frozenset(
+    {
+        "authorization",
+        "authorizations",
+        "cookie",
+        "cookies",
+        "credential",
+        "credentials",
+        "dsn",
+        "key",
+        "keys",
+        "passwd",
+        "password",
+        "pwd",
+        "secret",
+        "secrets",
+        "token",
+        "tokens",
+    }
+)
+_SENSITIVE_COMPACT_KEYS = frozenset(
+    {
+        "apikey",
+        "authorizationheader",
+        "clientsecret",
+        "connectionstring",
+        "databaseurl",
+        "privatekey",
+        "serviceaccountkey",
+    }
+)
+_CREDENTIAL_URL_RE = re.compile(
+    r"(?i)\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@"
+)
+_AUTHORIZATION_VALUE_RE = re.compile(
+    r"(?i)^\s*(?:authorization\s*:\s*)?"
+    r"(?:basic|bearer|digest|token)\s+\S+"
+)
+_DSN_SECRET_RE = re.compile(
+    r"(?i)(?:^|[^a-z0-9_])(?:password|passwd|pwd|token|secret)\s*="
+)
+_COOKIE_VALUE_RE = re.compile(
+    r"(?i)(?:(?:^|;\s*)(?:session(?:id)?|auth|jwt|sid|token|cookie)"
+    r"[a-z0-9_.-]*=[^;\s]+|^[^;\s=]+=[^;]+;\s*"
+    r"(?:path|domain|expires|max-age|samesite|secure|httponly)\b)"
+)
+
+
+def _is_sensitive_key(key: Any) -> bool:
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(key))
+    words = {part for part in re.split(r"[^a-z0-9]+", name.lower()) if part}
+    compact = re.sub(r"[^a-z0-9]", "", name.lower())
+    return bool(words & _SENSITIVE_KEY_WORDS) or compact in _SENSITIVE_COMPACT_KEYS
+
+
+def _is_sensitive_string(value: str) -> bool:
+    return bool(
+        _CREDENTIAL_URL_RE.search(value)
+        or _AUTHORIZATION_VALUE_RE.search(value)
+        or _DSN_SECRET_RE.search(value)
+        or _COOKIE_VALUE_RE.search(value)
+    )
 
 
 class ResetVerificationError(RuntimeError):
@@ -245,7 +313,7 @@ def _redact(value: Any, *, parent_key: str = "") -> Any:
         redacted = {}
         for key, child in value.items():
             normalized = str(key).lower()
-            if any(part in normalized for part in _SECRET_KEY_PARTS):
+            if _is_sensitive_key(key):
                 redacted[key] = "[REDACTED]"
             else:
                 redacted[key] = _redact(child, parent_key=normalized)
@@ -254,6 +322,8 @@ def _redact(value: Any, *, parent_key: str = "") -> Any:
         return [_redact(child, parent_key=parent_key) for child in value]
     if isinstance(value, tuple):
         return [_redact(child, parent_key=parent_key) for child in value]
+    if isinstance(value, str) and _is_sensitive_string(value):
+        return "[REDACTED]"
     return value
 
 
@@ -265,9 +335,25 @@ def _write_json(path: Path, value: Any) -> None:
     path.write_bytes(canonical_json(value) + b"\n")
 
 
+def _write_failure_report(path: Path, report: dict[str, Any]) -> None:
+    try:
+        _write_json(path, _redact(report))
+    except Exception:
+        # The original failure must remain primary; reporting is best effort.
+        pass
+
+
 def _fetch_rows(connection: Any, table: str, client_id: str) -> list[dict[str, Any]]:
     with connection.cursor() as cursor:
         cursor.execute(BACKUP_SQL[table], {"client_id": client_id})
+        return list(cursor.fetchall())
+
+
+def _fetch_complete_auth_fingerprints(
+    connection: Any, client_id: str
+) -> list[dict[str, Any]]:
+    with connection.cursor() as cursor:
+        cursor.execute(AUTH_VERIFICATION_SQL, {"client_id": client_id})
         return list(cursor.fetchall())
 
 
@@ -292,7 +378,9 @@ def _export_snapshot(
     client_id: str,
     execute: bool,
     snapshot: dict[str, list[dict[str, Any]]],
+    auth_complete_fingerprints: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], dict[str, bytes]]:
+    backup_dir.mkdir(parents=True, exist_ok=True)
     safe_snapshot = {table: _safe_rows(rows) for table, rows in snapshot.items()}
     for table, rows in safe_snapshot.items():
         _write_json(backup_dir / f"{table}.json", rows)
@@ -309,8 +397,9 @@ def _export_snapshot(
             table: safe_snapshot[table] for table in PRESERVED_TABLES
         },
         "preserved_fingerprints": {
-            table: _fingerprint(safe_snapshot[table]) for table in PRESERVED_TABLES
+            table: _fingerprint(snapshot[table]) for table in PRESERVED_TABLES
         },
+        "auth_users_complete_fingerprints": auth_complete_fingerprints,
         "generated_counts": {
             table: len(snapshot[table]) for table in GENERATED_TABLES
         },
@@ -321,6 +410,53 @@ def _export_snapshot(
     }
     _write_json(backup_dir / "manifest.json", manifest)
     return manifest, preserved_bytes
+
+
+def _load_reviewed_manifest(backup_dir: Path, client_id: str) -> dict[str, Any]:
+    path = backup_dir / "manifest.json"
+    try:
+        manifest = json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
+        raise ResetVerificationError(
+            "a valid reviewed dry-run manifest is required before execute"
+        ) from exc
+    required = {
+        "client_id",
+        "mode",
+        "preserved_fingerprints",
+        "auth_users_complete_fingerprints",
+    }
+    if (
+        not isinstance(manifest, dict)
+        or not required.issubset(manifest)
+        or manifest["client_id"] != client_id
+        or manifest["mode"] != "dry_run"
+    ):
+        raise ResetVerificationError(
+            "reviewed dry-run manifest does not match this client"
+        )
+    return manifest
+
+
+def _verify_reviewed_snapshot(
+    reviewed: dict[str, Any],
+    snapshot: dict[str, list[dict[str, Any]]],
+    auth_complete_fingerprints: list[dict[str, Any]],
+) -> None:
+    current = {
+        table: _fingerprint(snapshot[table]) for table in PRESERVED_TABLES
+    }
+    if current != reviewed["preserved_fingerprints"]:
+        raise ResetVerificationError(
+            "preserved rows differ from the reviewed dry-run manifest"
+        )
+    if (
+        auth_complete_fingerprints
+        != reviewed["auth_users_complete_fingerprints"]
+    ):
+        raise ResetVerificationError(
+            "auth_users differ from the reviewed dry-run manifest"
+        )
 
 
 def _delete_generated(connection: Any, client_id: str) -> None:
@@ -349,6 +485,7 @@ def _verify_preserved(
     connection: Any,
     client_id: str,
     before: dict[str, bytes],
+    auth_before: list[dict[str, Any]],
 ) -> dict[str, str]:
     after_fingerprints = {}
     for table in PRESERVED_TABLES:
@@ -358,7 +495,12 @@ def _verify_preserved(
             raise ResetVerificationError(
                 f"preserved table changed during reset: {table}"
             )
-        after_fingerprints[table] = _fingerprint(_safe_rows(rows))
+        after_fingerprints[table] = _fingerprint(rows)
+    auth_after = _fetch_complete_auth_fingerprints(connection, client_id)
+    if auth_after != auth_before:
+        raise ResetVerificationError(
+            "preserved table changed during reset: auth_users complete row"
+        )
     return after_fingerprints
 
 
@@ -376,8 +518,14 @@ def run_reset(
         "client_id": args.client_id,
         "mode": "execute" if args.execute else "dry_run",
     }
+    ready_to_commit = False
 
     try:
+        reviewed_manifest = (
+            _load_reviewed_manifest(backup_dir, args.client_id)
+            if args.execute
+            else None
+        )
         with connect(
             db_url,
             autocommit=not args.execute,
@@ -386,8 +534,15 @@ def run_reset(
             if not args.execute:
                 snapshot = _capture(connection, args.client_id)
                 _validate_client_selection(snapshot)
+                auth_fingerprints = _fetch_complete_auth_fingerprints(
+                    connection, args.client_id
+                )
                 manifest, _ = _export_snapshot(
-                    backup_dir, args.client_id, False, snapshot
+                    backup_dir,
+                    args.client_id,
+                    False,
+                    snapshot,
+                    auth_fingerprints,
                 )
                 report.update(
                     {
@@ -402,13 +557,28 @@ def run_reset(
                 with connection.transaction():
                     snapshot = _capture(connection, args.client_id)
                     _validate_client_selection(snapshot)
+                    auth_before = _fetch_complete_auth_fingerprints(
+                        connection, args.client_id
+                    )
+                    _verify_reviewed_snapshot(
+                        reviewed_manifest,
+                        snapshot,
+                        auth_before,
+                    )
                     manifest, preserved_bytes = _export_snapshot(
-                        backup_dir, args.client_id, True, snapshot
+                        backup_dir / "execute",
+                        args.client_id,
+                        True,
+                        snapshot,
+                        auth_before,
                     )
                     _delete_generated(connection, args.client_id)
                     after_counts = _verify_empty(connection, args.client_id)
                     after_fingerprints = _verify_preserved(
-                        connection, args.client_id, preserved_bytes
+                        connection,
+                        args.client_id,
+                        preserved_bytes,
+                        auth_before,
                     )
                     report.update(
                         {
@@ -425,6 +595,7 @@ def run_reset(
                             "preservation_verified": True,
                         }
                     )
+                    ready_to_commit = True
     except ResetVerificationError as exc:
         report.update(
             {
@@ -434,7 +605,23 @@ def run_reset(
                 "error": str(exc),
             }
         )
-        _write_json(backup_dir / "verification.json", report)
+        _write_failure_report(backup_dir / "verification.json", report)
+        raise
+    except Exception:
+        report.update(
+            {
+                "status": "failed",
+                "deletion_performed": False,
+                "preservation_verified": False,
+                "transaction_state": (
+                    "commit_unconfirmed"
+                    if ready_to_commit
+                    else "rolled_back_or_not_started"
+                ),
+                "error": "reset operation failed; exception details omitted",
+            }
+        )
+        _write_failure_report(backup_dir / "verification.json", report)
         raise
 
     _write_json(backup_dir / "verification.json", report)
