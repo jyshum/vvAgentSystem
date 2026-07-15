@@ -1,8 +1,9 @@
 -- ============================================================================
 -- Victory Velocity — consolidated schema (current version, 2026-07-15)
 -- ============================================================================
--- Single canonical baseline that replaces migrations 001–010. Paste the whole
--- file into the Supabase SQL editor and run once.
+-- Single canonical baseline that includes migrations 001–015. Paste the whole
+-- file into the Supabase SQL editor and run once. Do not replay migrations
+-- 001–015 after applying this schema.
 --
 -- WARNING: the DROP block below DELETES ALL DATA in these tables (clients,
 -- tracker history, reports, cards, etc.). Only run on a database you intend to
