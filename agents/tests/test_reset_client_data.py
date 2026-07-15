@@ -61,6 +61,13 @@ def test_preserved_tables_are_never_deleted():
     assert "delete from auth.users" not in sql
 
 
+def test_legacy_site_profile_is_exported_before_schema_cleanup():
+    assert "client_site_profiles" in PRESERVED_TABLES
+    assert "client_site_profiles" in BACKUP_SQL
+    sql = BACKUP_SQL["client_site_profiles"].lower()
+    assert "where client_site_profiles.client_id = %(client_id)s" in sql
+
+
 def test_every_query_is_client_scoped_and_parameterized():
     assert set(BACKUP_SQL) == set(PRESERVED_TABLES + GENERATED_TABLES)
     for sql in (
@@ -228,6 +235,9 @@ class ConnectRecorder:
 def sample_rows():
     rows = {
         "clients": [[{"id": CLIENT_ID, "name": "Example"}]],
+        "client_site_profiles": [
+            [{"client_id": CLIENT_ID, "platform": "squarespace"}]
+        ],
         "queries": [[{"id": "query-1", "client_id": CLIENT_ID}]],
         "client_users": [
             [{"id": "access-1", "client_id": CLIENT_ID, "user_id": "user-1"}]

@@ -20,6 +20,7 @@ from psycopg.rows import dict_row
 
 PRESERVED_TABLES = (
     "clients",
+    "client_site_profiles",
     "queries",
     "client_users",
     "auth_users",
@@ -71,6 +72,12 @@ BACKUP_SQL = {
     "clients": (
         "select clients.* from public.clients as clients "
         "where clients.id = %(client_id)s order by clients.id"
+    ),
+    "client_site_profiles": (
+        "select client_site_profiles.* "
+        "from public.client_site_profiles as client_site_profiles "
+        "where client_site_profiles.client_id = %(client_id)s "
+        "order by client_site_profiles.client_id"
     ),
     "queries": (
         "select queries.* from public.queries as queries "
