@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any
 
@@ -52,8 +52,9 @@ class AuditContext:
     domain: str
     site_identity: SiteIdentity
     pages: tuple[Observation, ...]
-    site_observations: dict[str, Observation]
+    site_observations: dict[str, Any]
     run_timestamp: str
+    integrations: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
