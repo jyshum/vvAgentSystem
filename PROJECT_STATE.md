@@ -1,97 +1,112 @@
 # VV Agent System — Project State
 
-## Active Development — Simplified Technical Audit V1
+## Current checkpoint — 2026-07-15
 
-- **Rollout:** development only; `TECHNICAL_AUDIT_V1_ENABLED=true` requires `TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS` to explicitly list the client. An empty allowlist enables no clients; `*` is development/testing only.
-- **Check sets:** `TECHNICAL_AUDIT_CHECK_SETS=foundation`; `foundation` is the only implemented set. For an active V1 client (global flag enabled and client allowlisted), an unavailable or empty set fails closed before work; disabled or unallowlisted clients skip check-set validation and continue unchanged on the legacy route.
-- **Database:** additive migrations `supabase/migrations/014_technical_audit_foundation.sql` and `supabase/migrations/015_improvement_run_mode.sql`; neither is applied to production.
-- **Implemented V1 path:** an allowlisted run writes immutable technical observations/results for deterministic `llms.txt`/title/description/canonical checks and uses the five-status audit contract.
-- **Durable run routing:** each new `improvement_runs` row stores immutable `run_mode` and typed `effective_check_sets` at insertion. Existing rows default to `legacy`; dashboard presentation never infers mode from a technical-audit child.
-- **Legacy preservation:** disabled or unallowlisted clients insert `legacy` with no effective check sets. The Pages primary tab is hidden but its direct route remains available; historical legacy runs preserve their label and original matcher/readiness evidence even if an older technical-audit child exists.
-- **Manual community selection:** V1 bypasses matching, scoring, briefs, and AI fixes, then directly selects at most five manual `community_check` cards from positive tracker competitor leads.
-- **Current product boundary:** V1 writes no `query_page_matches` or `page_citation_scores`, has no technical remediation cards, and cannot approve or publish a client-site change. Technical result/action composition is next.
-- **Operator guide:** `docs/technical-audit-operations.md`
+The backend is now one manual deterministic runtime. Scheduling, approval-resume,
+legacy matcher/scorer/readiness/card generation, implementation handlers, and
+legacy fallback behavior have been removed from the active Python application.
+Frontend cutover remains deliberately deferred.
 
-### Ordered follow-on roadmap
+### Production infrastructure
 
-1. **Unified technical audit cards and workflow** — linked immutable result evidence plus editable workflow records; Fail/Review/Unknown inbox behavior; Pass/Not applicable audit-page behavior; grouping, lifecycle, stale-state guard, and fresh re-audit verification.
-2. **Protocol check set** — robots.txt, sitemap, TLS/HTTPS, and schema integrity/coverage with bounded evidence and five-state outcomes.
-3. **Site-integrity check set** — broken links, image integrity/appropriateness review boundaries, freshness consistency, and existing source-support verification with bounded crawling.
-4. **Performance and connected-service check set** — CrUX, Lighthouse lab context, Google Search Console, and Bing Webmaster Tools; disconnected integrations become explicit Unknown with owner/unblock instructions.
-5. **Platform remediation adapters** — universal cards with Squarespace guided instructions, GitHub pull requests, guarded WordPress/Webflow staging/API paths, and copy/paste fallback. No adapter may publish without approval, stale-state validation, rollback, and re-audit.
+- **Supabase:** `vv-dashboard` is live in US West.
+- **Railway app:** `vv-tracker` is deployed and healthy with no cron or in-process
+  scheduler. `/health` returns 200 and `/api/schedules` returns 404.
+- **Railway checkpoints:** `checkpoints-v2` is the only checkpoint database. It
+  passed a real write/read/delete canary; the old Postgres service was deleted.
+- **Dashboard:** the existing frontend remains deployed but was not adapted to
+  migration 017. Routes that depend on removed legacy tables or columns may be
+  stale until the separate frontend cutover.
 
-Every follow-on plan must expand `AVAILABLE_CHECK_SETS`, add registry-level tests, update stored scope/check versions, and pass the same internal allowlist gate. Configuration alone must not enable an empty or partially implemented set. Historical readiness scores remain readable as legacy data.
+### Supabase schema and reset
 
-## What This Is
-GEO (Generative Engine Optimization) platform for Victory Velocity agency. Tracks how often client brands appear in AI responses, audits client websites for GEO health, and generates actionable fixes.
+- Migrations 014 and 015 were previously applied.
+- Migration 016 added `clients.site_platform` and
+  `clients.implementation_mode`.
+- Migration 017 removed legacy runtime tables and columns, including
+  `client_site_profiles`, page matching/readiness/card tables, scheduling fields,
+  legacy CMS fields, and obsolete improvement-run routing/statistics.
+- MCP migration records:
+  - `20260715095531_unified_manual_client_config`
+  - `20260715100006_remove_legacy_runtime`
+- The verified BudgetYourMD reset backup is local and Git-ignored at
+  `.artifacts/client-resets/budgetyourmd-2026-07-15/`.
 
----
+### BudgetYourMD preserved state
 
-## Where Things Live
+- Client ID: `03cfae03-7d1d-484f-94aa-f1e576ed299a`
+- Domain: `budgetyourmd.ca`
+- Platform: `squarespace`
+- Implementation mode: `copy_paste`
+- Query model: 8 active intent rows containing 47 unique approved wordings.
+- A future visibility baseline would make 188 model requests at one run per
+  wording across ChatGPT, Perplexity, Claude, and Gemini.
+- Authentication: 2 complete `auth.users` rows were fingerprinted before and
+  after reset and remained unchanged.
+- `client_users`: 0 rows existed before reset and 0 remain; current administrator
+  access is therefore not represented by a client-specific mapping row.
+- Generated state: tracker, tracker-result, prompt-score, competitive-gap,
+  pipeline, improvement, report, and technical-audit counts are all zero.
+- No production baseline or production technical-audit result has been created.
 
-| Layer | Status | URL / Location |
-|-------|--------|----------------|
-| Dashboard (Next.js) | Live | `dashboard-bice-two-ikwc6u6ndz.vercel.app` |
-| Custom domain | Pending DNS | `app.victoryvelocity.ca` → CNAME → `cname.vercel-dns.com` |
-| Supabase | Live | Project `vv-dashboard` (ref: `nihunlzmqcyqiacnkyxm`, US West) |
-| Python agents | Local only | Run manually from `agents/` |
+## Active deterministic audit slice
 
----
+Only the `foundation` check set is implemented:
 
-## Components
+- `llms.txt` integrity with platform-derived applicability;
+- meta-title integrity;
+- meta-description integrity;
+- canonical integrity.
 
-### AI Visibility Tracker
-Queries ChatGPT, Perplexity, Claude, and Gemini with client target queries. Detects brand mentions and citations. Results saved to Supabase and viewable in dashboard.
+The collector is bounded, records retrieval provenance, accepts the approved
+bare/`www` production-host pair, and fails safely. Squarespace `llms.txt`
+absence is Not Applicable. Missing descriptions on audited canonical indexable
+HTML pages are Review, never Fail.
 
-`python run.py --client-id <uuid> --upload`
+The manual graph is:
 
-### GEO Audit System *(branch: feat/audit-recommendation-engine — not yet merged)*
-Crawls a client's website, scores each page against 6 GEO pillars (Content Structure, Fact Density, Source Citations, Authority Signals, Schema Markup, Freshness). Uses page-type classification so only relevant pillars apply per page. Generates before/after action cards for weak pages. Can open GitHub PRs with fixes.
-
+```text
+load_config -> run_tracker -> run_gsc -> run_technical_pipeline -> end
 ```
-python audit.py --client-id <uuid> --upload
-python recommend.py --run-id <uuid> --upload
-python implement.py --card-id <uuid>
-```
 
-**Requires:** Run `supabase/migrations/002_audit_schema.sql` in Supabase SQL Editor before using.
+`technical_only` skips tracker/GSC. `tracker_only` ends after GSC. Technical
+failures never call removed legacy heuristics or fabricate results.
 
-### Reddit Scout *(same branch)*
-Surfaces Reddit posts where the client brand should be mentioned but isn't. Uses public `.json` endpoints — no API key required.
+## Verification evidence
 
-`python scout.py --client-id <uuid> --upload`
+- Backend: 251 tests passed; one pre-existing Starlette/httpx deprecation
+  warning.
+- Dashboard: 108 tests passed and the Next.js production build succeeded before
+  the schema reset. This does not mean the deferred frontend is compatible with
+  migration 017.
+- Reset: reviewed pre-counts and preserved SHA-256 fingerprints were enforced
+  inside the deletion transaction; post-delete counts were zero and preserved
+  fingerprints were unchanged.
+- Final production verification confirmed 1 client, 8 intents, 47 unique
+  wordings, 2 unchanged auth users, zero generated rows, and all approved legacy
+  tables/columns absent.
 
----
+## Paused next gate
 
-## Live Clients
+Development/staging validation has **not** been run. Do not start a production
+baseline. The next approved work, only after explicit instruction, is Task 12
+in `docs/superpowers/plans/2026-07-15-technical-audit-tranche-0.md`:
 
-| Client | Supabase ID | Latest Tracker Run |
-|--------|-------------|--------------------|
-| ChildSpot | `302eb603-3a0c-4429-bd8e-191ac30a965a` | 2026-06-17 — 16% mention, 0% citation |
+1. migrate local Supabase;
+2. seed a fixed demo client;
+3. run targeted automated tests;
+4. persist one demo Foundation audit locally;
+5. run a non-persisting BudgetYourMD website smoke audit;
+6. re-verify production remains empty.
 
----
+Do not plan or implement Protocol checks until that evidence is reviewed.
 
-## Key Files
+## Key documents
 
-| File | Purpose |
-|------|---------|
-| `supabase/migrations/001_initial_schema.sql` | Tracker tables |
-| `supabase/migrations/002_audit_schema.sql` | Audit tables (run manually) |
-| `agents/run.py` | Tracker CLI |
-| `agents/audit.py` | Audit CLI |
-| `agents/recommend.py` | Recommendation engine CLI |
-| `agents/implement.py` | Implementation handler CLI |
-| `agents/scout.py` | Reddit scout CLI |
-| `clients/childspot.json` | ChildSpot config |
-| `agents/.env` | ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY |
-| `dashboard/.env.local` | Supabase keys for Next.js |
-
----
-
-## Deferred
-
-- Auto-scheduling tracker and audit runs
-- Server-side PDF generation
-- GSC integration
-- WordPress implementation handler (copy-paste fallback used until a WP client onboards)
-- Webflow implementation handler
+- Normative design:
+  `docs/superpowers/specs/2026-07-14-deterministic-technical-audit-design.md`
+- Reset/runtime design:
+  `docs/superpowers/specs/2026-07-15-technical-audit-reset-engine-first-design.md`
+- Tranche plan:
+  `docs/superpowers/plans/2026-07-15-technical-audit-tranche-0.md`
+- Operator guide: `docs/technical-audit-operations.md`
