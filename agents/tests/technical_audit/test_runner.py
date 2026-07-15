@@ -1,3 +1,5 @@
+import pytest
+
 from src.technical_audit.runner import _bounded_text, run_technical_audit
 
 
@@ -350,3 +352,30 @@ def test_unsafe_llms_txt_content_is_not_copied_into_persisted_excerpt():
     assert llms["data"]["body_excerpt"] == "[REDACTED: unsafe content detected]"
     assert llms["data"]["unsafe_content_detected"] is True
     assert "client-secret-value" not in str(llms)
+
+
+@pytest.mark.parametrize("enabled_check_sets", [("unsupported",), ()])
+def test_invalid_check_sets_fail_before_fetching(enabled_check_sets):
+    fetched = []
+
+    def fetcher(url):
+        fetched.append(url)
+        return {
+            "status_code": 200,
+            "content_type": "text/html",
+            "body": "<html></html>",
+            "final_url": url,
+            "error": None,
+        }
+
+    with pytest.raises(ValueError, match="Unsupported technical audit check sets"):
+        run_technical_audit(
+            client_id="client-1",
+            domain="example.com",
+            inventory=[],
+            profile={},
+            enabled_check_sets=enabled_check_sets,
+            fetcher=fetcher,
+        )
+
+    assert fetched == []

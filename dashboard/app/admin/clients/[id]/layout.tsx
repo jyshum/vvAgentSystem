@@ -8,6 +8,10 @@ import { rankAndGap, topCompetitor } from "@/lib/derive";
 import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatDelta, formatRate } from "@/lib/utils";
 import { clientTabs } from "@/lib/client-tabs";
+import {
+  crawlabilityBannerPresentation,
+  runPresentationMode,
+} from "@/lib/run-presentation";
 import type { Client, TrackerRun } from "@/lib/types";
 import type { CrawlabilityReport, ImprovementRun } from "@/lib/improvement-types";
 
@@ -48,7 +52,7 @@ export default async function ClientLayout({
       .limit(2),
     supabase
       .from("improvement_runs")
-      .select("id, ran_at, crawlability_report")
+      .select("id, ran_at, crawlability_report, run_mode")
       .eq("client_id", id)
       .order("ran_at", { ascending: false })
       .limit(1),
@@ -72,7 +76,7 @@ export default async function ClientLayout({
   const schedule = schedules.find((s) => s.client_id === id);
   const nextRunLabel = schedule?.next_run ? formatNextRun(schedule.next_run) : null;
 
-  const improvementRun = (improvementRuns as Pick<ImprovementRun, "id" | "ran_at" | "crawlability_report">[])?.[0];
+  const improvementRun = (improvementRuns as Pick<ImprovementRun, "id" | "ran_at" | "crawlability_report" | "run_mode">[])?.[0];
   const report = improvementRun?.crawlability_report as CrawlabilityReport | undefined;
   const blocker = report?.has_critical_blocker === true;
   const failing = blocker
@@ -81,6 +85,8 @@ export default async function ClientLayout({
         detail: report?.[k]?.detail ?? k,
       }))
     : [];
+  const presentationMode = runPresentationMode(improvementRun ?? null);
+  const crawlabilityBanner = crawlabilityBannerPresentation(presentationMode, id);
 
   const tabs = clientTabs(id);
 
@@ -201,13 +207,13 @@ export default async function ClientLayout({
           <div className="font-serif text-[13px]" style={{ color: "var(--white)" }}>
             {failing.length > 0
               ? failing.map((f) => `${f.name}: ${f.detail}`).join(" · ")
-              : "see the priority-0 card for details"}
+              : crawlabilityBanner.detailFallback}
           </div>
-          <Link href="/admin/approvals" className="font-mono text-[9px] tracking-[0.1em] uppercase underline" style={{ color: "var(--neg)" }}>
-            VIEW FIX-CRAWLABILITY CARD →
+          <Link href={crawlabilityBanner.href} className="font-mono text-[9px] tracking-[0.1em] uppercase underline" style={{ color: "var(--neg)" }}>
+            {crawlabilityBanner.ctaLabel}
           </Link>
           <div className="font-mono text-[8px] mt-1" style={{ color: "var(--faint)" }}>
-            DIAGNOSIS BELOW IS THE PRE-FIX BASELINE — VISIBILITY DATA REMAINS VALID
+            {crawlabilityBanner.guidance}
           </div>
         </div>
       )}

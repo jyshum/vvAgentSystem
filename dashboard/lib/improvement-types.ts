@@ -19,10 +19,15 @@ export interface CrawlabilityReport {
   [key: string]: unknown;
 }
 
+export type ImprovementRunMode = "legacy" | "technical_v1";
+export type TechnicalAuditCheckSet = "foundation";
+
 export interface ImprovementRun {
   id: string;
   client_id: string;
   thread_id: string | null;
+  run_mode: ImprovementRunMode;
+  effective_check_sets: TechnicalAuditCheckSet[];
   ran_at: string;
   crawlability_report: CrawlabilityReport;
   pages_inventoried: number;

@@ -653,6 +653,9 @@ def test_v1_audit_persists_evidence_without_running_legacy_technical_cards(monke
     assert result["technical_audit_summary"]["fail"] == 1
     assert result["query_matches"] == []
     assert result["citation_scores"] == []
+    improvement_run_insert = tables["improvement_runs"].insert.call_args.args[0]
+    assert improvement_run_insert["run_mode"] == "technical_v1"
+    assert improvement_run_insert["effective_check_sets"] == ["foundation"]
     assert len(result["competitive_gap_data"]) == 5
     assert [card["action_type"] for card in result["action_cards"]] == [
         "community_check"
@@ -722,6 +725,9 @@ def test_v1_flag_disabled_preserves_legacy_route_without_audit_writes(monkeypatc
 
     assert result["technical_audit_run_id"] is None
     assert result["technical_audit_summary"] == {}
+    improvement_run_insert = tables["improvement_runs"].insert.call_args.args[0]
+    assert improvement_run_insert["run_mode"] == "legacy"
+    assert improvement_run_insert["effective_check_sets"] == []
     mock_match.assert_called_once()
     mock_gap_check.assert_called_once()
     mock_audit.assert_not_called()
@@ -794,6 +800,9 @@ def test_v1_non_allowlisted_client_preserves_legacy_route_without_audit_writes(m
     mock_audit.assert_not_called()
     assert result["query_matches"] == legacy_matches
     assert result["competitive_gap_data"] == legacy_gaps
+    improvement_run_insert = tables["improvement_runs"].insert.call_args.args[0]
+    assert improvement_run_insert["run_mode"] == "legacy"
+    assert improvement_run_insert["effective_check_sets"] == []
     assert "technical_audit_runs" not in [call.args[0] for call in sb.table.call_args_list]
 
 

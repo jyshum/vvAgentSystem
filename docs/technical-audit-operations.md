@@ -5,7 +5,7 @@
 The technical-audit foundation is **development only** and is protected by a global flag, client allowlist, and check-set configuration.
 
 - The feature defaults off.
-- Migration `014_technical_audit_foundation.sql` has not been applied to production.
+- Migrations `014_technical_audit_foundation.sql` and `015_improvement_run_mode.sql` have not been applied to production.
 - No technical audit result can approve a change or publish to a client website.
 - The only implemented check set is `foundation`: `llms.txt`, meta titles, meta descriptions, and canonical declarations.
 - Technical result/action composition and technical remediation cards are the next plan; this tranche creates only bounded manual community cards.
@@ -40,7 +40,7 @@ Neither rollback option deletes stored V1 evidence or results.
 
 For an allowlisted V1 client, the improvement pipeline bypasses legacy query matching, structural scoring, briefs, and AI fixes. It writes technical observations/results for `foundation` and directly selects at most five manual `community_check` cards from positive tracker competitor leads. It does not write `query_page_matches` or `page_citation_scores`, and it does not create technical remediation cards in this tranche.
 
-The Pages primary tab is hidden, but the direct Pages route remains available for legacy data. Run pages use technical presentation when a technical audit is present and preserve the legacy badge, matching evidence, and legacy content for older runs.
+The Pages primary tab is hidden, but the direct Pages route remains available for legacy data. Run pages use the immutable `improvement_runs.run_mode` value, not the existence of a `technical_audit_runs` child, to select their presentation. A `technical_v1` run therefore remains technical when audit initialization fails before a child row is created. Historical rows default to `legacy` and preserve their legacy badge, matching evidence, and readiness evidence even if an older technical-audit child exists.
 
 ## Status handling
 
@@ -72,16 +72,23 @@ Apply:
 
 ```text
 supabase/migrations/014_technical_audit_foundation.sql
+supabase/migrations/015_improvement_run_mode.sql
 ```
 
-The migration is additive. It creates:
+Apply them in numeric order. Migration 014 creates:
 
 - `client_site_profiles`
 - `technical_audit_runs`
 - `technical_audit_observations`
 - `technical_audit_results`
 
-It does not drop or reinterpret `page_citation_scores`, `action_cards`, or historical improvement runs.
+Migration 015 additively extends `improvement_runs` with:
+
+- `run_mode`, constrained to `legacy` or `technical_v1`;
+- `effective_check_sets`, a non-null `text[]` containing the check sets selected at insertion;
+- a trigger preventing either route field from being changed after insertion.
+
+Existing rows receive the safe defaults `run_mode='legacy'` and `effective_check_sets='{}'`. The migration does not inspect `technical_audit_runs`, so an older child row cannot reclassify or reinterpret a historical run. New pipeline inserts explicitly persist `technical_v1` plus `foundation` for active V1, or `legacy` plus an empty set for disabled/nonallowlisted clients. Neither migration drops or reinterprets `page_citation_scores`, `query_page_matches`, `action_cards`, or historical improvement evidence.
 
 ## Next operator validation gate: validate a development/staging run
 
@@ -92,9 +99,10 @@ This manual fixture validation has not been run as part of this documentation tr
 3. Confirm the run writes technical observations/results and at most five `community_check` cards.
 4. Confirm it writes no `query_page_matches` or `page_citation_scores` rows.
 5. Confirm the query page has no PAGE, similarity, or WEAK column.
-6. Confirm the run page has no matching, content-gap, or readiness-score claims.
-7. Open an older run URL and confirm the legacy badge, matching evidence, and direct Pages route still render.
-8. Remove the client ID from the allowlist and confirm the next run follows the legacy route.
+6. Confirm the run page uses its persisted `technical_v1` marker and has no matching, content-gap, or readiness-score claims.
+7. Simulate audit initialization failure before child insertion and confirm the marked run stays technical with neutral unavailable/error guidance.
+8. Open an older legacy run URL, including a fixture with an older technical-audit child, and confirm the legacy badge, matching evidence, readiness evidence, and direct Pages route still render.
+9. Remove the client ID from the allowlist and confirm the next run is inserted as `legacy` with no effective check sets.
 
 ## Failure handling
 
@@ -114,6 +122,7 @@ npm test
 npm run build
 npx eslint \
   lib/client-tabs.ts \
+  lib/improvement-types.ts \
   lib/run-presentation.ts \
   components/admin/HeatTable.tsx \
   app/admin/clients/'[id]'/layout.tsx \

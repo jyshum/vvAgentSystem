@@ -4,9 +4,10 @@
 
 - **Rollout:** development only; `TECHNICAL_AUDIT_V1_ENABLED=true` requires `TECHNICAL_AUDIT_INTERNAL_CLIENT_IDS` to explicitly list the client. An empty allowlist enables no clients; `*` is development/testing only.
 - **Check sets:** `TECHNICAL_AUDIT_CHECK_SETS=foundation`; `foundation` is the only implemented set. For an active V1 client (global flag enabled and client allowlisted), an unavailable or empty set fails closed before work; disabled or unallowlisted clients skip check-set validation and continue unchanged on the legacy route.
-- **Database:** additive migration `supabase/migrations/014_technical_audit_foundation.sql`; not applied to production.
+- **Database:** additive migrations `supabase/migrations/014_technical_audit_foundation.sql` and `supabase/migrations/015_improvement_run_mode.sql`; neither is applied to production.
 - **Implemented V1 path:** an allowlisted run writes immutable technical observations/results for deterministic `llms.txt`/title/description/canonical checks and uses the five-status audit contract.
-- **Legacy preservation:** disabled or unallowlisted clients use the legacy route. The Pages primary tab is hidden but its direct route remains available; run pages use technical or legacy presentation and preserve historical legacy evidence.
+- **Durable run routing:** each new `improvement_runs` row stores immutable `run_mode` and typed `effective_check_sets` at insertion. Existing rows default to `legacy`; dashboard presentation never infers mode from a technical-audit child.
+- **Legacy preservation:** disabled or unallowlisted clients insert `legacy` with no effective check sets. The Pages primary tab is hidden but its direct route remains available; historical legacy runs preserve their label and original matcher/readiness evidence even if an older technical-audit child exists.
 - **Manual community selection:** V1 bypasses matching, scoring, briefs, and AI fixes, then directly selects at most five manual `community_check` cards from positive tracker competitor leads.
 - **Current product boundary:** V1 writes no `query_page_matches` or `page_citation_scores`, has no technical remediation cards, and cannot approve or publish a client-site change. Technical result/action composition is next.
 - **Operator guide:** `docs/technical-audit-operations.md`

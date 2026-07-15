@@ -10,7 +10,7 @@ import type { PipelineRun, ImprovementRun, PageCitationScore, QueryPageMatch, Ac
 import type { TrackerRun, CompetitiveGap } from "@/lib/types";
 import type { TechnicalAuditResult, TechnicalAuditRun } from "@/lib/technical-audit-types";
 import { PIPELINE_STATUS_COLOR } from "@/lib/run-status";
-import { buildRunFunnel, runPresentationMode } from "@/lib/run-presentation";
+import { buildRunFunnel, formatCount, runPresentationMode } from "@/lib/run-presentation";
 
 function formatDuration(startedAt: string, completedAt: string | null): string {
   if (!completedAt) return "running";
@@ -146,7 +146,7 @@ export default async function RunDetailPage({
     not_applicable: technicalAudit.run.summary?.not_applicable ?? 0,
     total: technicalAudit.run.summary?.total ?? 0,
   } : null;
-  const presentationMode = runPresentationMode(technicalAudit.run);
+  const presentationMode = runPresentationMode(improvementRun);
   const technicalAuditStatus = technicalAudit.run?.status ?? null;
 
   // Worst competitive gap
@@ -347,14 +347,16 @@ export default async function RunDetailPage({
           </div>
           <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
             {presentationMode === "technical_v1"
-              ? technicalAuditStatus === "completed" ? auditSummary?.total : technicalAuditStatus?.toUpperCase() ?? "—"
+              ? technicalAuditStatus === "completed"
+                ? auditSummary?.total
+                : technicalAuditStatus?.toUpperCase() ?? "UNAVAILABLE"
               : avgScore != null ? Math.round(avgScore) : "—"}
           </div>
           <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--mute)" }}>
             {presentationMode === "technical_v1"
               ? technicalAuditStatus === "completed"
                 ? `${auditSummary?.fail} fail · ${auditSummary?.review} review · ${auditSummary?.unknown} unknown`
-                : technicalAudit.run?.error_message || "Checklist not yet available"
+                : technicalAudit.run?.error_message || "Audit evidence was not created for this run"
               : avgScore != null
                 ? `legacy avg ${Math.round(avgScore)} · lowest ${minScore}`
                 : ""}
@@ -372,7 +374,7 @@ export default async function RunDetailPage({
           <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--mute)" }}>
             {improvementRun
               ? presentationMode === "technical_v1"
-                ? `${totalCards} manual cards · ${pendingCards} to review`
+                ? `${formatCount(totalCards, "manual card")} · ${pendingCards} to review`
                 : `${autoCards} auto · ${pendingCards} to you`
               : ""}
           </div>

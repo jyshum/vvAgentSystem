@@ -148,6 +148,10 @@ def run_improvement_pipeline(
         "client_id": client_id,
         "status": "running",
         "thread_id": state.get("thread_id"),
+        "run_mode": "technical_v1" if technical_v1_active else "legacy",
+        "effective_check_sets": (
+            list(policy.check_sets) if technical_v1_active else []
+        ),
     }).execute()
     run_id = run_resp.data[0]["id"]
     technical_audit_run_id = None
