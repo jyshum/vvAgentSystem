@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RunRail } from "@/components/runs/RunRail";
-import { TechnicalAuditChecklist } from "@/components/runs/TechnicalAuditChecklist";
+import { RunTechnicalAuditEvidence } from "@/components/runs/RunTechnicalAuditEvidence";
 import { fetchSchedules } from "@/lib/schedules";
 import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatRate, formatDelta } from "@/lib/utils";
@@ -381,9 +381,11 @@ export default async function RunDetailPage({
         </div>
       </div>
 
-      {presentationMode === "technical_v1" && technicalAudit.run && (
-        <TechnicalAuditChecklist run={technicalAudit.run} results={technicalAudit.results} />
-      )}
+      <RunTechnicalAuditEvidence
+        mode={presentationMode}
+        run={technicalAudit.run}
+        results={technicalAudit.results}
+      />
 
       {/* Funnel */}
       {improvementRun && (

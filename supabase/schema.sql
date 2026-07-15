@@ -1,5 +1,5 @@
 -- ============================================================================
--- Victory Velocity — consolidated schema (current version, 2026-07-08)
+-- Victory Velocity — consolidated schema (current version, 2026-07-15)
 -- ============================================================================
 -- Single canonical baseline that replaces migrations 001–010. Paste the whole
 -- file into the Supabase SQL editor and run once.
@@ -62,6 +62,7 @@ drop table if exists public.audit_runs cascade;
 
 drop function if exists public.get_my_client_id() cascade;
 drop function if exists public.is_admin() cascade;
+drop function if exists public.prevent_improvement_run_route_mutation() cascade;
 
 -- ─────────────────────────────────────────────
 -- 1. Core tables
@@ -233,8 +234,42 @@ create table public.improvement_runs (
   status text default 'running' check (status in ('running', 'completed', 'error')),
   error_message text,
   completed_at timestamptz,
-  thread_id text
+  thread_id text,
+  run_mode text not null default 'legacy'
+    constraint improvement_runs_run_mode_check
+    check (run_mode in ('legacy', 'technical_v1')),
+  effective_check_sets text[] not null default '{}'::text[],
+  constraint improvement_runs_check_sets_match_mode_check
+    check (
+      (run_mode = 'legacy' and cardinality(effective_check_sets) = 0)
+      or
+      (run_mode = 'technical_v1' and cardinality(effective_check_sets) > 0)
+    )
 );
+
+create or replace function public.prevent_improvement_run_route_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.run_mode is distinct from new.run_mode
+    or old.effective_check_sets is distinct from new.effective_check_sets then
+    raise exception 'improvement run route controls are immutable';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger improvement_runs_route_controls_immutable
+  before update of run_mode, effective_check_sets
+  on public.improvement_runs
+  for each row
+  execute function public.prevent_improvement_run_route_mutation();
+
+comment on column public.improvement_runs.run_mode is
+  'Immutable route selected when the improvement run was inserted.';
+comment on column public.improvement_runs.effective_check_sets is
+  'Immutable technical check sets selected when the improvement run was inserted.';
 
 -- Versioned technical checklist. Legacy page_citation_scores remain historical.
 create table public.client_site_profiles (
