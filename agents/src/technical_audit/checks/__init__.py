@@ -2,7 +2,11 @@ from ..registry import CheckDefinition, CheckRegistry
 from .canonical import evaluate_canonical
 from .llms_txt import evaluate_llms_txt
 from .metadata import evaluate_meta_description, evaluate_meta_title
+from .freshness import evaluate_freshness
+from .images import evaluate_alt_text, evaluate_image_integrity
+from .links import evaluate_external_links, evaluate_internal_links
 from .robots import evaluate_robots_access, evaluate_robots_integrity
+from .source_support import evaluate_source_support
 from .schema_markup import evaluate_schema_coverage, evaluate_schema_integrity
 from .sitemap import (
     evaluate_sitemap_coverage,
@@ -43,6 +47,17 @@ _CHECK_SETS: dict[str, tuple[CheckDefinition, ...]] = {
         CheckDefinition("tls.mixed_content", 1, "ssl_https", "page", evaluate_mixed_content),
         CheckDefinition("schema.integrity", 1, "schema_markup", "page", evaluate_schema_integrity),
         CheckDefinition("schema.coverage", 1, "schema_markup", "page", evaluate_schema_coverage),
+    ),
+    "site_integrity": (
+        CheckDefinition("links.internal_health", 1, "broken_links", "page", evaluate_internal_links),
+        CheckDefinition("links.external_health", 1, "broken_links", "site", evaluate_external_links),
+        CheckDefinition("images.integrity", 1, "image_optimization", "page", evaluate_image_integrity),
+        CheckDefinition("images.alt_text", 1, "image_optimization", "page", evaluate_alt_text),
+        CheckDefinition("freshness.dates", 1, "freshness", "page", evaluate_freshness),
+        CheckDefinition(
+            "source_support.link_health", 1, "source_citations", "page",
+            evaluate_source_support,
+        ),
     ),
 }
 
