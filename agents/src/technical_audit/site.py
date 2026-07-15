@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from ipaddress import ip_address
+import re
 from urllib.parse import urlsplit
 
 
@@ -28,6 +29,11 @@ class SiteIdentity:
             is_ip_literal = True
         except ValueError:
             pass
+        labels = host.split(".")
+        is_numeric_host_form = bool(labels) and all(
+            re.fullmatch(r"(?:[0-9]+|0x[0-9a-f]+)", label, re.IGNORECASE)
+            for label in labels
+        )
         if (
             not host
             or parsed.path not in {"", "/"}
@@ -37,6 +43,7 @@ class SiteIdentity:
             or parsed.password is not None
             or port not in {None, 443}
             or is_ip_literal
+            or is_numeric_host_form
             or host == "localhost"
             or host.endswith((".localhost", ".local", ".internal"))
         ):

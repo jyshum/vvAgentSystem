@@ -1,4 +1,14 @@
-from src.technical_audit.collector import MAX_BODY_BYTES, collect_foundation
+from dataclasses import asdict
+
+import httpx
+import pytest
+
+import src.technical_audit.collector as collector_module
+from src.technical_audit.collector import (
+    MAX_BODY_BYTES,
+    _HttpxFetcher,
+    collect_foundation,
+)
 from src.technical_audit.site import SiteIdentity
 
 
@@ -121,7 +131,7 @@ def test_collection_rejects_credential_bearing_redirect_before_normalization():
         return _response(
             url,
             status=302,
-            location="https://user:secret@example.com/private",
+            location="https://alice:super-secret@example.com/private",
         )
 
     collected = collect_foundation(
@@ -131,7 +141,124 @@ def test_collection_rejects_credential_bearing_redirect_before_normalization():
 
     assert calls == ["https://example.com/", "https://example.com/llms.txt"]
     assert "not an allowed same-site HTTPS URL" in collected.homepage.error
-    assert all("secret" not in url for url in collected.homepage.redirect_chain)
+    serialized = str(asdict(collected.homepage))
+    assert "alice" not in serialized
+    assert "super-secret" not in serialized
+    assert "[REDACTED]@example.com/private" in collected.homepage.error
+
+
+def test_consolidated_redirect_evidence_redacts_credentials_everywhere():
+    credential_url = "https://bob:hunter2@example.com/private"
+
+    def fetcher(url):
+        if url.endswith("/llms.txt"):
+            return _response(url, status=404, content_type="text/plain")
+        return {
+            **_response(url),
+            "final_url": credential_url,
+            "redirect_chain": (url, credential_url),
+        }
+
+    collected = collect_foundation(
+        SiteIdentity.from_domain("example.com", "other"),
+        fetcher=fetcher,
+    )
+
+    serialized = str(asdict(collected.homepage))
+    assert "bob" not in serialized
+    assert "hunter2" not in serialized
+    assert "[REDACTED]@example.com/private" in collected.homepage.error
+
+
+@pytest.mark.parametrize(
+    "unsafe_address",
+    [
+        "127.0.0.1",
+        "10.0.0.1",
+        "169.254.1.1",
+        "224.0.0.1",
+        "0.0.0.0",
+        "240.0.0.1",
+        "::1",
+        "fc00::1",
+        "fe80::1",
+        "ff02::1",
+        "::",
+    ],
+)
+def test_public_resolution_rejects_any_unsafe_dns_answer(unsafe_address):
+    resolver = lambda host, port: ("93.184.216.34", unsafe_address)
+
+    with pytest.raises(ValueError, match="non-public address"):
+        collector_module.validate_public_resolution(
+            "https://example.com/path", resolver
+        )
+
+
+@pytest.mark.parametrize("answers", [(), None])
+def test_public_resolution_rejects_empty_dns_answers(answers):
+    with pytest.raises(ValueError, match="DNS resolution failed"):
+        collector_module.validate_public_resolution(
+            "https://example.com/",
+            lambda host, port: answers,
+        )
+
+
+def test_public_resolution_rejects_resolver_failure():
+    def resolver(host, port):
+        raise OSError("resolver unavailable")
+
+    with pytest.raises(ValueError, match="DNS resolution failed"):
+        collector_module.validate_public_resolution(
+            "https://example.com/",
+            resolver,
+        )
+
+
+def test_production_fetcher_resolves_immediately_before_initial_request():
+    calls = []
+
+    def resolver(host, port):
+        calls.append((host, port))
+        return ("127.0.0.1",)
+
+    fetcher = _HttpxFetcher(
+        SiteIdentity.from_domain("example.com", "other"),
+        resolver=resolver,
+    )
+    try:
+        with pytest.raises(ValueError, match="non-public address"):
+            fetcher("https://example.com/")
+    finally:
+        fetcher.close()
+
+    assert calls == [("example.com", 443)]
+
+
+def test_production_fetcher_resolves_redirect_target_before_following_hop():
+    calls = []
+
+    def resolver(host, port):
+        calls.append((host, port))
+        return ("10.0.0.8",)
+
+    fetcher = _HttpxFetcher(
+        SiteIdentity.from_domain("example.com", "other"),
+        resolver=resolver,
+    )
+    request = httpx.Request("GET", "https://example.com/")
+    response = httpx.Response(
+        302,
+        headers={"location": "https://www.example.com/private"},
+        request=request,
+    )
+    try:
+        with pytest.raises(ValueError, match="non-public address"):
+            fetcher._validate_redirect(response)
+    finally:
+        fetcher.close()
+
+    assert calls == [("www.example.com", 443)]
 
 
 def test_collection_enforces_five_redirect_limit():

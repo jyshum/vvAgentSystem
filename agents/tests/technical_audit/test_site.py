@@ -34,7 +34,16 @@ def test_site_identity_normalizes_www_configuration_to_one_host_pair():
 
 @pytest.mark.parametrize(
     "domain",
-    ["https://example.com:8443", "localhost", "127.0.0.1", "[::1]"],
+    [
+        "https://example.com:8443",
+        "localhost",
+        "127.0.0.1",
+        "[::1]",
+        "2130706433",
+        "0x7f000001",
+        "017700000001",
+        "0x7f.0x0.0x0.0x1",
+    ],
 )
 def test_site_identity_rejects_non_public_or_nonstandard_configured_hosts(domain):
     with pytest.raises(ValueError, match="public hostname"):

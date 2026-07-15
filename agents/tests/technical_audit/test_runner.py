@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from src.technical_audit.collector import CollectedSite, HttpEvidence
@@ -110,6 +112,13 @@ def test_runner_retains_unavailable_page_as_unknown_results():
     )
     assert page_observation["data"]["available"] is False
     assert page_observation["data"]["status_code"] == 403
+    description = next(
+        result
+        for result in page_results
+        if result["check_id"] == "meta_description.integrity"
+    )
+    assert "audited page" in description["expected"].lower()
+    assert "priority" not in description["expected"].lower()
 
 
 def test_runner_accepts_www_canonical_after_bare_homepage_redirect():
@@ -203,3 +212,33 @@ def test_invalid_check_sets_fail_without_mutating_collected_evidence(enabled_che
         )
 
     assert collected.pages == (collected.homepage,)
+
+
+@pytest.mark.parametrize(
+    "altered_identity",
+    [
+        replace(
+            SiteIdentity.from_domain("example.com", "squarespace"),
+            platform="other",
+        ),
+        replace(
+            SiteIdentity.from_domain("example.com", "squarespace"),
+            allowed_hosts=frozenset(
+                {"example.com", "www.example.com", "attacker.example"}
+            ),
+        ),
+        replace(
+            SiteIdentity.from_domain("example.com", "squarespace"),
+            allowed_hosts=frozenset({"example.com"}),
+        ),
+    ],
+)
+def test_runner_rejects_any_collected_identity_mismatch(altered_identity):
+    identity = SiteIdentity.from_domain("example.com", "squarespace")
+    collected = replace(_collected(identity=identity), identity=altered_identity)
+
+    with pytest.raises(
+        ValueError,
+        match="collected evidence does not match the configured site identity",
+    ):
+        run_technical_audit("client-1", identity, collected)

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import socket
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+from ipaddress import ip_address
 from typing import Any
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from xml.etree import ElementTree
@@ -47,15 +49,91 @@ class CollectedSite:
 
 FetchResult = HttpEvidence | dict[str, Any]
 Fetcher = Callable[[str], FetchResult]
+Resolver = Callable[[str, int], Any]
 
 
 class _UnsafeRedirect(ValueError):
     pass
 
 
+def _redacted_url(url: str) -> str:
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "unknown-host").lower().rstrip(".")
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        try:
+            port = parts.port
+        except ValueError:
+            port = None
+        host_port = f"{host}:{port}" if port is not None else host
+        credentials = (
+            "[REDACTED]@"
+            if parts.username is not None or parts.password is not None
+            else ""
+        )
+        return urlunsplit(
+            (
+                parts.scheme.lower(),
+                f"{credentials}{host_port}",
+                parts.path or "/",
+                "",
+                "",
+            )
+        )
+    except Exception:
+        return "[invalid URL]"
+
+
+def _system_resolver(host: str, port: int) -> tuple[str, ...]:
+    answers = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    return tuple(dict.fromkeys(answer[4][0] for answer in answers))
+
+
+def validate_public_resolution(url: str, resolver: Resolver = _system_resolver) -> None:
+    # This policy check intentionally runs immediately before HTTPX. HTTPX still
+    # resolves the hostname for its own socket, so this validates DNS answers but
+    # does not pin the connection to one of the validated addresses.
+    safe_url = _redacted_url(url)
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    try:
+        port = parts.port or 443
+        answers = tuple(resolver(host, port) or ())
+    except Exception as exc:
+        raise ValueError(f"DNS resolution failed for {safe_url}") from exc
+    if not answers:
+        raise ValueError(f"DNS resolution failed for {safe_url}: no addresses")
+    for raw_address in answers:
+        try:
+            address = ip_address(str(raw_address).split("%", 1)[0])
+        except ValueError as exc:
+            raise ValueError(
+                f"DNS resolution failed for {safe_url}: invalid address"
+            ) from exc
+        if (
+            not address.is_global
+            or address.is_loopback
+            or address.is_private
+            or address.is_link_local
+            or address.is_multicast
+            or address.is_unspecified
+            or address.is_reserved
+        ):
+            raise ValueError(
+                f"DNS resolution for {safe_url} returned non-public address {address}"
+            )
+
+
 class _HttpxFetcher:
-    def __init__(self, identity: SiteIdentity) -> None:
+    def __init__(
+        self,
+        identity: SiteIdentity,
+        *,
+        resolver: Resolver = _system_resolver,
+    ) -> None:
         self._identity = identity
+        self._resolver = resolver
         self._client = httpx.Client(
             follow_redirects=True,
             timeout=TIMEOUT_SECONDS,
@@ -71,10 +149,13 @@ class _HttpxFetcher:
         target = urljoin(str(response.url), location)
         if not self._identity.allows(target):
             raise _UnsafeRedirect(
-                f"redirect target is not an allowed same-site HTTPS URL: {target}"
+                "redirect target is not an allowed same-site HTTPS URL: "
+                f"{_redacted_url(target)}"
             )
+        validate_public_resolution(target, self._resolver)
 
     def __call__(self, url: str) -> FetchResult:
+        validate_public_resolution(url, self._resolver)
         with self._client.stream("GET", url) as response:
             body, truncated = _bounded_body(response.iter_bytes())
             chain = tuple(str(item.url) for item in response.history) + (
@@ -221,7 +302,10 @@ def _fetch(fetcher: Fetcher, identity: SiteIdentity, request_url: str) -> HttpEv
                         content_type=_raw_value(result, "content_type", ""),
                         body="",
                         body_truncated=False,
-                        error=f"redirect target is not an allowed same-site HTTPS URL: {url}",
+                        error=(
+                            "redirect target is not an allowed same-site HTTPS URL: "
+                            f"{_redacted_url(url)}"
+                        ),
                     )
             normalized_result_chain = [_normalize_url(url) for url in result_chain]
             if normalized_result_chain[0] != current_url:
@@ -236,7 +320,10 @@ def _fetch(fetcher: Fetcher, identity: SiteIdentity, request_url: str) -> HttpEv
                         content_type=_raw_value(result, "content_type", ""),
                         body="",
                         body_truncated=False,
-                        error=f"redirect target is not an allowed same-site HTTPS URL: {url}",
+                        error=(
+                            "redirect target is not an allowed same-site HTTPS URL: "
+                            f"{_redacted_url(url)}"
+                        ),
                     )
             combined_chain = [*chain[:-1], *normalized_result_chain]
             if len(combined_chain) - 1 > MAX_REDIRECTS:
@@ -263,7 +350,10 @@ def _fetch(fetcher: Fetcher, identity: SiteIdentity, request_url: str) -> HttpEv
                     content_type=_raw_value(result, "content_type", ""),
                     body="",
                     body_truncated=False,
-                    error=f"redirect target is not an allowed same-site HTTPS URL: {raw_final}",
+                    error=(
+                        "redirect target is not an allowed same-site HTTPS URL: "
+                        f"{_redacted_url(raw_final)}"
+                    ),
                 )
             final_url = _normalize_url(raw_final)
             if final_url != current_url:
@@ -285,7 +375,10 @@ def _fetch(fetcher: Fetcher, identity: SiteIdentity, request_url: str) -> HttpEv
                     content_type=_raw_value(result, "content_type", ""),
                     body=_raw_value(result, "body", ""),
                     body_truncated=bool(_raw_value(result, "body_truncated", False)),
-                    error=f"redirect target is not an allowed same-site HTTPS URL: {raw_target}",
+                    error=(
+                        "redirect target is not an allowed same-site HTTPS URL: "
+                        f"{_redacted_url(raw_target)}"
+                    ),
                 )
             target = _normalize_url(raw_target)
             if len(chain) - 1 >= MAX_REDIRECTS:
@@ -354,11 +447,14 @@ def collect_foundation(
     identity: SiteIdentity,
     max_pages: int = MAX_PAGES,
     fetcher: Fetcher | None = None,
+    resolver: Resolver = _system_resolver,
 ) -> CollectedSite:
     if not 1 <= max_pages <= MAX_PAGES:
         raise ValueError(f"max_pages must be between 1 and {MAX_PAGES}")
 
-    default_fetcher = _HttpxFetcher(identity) if fetcher is None else None
+    default_fetcher = (
+        _HttpxFetcher(identity, resolver=resolver) if fetcher is None else None
+    )
     effective_fetcher = fetcher or default_fetcher
     assert effective_fetcher is not None
 

@@ -52,9 +52,9 @@ def run_technical_audit(
     collected: CollectedSite,
     enabled_check_sets: tuple[str, ...] = ("foundation",),
 ) -> dict[str, Any]:
-    registry = build_v1_registry(enabled_check_sets)
-    if identity.configured_domain != collected.identity.configured_domain:
+    if identity != collected.identity:
         raise ValueError("collected evidence does not match the configured site identity")
+    registry = build_v1_registry(enabled_check_sets)
 
     page_observations = tuple(_page_observation(page) for page in collected.pages)
     llms_observation = _llms_observation(collected.llms_txt)

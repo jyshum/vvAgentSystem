@@ -148,7 +148,7 @@ def evaluate_meta_description(context: AuditContext) -> list[CheckResult]:
                 page,
                 "meta_description.integrity",
                 "meta_description",
-                "An observable description state for the priority page",
+                "An observable description state for the audited page",
             ))
             continue
         reason = _not_indexable_reason(page)
