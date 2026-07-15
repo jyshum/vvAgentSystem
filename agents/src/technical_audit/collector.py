@@ -7,6 +7,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 from ipaddress import ip_address
+from queue import Empty, Queue
+from threading import Thread
 from typing import Any
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from xml.etree import ElementTree
@@ -22,6 +24,7 @@ MAX_REDIRECTS = 5
 MAX_PAGES = 20
 MAX_SITEMAPS = 3
 TIMEOUT_SECONDS = 10
+RESOLVER_TIMEOUT_SECONDS = 10
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,10 @@ Resolver = Callable[[str, int], Any]
 
 
 class _UnsafeRedirect(ValueError):
+    pass
+
+
+class _ResolverTimeout(TimeoutError):
     pass
 
 
@@ -90,7 +97,38 @@ def _system_resolver(host: str, port: int) -> tuple[str, ...]:
     return tuple(dict.fromkeys(answer[4][0] for answer in answers))
 
 
-def validate_public_resolution(url: str, resolver: Resolver = _system_resolver) -> None:
+def _resolve_with_deadline(
+    resolver: Resolver,
+    host: str,
+    port: int,
+    timeout_seconds: float,
+) -> Any:
+    outcome: Queue[tuple[bool, Any]] = Queue(maxsize=1)
+
+    def resolve() -> None:
+        try:
+            outcome.put((True, resolver(host, port)))
+        except Exception as exc:
+            outcome.put((False, exc))
+
+    # Python cannot safely cancel a running getaddrinfo/NSS call. A daemon avoids
+    # making the audit caller or interpreter shutdown join a timed-out resolver.
+    # The worker exits naturally if/when the underlying resolver returns.
+    Thread(target=resolve, name="technical-audit-resolver", daemon=True).start()
+    try:
+        succeeded, value = outcome.get(timeout=timeout_seconds)
+    except Empty as exc:
+        raise _ResolverTimeout from exc
+    if succeeded:
+        return value
+    raise value
+
+
+def validate_public_resolution(
+    url: str,
+    resolver: Resolver = _system_resolver,
+    resolver_timeout_seconds: float = RESOLVER_TIMEOUT_SECONDS,
+) -> None:
     # This policy check intentionally runs immediately before HTTPX. HTTPX still
     # resolves the hostname for its own socket, so this validates DNS answers but
     # does not pin the connection to one of the validated addresses.
@@ -99,7 +137,20 @@ def validate_public_resolution(url: str, resolver: Resolver = _system_resolver) 
     host = parts.hostname or ""
     try:
         port = parts.port or 443
-        answers = tuple(resolver(host, port) or ())
+        answers = tuple(
+            _resolve_with_deadline(
+                resolver,
+                host,
+                port,
+                resolver_timeout_seconds,
+            )
+            or ()
+        )
+    except _ResolverTimeout as exc:
+        deadline = f"{resolver_timeout_seconds:g}"
+        raise ValueError(
+            f"DNS resolution timed out after {deadline} seconds for {safe_url}"
+        ) from exc
     except Exception as exc:
         raise ValueError(f"DNS resolution failed for {safe_url}") from exc
     if not answers:
@@ -131,9 +182,11 @@ class _HttpxFetcher:
         identity: SiteIdentity,
         *,
         resolver: Resolver = _system_resolver,
+        resolver_timeout_seconds: float = RESOLVER_TIMEOUT_SECONDS,
     ) -> None:
         self._identity = identity
         self._resolver = resolver
+        self._resolver_timeout_seconds = resolver_timeout_seconds
         self._client = httpx.Client(
             follow_redirects=True,
             timeout=TIMEOUT_SECONDS,
@@ -152,10 +205,18 @@ class _HttpxFetcher:
                 "redirect target is not an allowed same-site HTTPS URL: "
                 f"{_redacted_url(target)}"
             )
-        validate_public_resolution(target, self._resolver)
+        validate_public_resolution(
+            target,
+            self._resolver,
+            self._resolver_timeout_seconds,
+        )
 
     def __call__(self, url: str) -> FetchResult:
-        validate_public_resolution(url, self._resolver)
+        validate_public_resolution(
+            url,
+            self._resolver,
+            self._resolver_timeout_seconds,
+        )
         with self._client.stream("GET", url) as response:
             body, truncated = _bounded_body(response.iter_bytes())
             chain = tuple(str(item.url) for item in response.history) + (
@@ -448,12 +509,21 @@ def collect_foundation(
     max_pages: int = MAX_PAGES,
     fetcher: Fetcher | None = None,
     resolver: Resolver = _system_resolver,
+    resolver_timeout_seconds: float = RESOLVER_TIMEOUT_SECONDS,
 ) -> CollectedSite:
     if not 1 <= max_pages <= MAX_PAGES:
         raise ValueError(f"max_pages must be between 1 and {MAX_PAGES}")
+    if resolver_timeout_seconds <= 0:
+        raise ValueError("resolver_timeout_seconds must be positive")
 
     default_fetcher = (
-        _HttpxFetcher(identity, resolver=resolver) if fetcher is None else None
+        _HttpxFetcher(
+            identity,
+            resolver=resolver,
+            resolver_timeout_seconds=resolver_timeout_seconds,
+        )
+        if fetcher is None
+        else None
     )
     effective_fetcher = fetcher or default_fetcher
     assert effective_fetcher is not None
@@ -541,6 +611,7 @@ def collect_foundation(
             "sitemap_limit": MAX_SITEMAPS,
             "sitemaps_fetched": sitemaps_fetched,
             "timeout_seconds": TIMEOUT_SECONDS,
+            "resolver_timeout_seconds": resolver_timeout_seconds,
             "same_site_https": True,
             "concurrency_limit": 1,
         }

@@ -1,4 +1,6 @@
 from dataclasses import asdict
+from threading import Event
+from time import monotonic
 
 import httpx
 import pytest
@@ -84,6 +86,7 @@ def test_collection_follows_bare_domain_and_bounds_sitemap_and_nav_pages():
     assert collected.scope["body_byte_limit"] == MAX_BODY_BYTES
     assert collected.scope["redirect_limit"] == 5
     assert collected.scope["timeout_seconds"] == 10
+    assert collected.scope["resolver_timeout_seconds"] == 10
     assert collected.identity.allowed_hosts == frozenset(
         {"budgetyourmd.ca", "www.budgetyourmd.ca"}
     )
@@ -259,6 +262,68 @@ def test_production_fetcher_resolves_redirect_target_before_following_hop():
         fetcher.close()
 
     assert calls == [("www.example.com", 443)]
+
+
+def test_collection_bounds_blocking_resolver_and_records_timeout_evidence():
+    release = Event()
+    calls = []
+
+    def blocking_resolver(host, port):
+        calls.append((host, port))
+        release.wait(1)
+        return ("93.184.216.34",)
+
+    started = monotonic()
+    try:
+        collected = collect_foundation(
+            SiteIdentity.from_domain("example.com", "other"),
+            resolver=blocking_resolver,
+            resolver_timeout_seconds=0.02,
+        )
+        elapsed = monotonic() - started
+    finally:
+        release.set()
+
+    assert elapsed < 0.25
+    assert calls == [("example.com", 443), ("example.com", 443)]
+    assert collected.scope["resolver_timeout_seconds"] == 0.02
+    for evidence in (collected.homepage, collected.llms_txt):
+        assert evidence.status_code == 0
+        assert "DNS resolution timed out after 0.02 seconds" in evidence.error
+        assert evidence.retrieved_at.endswith("+00:00")
+        assert len(evidence.fingerprint) == 64
+
+
+def test_redirect_hop_bounds_blocking_resolver_without_waiting_for_cleanup():
+    release = Event()
+
+    def blocking_resolver(host, port):
+        release.wait(1)
+        return ("93.184.216.34",)
+
+    fetcher = _HttpxFetcher(
+        SiteIdentity.from_domain("example.com", "other"),
+        resolver=blocking_resolver,
+        resolver_timeout_seconds=0.02,
+    )
+    response = httpx.Response(
+        302,
+        headers={"location": "https://www.example.com/private"},
+        request=httpx.Request("GET", "https://example.com/"),
+    )
+    started = monotonic()
+    try:
+        with pytest.raises(
+            ValueError,
+            match=r"DNS resolution timed out after 0\.02 seconds",
+        ):
+            fetcher._validate_redirect(response)
+        elapsed = monotonic() - started
+    finally:
+        release.set()
+        fetcher.close()
+
+    assert elapsed < 0.25
 
 
 def test_collection_enforces_five_redirect_limit():
