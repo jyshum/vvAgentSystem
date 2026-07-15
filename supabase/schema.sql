@@ -76,6 +76,10 @@ create table public.clients (
   brand_variations jsonb default '[]'::jsonb,
   target_queries jsonb default '[]'::jsonb,
   competitors jsonb default '[]'::jsonb,
+  site_platform text not null default 'unknown'
+    check (site_platform in ('unknown', 'squarespace', 'wordpress', 'webflow', 'shopify', 'repository', 'other')),
+  implementation_mode text not null default 'copy_paste'
+    check (implementation_mode in ('copy_paste', 'guided', 'github_pr', 'staged_api')),
   cms_type text default 'copy_paste'
     check (cms_type in ('github', 'wordpress', 'webflow', 'shopify', 'copy_paste')),
   cms_config jsonb default '{}'::jsonb,
