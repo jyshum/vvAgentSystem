@@ -187,6 +187,7 @@ def test_run_technical_pipeline_returns_audit_error_without_action_cards(monkeyp
         "technical_audit_results": [],
         "technical_audit_error": "audit unavailable",
         "community_opportunities": [],
+        "error": "audit unavailable",
     }
     assert "action_cards" not in result
     audit_update = tables["technical_audit_runs"].update.call_args.args[0]

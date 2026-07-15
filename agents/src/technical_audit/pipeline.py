@@ -167,7 +167,7 @@ def run_technical_pipeline(
         "id", improvement_run_id
     ).execute()
 
-    return {
+    result = {
         "improvement_run_id": improvement_run_id,
         "technical_audit_run_id": audit["run_id"],
         "technical_audit_summary": audit["summary"],
@@ -177,3 +177,6 @@ def run_technical_pipeline(
             item.to_gap_dict() for item in selection.opportunities
         ],
     }
+    if audit["error"]:
+        result["error"] = audit["error"]
+    return result

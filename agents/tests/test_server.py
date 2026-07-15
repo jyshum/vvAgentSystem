@@ -36,6 +36,26 @@ def test_approve_route_does_not_exist():
     assert resp.status_code == 404
 
 
+def test_status_response_has_no_approval_field(monkeypatch):
+    import server as server_mod
+
+    state = type("State", (), {"next": ()})()
+    monkeypatch.setattr(
+        server_mod.graph,
+        "get_state",
+        lambda config=None: state,
+    )
+
+    client = TestClient(server_mod.app)
+    resp = client.get(
+        "/api/status/thread-1",
+        headers={"Authorization": f"Bearer {server_mod.API_KEY}"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"next": []}
+
+
 def test_build_checkpointer_returns_none_without_database_url(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     import server as server_mod

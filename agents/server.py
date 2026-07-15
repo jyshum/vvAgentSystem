@@ -158,7 +158,6 @@ async def get_status(thread_id: str, authorization: str | None = Header(None)):
         state = graph.get_state(config=config)
         return {
             "next": list(state.next) if state.next else [],
-            "has_pending_approval": False,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
