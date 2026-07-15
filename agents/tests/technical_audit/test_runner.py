@@ -1,36 +1,75 @@
 import pytest
 
-from src.technical_audit.runner import _bounded_text, run_technical_audit
+from src.technical_audit.collector import CollectedSite, HttpEvidence
+from src.technical_audit.runner import run_technical_audit
+from src.technical_audit.site import SiteIdentity
 
 
-def test_runner_returns_counts_and_never_a_score():
-    inventory = [
-        {
-            "url": "https://example.com/",
-            "raw_html": (
-                '<html><head><title>Example</title><meta name="description" content="'
-                + ("A" * 80)
-                + '"><link rel="canonical" href="https://example.com/"></head><body></body></html>'
-            ),
-        }
-    ]
+RETRIEVED_AT = "2026-07-15T12:00:00+00:00"
 
-    report = run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=inventory,
-        profile={
-            "llms_txt_enabled": False,
-            "priority_urls": ["https://example.com/"],
-        },
-        fetcher=lambda url: {
-            "status_code": 200 if url == "https://example.com/" else 404,
-            "content_type": "text/html" if url == "https://example.com/" else "text/plain",
-            "body": inventory[0]["raw_html"] if url == "https://example.com/" else "",
-            "final_url": url,
-            "error": None,
+
+def _evidence(
+    url,
+    *,
+    status=200,
+    content_type="text/html",
+    body="",
+    final_url=None,
+    chain=None,
+    error=None,
+    fingerprint="a" * 64,
+):
+    return HttpEvidence(
+        request_url=url,
+        final_url=final_url or url,
+        redirect_chain=chain or (url,),
+        status_code=status,
+        content_type=content_type,
+        body=body,
+        body_truncated=False,
+        error=error,
+        retrieved_at=RETRIEVED_AT,
+        fingerprint=fingerprint,
+    )
+
+
+def _collected(*, page=None, llms=None, identity=None):
+    identity = identity or SiteIdentity.from_domain("example.com", "squarespace")
+    page = page or _evidence(
+        "https://example.com/",
+        body=(
+            '<html><head><title>Example</title>'
+            f'<meta name="description" content="{"A" * 80}">'
+            '<link rel="canonical" href="https://example.com/">'
+            "</head><body></body></html>"
+        ),
+    )
+    llms = llms or _evidence(
+        f"https://{identity.configured_domain}/llms.txt",
+        status=404,
+        content_type="text/plain",
+        fingerprint="b" * 64,
+    )
+    return CollectedSite(
+        identity=identity,
+        homepage=page,
+        pages=(page,),
+        llms_txt=llms,
+        scope={
+            "max_pages": 20,
+            "pages_collected": 1,
+            "truncated": False,
+            "body_byte_limit": 512_000,
+            "redirect_limit": 5,
         },
     )
+
+
+def test_runner_returns_counts_scope_and_never_a_score():
+    identity = SiteIdentity.from_domain("example.com", "squarespace")
+    collected = _collected(identity=identity)
+
+    report = run_technical_audit("client-1", identity, collected)
 
     assert report["audit_version"] == 1
     assert report["summary"] == {
@@ -41,341 +80,126 @@ def test_runner_returns_counts_and_never_a_score():
         "not_applicable": 1,
         "total": 4,
     }
+    assert report["scope"] == collected.scope
     assert "score" not in report
     assert all("score" not in result for result in report["results"])
 
 
-def test_runner_fetches_a_missing_homepage_once_and_records_fetch_errors():
-    calls = []
-
-    def fetcher(url):
-        calls.append(url)
-        if url == "https://example.com/":
-            return {
-                "status_code": 200,
-                "content_type": "text/html",
-                "body": "<html><head><title>Home</title></head></html>",
-                "final_url": url,
-                "error": None,
-            }
-        return {
-            "status_code": 0,
-            "content_type": "",
-            "body": "",
-            "final_url": url,
-            "error": "timeout",
-        }
+def test_runner_retains_unavailable_page_as_unknown_results():
+    identity = SiteIdentity.from_domain("example.com", "squarespace")
+    blocked = _evidence(
+        "https://example.com/",
+        status=403,
+        body="Forbidden",
+        error=None,
+    )
 
     report = run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=[],
-        profile={"llms_txt_enabled": True, "priority_urls": []},
-        fetcher=fetcher,
+        "client-1",
+        identity,
+        _collected(identity=identity, page=blocked),
     )
 
-    assert calls == ["https://example.com/", "https://example.com/llms.txt"]
-    assert report["summary"]["unknown"] == 1
-    assert len(report["observations"]) == 2
-
-
-def test_runner_bounds_persisted_llms_txt_evidence():
-    report = run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=[{
-            "url": "https://example.com/",
-            "raw_html": "<html><head><title>Home</title></head></html>",
-        }],
-        profile={"llms_txt_enabled": True, "priority_urls": []},
-        fetcher=lambda url: {
-            "status_code": 200,
-            "content_type": "text/plain",
-            "body": "x" * 10_000,
-            "final_url": url,
-            "error": None,
-        },
-    )
-
-    llms = next(item for item in report["observations"] if item["kind"] == "llms_txt")
-    assert "body" not in llms["data"]
-    assert len(llms["data"]["body_excerpt"]) == 4_000
-    assert llms["data"]["body_bytes"] == 10_000
-
-
-def test_homepage_is_a_priority_page_when_profile_has_no_priority_urls():
-    homepage_html = '<html><head><title>Home</title><link rel="canonical" href="https://example.com/"></head></html>'
-    report = run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=[{
-            "url": "https://example.com/",
-            "raw_html": homepage_html,
-        }],
-        profile={"llms_txt_enabled": False},
-        fetcher=lambda url: {
-            "status_code": 200 if url == "https://example.com/" else 404,
-            "content_type": "text/html" if url == "https://example.com/" else "text/plain",
-            "body": homepage_html if url == "https://example.com/" else "",
-            "final_url": url,
-            "error": None,
-        },
-    )
-
-    description = next(
-        result for result in report["results"]
-        if result["check_id"] == "meta_description.integrity"
-    )
-    assert description["status"] == "review"
-
-
-def test_unavailable_homepage_emits_unknown_page_results():
-    def fetcher(url):
-        if url == "https://example.com/":
-            return {
-                "status_code": 403,
-                "content_type": "text/html",
-                "body": "Forbidden",
-                "final_url": url,
-                "error": None,
-            }
-        return {
-            "status_code": 404,
-            "content_type": "text/plain",
-            "body": "",
-            "final_url": url,
-            "error": None,
-        }
-
-    report = run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=[],
-        profile={"llms_txt_enabled": False},
-        fetcher=fetcher,
-    )
-
-    page_results = [result for result in report["results"] if result["section"] != "llms_txt"]
+    page_results = [
+        result for result in report["results"] if result["section"] != "llms_txt"
+    ]
     assert len(page_results) == 3
     assert {result["status"] for result in page_results} == {"unknown"}
-    assert report["summary"]["unknown"] == 3
+    page_observation = next(
+        item for item in report["observations"] if item["kind"] == "page"
+    )
+    assert page_observation["data"]["available"] is False
+    assert page_observation["data"]["status_code"] == 403
 
 
-def test_missing_configured_priority_page_is_fetched_and_reported_unknown():
-    missing_priority = "https://example.com/important"
+def test_runner_accepts_www_canonical_after_bare_homepage_redirect():
+    configured = SiteIdentity.from_domain("budgetyourmd.ca", "squarespace")
+    resolved = configured.with_final_homepage("https://www.budgetyourmd.ca/")
+    page = _evidence(
+        "https://budgetyourmd.ca/",
+        final_url="https://www.budgetyourmd.ca/",
+        chain=(
+            "https://budgetyourmd.ca/",
+            "https://www.budgetyourmd.ca/",
+        ),
+        body=(
+            '<html><head><title>Budget Your MD</title>'
+            f'<meta name="description" content="{"A" * 80}">'
+            '<link rel="canonical" href="https://www.budgetyourmd.ca/">'
+            "</head></html>"
+        ),
+    )
+    llms = _evidence(
+        "https://www.budgetyourmd.ca/llms.txt",
+        status=404,
+        content_type="text/plain",
+    )
+    collected = _collected(identity=resolved, page=page, llms=llms)
 
-    def fetcher(url):
-        if url == missing_priority:
-            return {
-                "status_code": 403,
-                "content_type": "text/html",
-                "body": "Forbidden",
-                "final_url": url,
-                "error": None,
-            }
-        if url == "https://example.com/":
-            return {
-                "status_code": 200,
-                "content_type": "text/html",
-                "body": "<html><head><title>Home</title></head></html>",
-                "final_url": url,
-                "error": None,
-            }
-        return {
-            "status_code": 404,
-            "content_type": "text/plain",
-            "body": "",
-            "final_url": url,
-            "error": None,
-        }
+    report = run_technical_audit("client-1", configured, collected)
+
+    canonical = next(
+        result
+        for result in report["results"]
+        if result["check_id"] == "canonical.integrity"
+    )
+    assert canonical["status"] == "pass"
+    assert canonical["subject"] == "https://www.budgetyourmd.ca/"
+    llms_result = next(
+        result
+        for result in report["results"]
+        if result["check_id"] == "llms_txt.integrity"
+    )
+    assert llms_result["subject"] == "https://www.budgetyourmd.ca/llms.txt"
+
+
+def test_runner_persists_network_provenance_and_bounds_unsafe_llms_content():
+    identity = SiteIdentity.from_domain("example.com", "squarespace")
+    page = _collected(identity=identity).homepage
+    llms = _evidence(
+        "https://example.com/llms.txt",
+        content_type="text/plain",
+        body="password=client-secret-value",
+        fingerprint="c" * 64,
+    )
 
     report = run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=[],
-        profile={"llms_txt_enabled": False, "priority_urls": [missing_priority]},
-        fetcher=fetcher,
+        "client-1",
+        identity,
+        _collected(identity=identity, page=page, llms=llms),
     )
 
-    missing_results = [
-        result for result in report["results"] if result["subject"] == missing_priority
-    ]
-    assert len(missing_results) == 3
-    assert {result["status"] for result in missing_results} == {"unknown"}
-    assert any(
-        observation["subject"] == missing_priority
-        and observation["data"]["status_code"] == 403
-        for observation in report["observations"]
+    persisted_page = next(
+        item for item in report["observations"] if item["kind"] == "page"
     )
+    assert persisted_page["retrieved_at"] == RETRIEVED_AT
+    assert persisted_page["fingerprint"] == "a" * 64
+    assert persisted_page["data"]["request_url"] == "https://example.com/"
+    assert persisted_page["data"]["redirect_chain"] == ["https://example.com/"]
 
-
-def test_priority_fetches_are_limited_to_same_site_https_urls():
-    fetched = []
-
-    def fetcher(url):
-        fetched.append(url)
-        return {
-            "status_code": 404,
-            "content_type": "text/plain",
-            "body": "",
-            "final_url": url,
-            "error": None,
-        }
-
-    configured = [f"https://example.com/page-{index}" for index in range(30)]
-    configured += ["http://example.com/insecure", "https://evil.example/internal"]
-    run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=[],
-        profile={"llms_txt_enabled": False, "priority_urls": configured},
-        fetcher=fetcher,
+    persisted_llms = next(
+        item for item in report["observations"] if item["kind"] == "llms_txt"
     )
-
-    page_fetches = [url for url in fetched if not url.endswith("/llms.txt")]
-    assert len(page_fetches) <= 20
-    assert all(url.startswith("https://example.com/") for url in page_fetches)
-    assert "http://example.com/insecure" not in fetched
-    assert "https://evil.example/internal" not in fetched
-
-
-def test_redirected_priority_page_is_unknown_not_destination_metadata():
-    priority_url = "https://example.com/important"
-
-    def fetcher(url):
-        if url == priority_url:
-            return {
-                "status_code": 200,
-                "content_type": "text/html",
-                "body": "<html><head><title>Login</title></head></html>",
-                "final_url": "https://example.com/login",
-                "error": None,
-            }
-        return {
-            "status_code": 404,
-            "content_type": "text/plain",
-            "body": "",
-            "final_url": url,
-            "error": None,
-        }
-
-    report = run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=[{
-            "url": "https://example.com/",
-            "raw_html": "<html><head><title>Home</title></head></html>",
-        }],
-        profile={"llms_txt_enabled": False, "priority_urls": [priority_url]},
-        fetcher=fetcher,
+    assert persisted_llms["retrieved_at"] == RETRIEVED_AT
+    assert persisted_llms["fingerprint"] == "c" * 64
+    assert persisted_llms["data"]["body_excerpt"] == (
+        "[REDACTED: unsafe content detected]"
     )
-
-    priority_results = [
-        result for result in report["results"] if result["subject"] == priority_url
-    ]
-    assert len(priority_results) == 3
-    assert {result["status"] for result in priority_results} == {"unknown"}
-    assert all("redirect" in str(result["observed"]).lower() for result in priority_results)
-
-
-def test_priority_page_in_inventory_is_refetched_without_trusting_redirected_html():
-    priority_url = "https://example.com/important"
-
-    def fetcher(url):
-        if url == priority_url:
-            return {
-                "status_code": 302,
-                "content_type": "text/html",
-                "body": "",
-                "final_url": url,
-                "redirect_location": "https://example.com/login",
-                "error": None,
-            }
-        if url == "https://example.com/":
-            return {
-                "status_code": 200,
-                "content_type": "text/html",
-                "body": "<html><head><title>Home</title></head></html>",
-                "final_url": url,
-                "error": None,
-            }
-        return {
-            "status_code": 404,
-            "content_type": "text/plain",
-            "body": "",
-            "final_url": url,
-            "error": None,
-        }
-
-    report = run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=[{
-            "url": priority_url,
-            "raw_html": "<html><head><title>Login destination</title></head></html>",
-        }],
-        profile={"llms_txt_enabled": False, "priority_urls": [priority_url]},
-        fetcher=fetcher,
-    )
-
-    priority_results = [
-        result for result in report["results"] if result["subject"] == priority_url
-    ]
-    assert len(priority_results) == 3
-    assert {result["status"] for result in priority_results} == {"unknown"}
-    assert all("Redirect response" in str(result["observed"]) for result in priority_results)
-
-
-def test_network_body_reader_stops_at_hard_byte_limit():
-    body, truncated = _bounded_text([b"abc", b"def", b"ghi"], limit=5)
-
-    assert body == "abcde"
-    assert truncated is True
-
-
-def test_unsafe_llms_txt_content_is_not_copied_into_persisted_excerpt():
-    report = run_technical_audit(
-        client_id="client-1",
-        domain="example.com",
-        inventory=[{"url": "https://example.com/", "raw_html": "<html></html>"}],
-        profile={"llms_txt_enabled": True},
-        fetcher=lambda url: {
-            "status_code": 200,
-            "content_type": "text/plain",
-            "body": "password=client-secret-value",
-            "final_url": url,
-            "error": None,
-        },
-    )
-
-    llms = next(item for item in report["observations"] if item["kind"] == "llms_txt")
-    assert llms["data"]["body_excerpt"] == "[REDACTED: unsafe content detected]"
-    assert llms["data"]["unsafe_content_detected"] is True
-    assert "client-secret-value" not in str(llms)
+    assert persisted_llms["data"]["unsafe_content_detected"] is True
+    assert "client-secret-value" not in str(persisted_llms)
 
 
 @pytest.mark.parametrize("enabled_check_sets", [("unsupported",), ()])
-def test_invalid_check_sets_fail_before_fetching(enabled_check_sets):
-    fetched = []
-
-    def fetcher(url):
-        fetched.append(url)
-        return {
-            "status_code": 200,
-            "content_type": "text/html",
-            "body": "<html></html>",
-            "final_url": url,
-            "error": None,
-        }
+def test_invalid_check_sets_fail_without_mutating_collected_evidence(enabled_check_sets):
+    identity = SiteIdentity.from_domain("example.com", "squarespace")
+    collected = _collected(identity=identity)
 
     with pytest.raises(ValueError, match="Unsupported technical audit check sets"):
         run_technical_audit(
-            client_id="client-1",
-            domain="example.com",
-            inventory=[],
-            profile={},
+            "client-1",
+            identity,
+            collected,
             enabled_check_sets=enabled_check_sets,
-            fetcher=fetcher,
         )
 
-    assert fetched == []
+    assert collected.pages == (collected.homepage,)

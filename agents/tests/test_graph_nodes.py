@@ -3,6 +3,41 @@ from unittest.mock import MagicMock, patch
 from src.graph.state import GEOState
 
 
+@patch("supabase.create_client")
+def test_load_config_includes_unified_site_fields(mock_create_client, monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://supabase.invalid")
+    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "test-key")
+    client_table = MagicMock()
+    client_table.select.return_value.eq.return_value.single.return_value.execute.return_value = MagicMock(
+        data={
+            "brand_name": "Budget Your MD",
+            "website_domain": "budgetyourmd.ca",
+            "brand_variations": [],
+            "competitors": [],
+            "gsc_site_url": "",
+            "site_platform": "squarespace",
+            "implementation_mode": "copy_paste",
+        }
+    )
+    query_table = MagicMock()
+    query_table.select.return_value.eq.return_value.eq.return_value.order.return_value.order.return_value.execute.return_value = MagicMock(
+        data=[]
+    )
+    sb = MagicMock()
+    sb.table.side_effect = lambda name: {
+        "clients": client_table,
+        "queries": query_table,
+    }[name]
+    mock_create_client.return_value = sb
+
+    from src.graph.nodes import load_config
+
+    result = load_config({"client_id": "client-1"})
+
+    assert result["client_config"]["site_platform"] == "squarespace"
+    assert result["client_config"]["implementation_mode"] == "copy_paste"
+
+
 def test_geo_state_has_required_keys():
     state = GEOState(
         client_id="test-uuid",

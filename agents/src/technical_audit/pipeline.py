@@ -2,8 +2,12 @@ import os
 from datetime import datetime, timezone
 
 from src.improvement.community import select_community_opportunities
-from src.technical_audit.rollout import AuditRolloutPolicy
+from src.technical_audit.collector import collect_foundation
 from src.technical_audit.runner import run_technical_audit
+from src.technical_audit.site import SiteIdentity
+
+
+FOUNDATION_CHECK_SETS = ("foundation",)
 
 
 def _get_supabase():
@@ -22,14 +26,6 @@ def _run_and_persist_technical_audit(
 ) -> dict:
     client_id = state["client_id"]
     config = state["client_config"]
-    profile_resp = (
-        sb.table("client_site_profiles")
-        .select("*")
-        .eq("client_id", client_id)
-        .maybe_single()
-        .execute()
-    )
-    profile = profile_resp.data or {}
 
     pipeline_run_id = None
     thread_id = state.get("thread_id")
@@ -45,7 +41,6 @@ def _run_and_persist_technical_audit(
         if pipeline_resp.data:
             pipeline_run_id = pipeline_resp.data["id"]
 
-    inventory: list[dict] = []
     run_resp = sb.table("technical_audit_runs").insert(
         {
             "client_id": client_id,
@@ -54,19 +49,22 @@ def _run_and_persist_technical_audit(
             "audit_version": 1,
             "status": "running",
             "scope": {
-                "inventory_pages": len(inventory),
                 "check_sets": list(enabled_check_sets),
+                "max_pages": 20,
             },
         }
     ).execute()
     audit_run_id = run_resp.data[0]["id"]
 
     try:
+        identity = SiteIdentity.from_domain(
+            config["website_domain"], config.get("site_platform") or "other"
+        )
+        collected = collect_foundation(identity)
         report = run_technical_audit(
-            client_id=client_id,
-            domain=config["website_domain"],
-            inventory=inventory,
-            profile=profile,
+            client_id,
+            identity,
+            collected,
             enabled_check_sets=enabled_check_sets,
         )
 
@@ -96,9 +94,9 @@ def _run_and_persist_technical_audit(
             {
                 "status": "completed",
                 "scope": {
-                    "inventory_pages": len(inventory),
                     "observations": len(observations),
                     "check_sets": list(enabled_check_sets),
+                    **report["scope"],
                 },
                 "summary": report["summary"],
                 "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -132,7 +130,6 @@ def run_technical_pipeline(
     competitive_gaps: list[dict],
 ) -> dict:
     del queries
-    policy = AuditRolloutPolicy.from_environment()
     client_id = state["client_id"]
     sb = _get_supabase()
 
@@ -142,7 +139,7 @@ def run_technical_pipeline(
             "status": "running",
             "thread_id": state.get("thread_id"),
             "run_mode": "technical_v1",
-            "effective_check_sets": list(policy.check_sets),
+            "effective_check_sets": list(FOUNDATION_CHECK_SETS),
         }
     ).execute()
     improvement_run_id = run_resp.data[0]["id"]
@@ -151,7 +148,7 @@ def run_technical_pipeline(
         sb,
         state,
         improvement_run_id,
-        policy.check_sets,
+        FOUNDATION_CHECK_SETS,
     )
     selection = select_community_opportunities(competitive_gaps, limit=5)
     completed_at = datetime.now(timezone.utc).isoformat()

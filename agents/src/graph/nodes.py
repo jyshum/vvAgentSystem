@@ -23,6 +23,8 @@ def load_config(state: GEOState) -> dict:
         "client_name": row["brand_name"],
         "brand_name": row["brand_name"],
         "website_domain": row["website_domain"],
+        "site_platform": row.get("site_platform") or "other",
+        "implementation_mode": row.get("implementation_mode") or "manual",
         "brand_variations": row["brand_variations"] or [],
         "target_queries": target_queries,
         "competitors": row["competitors"] or [],

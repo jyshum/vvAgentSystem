@@ -1,5 +1,6 @@
 from src.technical_audit.checks import build_v1_registry
 from src.technical_audit.models import AuditContext, Observation
+from src.technical_audit.site import SiteIdentity
 
 
 def _page_observation(
@@ -35,8 +36,7 @@ def _context(
     canonical=None,
     is_html=True,
     robots=None,
-    priority=True,
-    llms_enabled=False,
+    platform="squarespace",
     llms_status=404,
     llms_body="",
     llms_content_type="text/plain",
@@ -66,10 +66,7 @@ def _context(
     return AuditContext(
         client_id="client-1",
         domain="example.com",
-        profile={
-            "llms_txt_enabled": llms_enabled,
-            "priority_urls": ["https://example.com/page"] if priority else [],
-        },
+        site_identity=SiteIdentity.from_domain("example.com", platform),
         pages=(page,),
         site_observations={"llms_txt": llms},
         run_timestamp="2026-07-14T10:00:00+00:00",
@@ -99,9 +96,8 @@ def test_title_length_between_65_and_100_only_reviews_verbose_titles():
     assert _status(_context(title=[verbose]), "meta_title.integrity") == "review"
 
 
-def test_description_statuses_respect_priority_and_soft_length_guidance():
+def test_description_statuses_use_all_audited_indexable_pages_and_soft_guidance():
     assert _status(_context(description=[]), "meta_description.integrity") == "review"
-    assert _status(_context(description=[], priority=False), "meta_description.integrity") == "not_applicable"
     assert _status(_context(description=["A useful description."]), "meta_description.integrity") == "review"
     assert _status(_context(description=["A" * 80]), "meta_description.integrity") == "pass"
     assert _status(_context(description=["A" * 201]), "meta_description.integrity") == "review"
@@ -119,12 +115,15 @@ def test_canonical_statuses_do_not_choose_between_conflicting_targets():
     ) == "fail"
 
 
-def test_cross_domain_canonical_requires_verified_allowlist():
-    context = _context(canonical=["https://store.example.net/page"])
-    assert _status(context, "canonical.integrity") == "fail"
-
-    context.profile["allowed_canonical_hosts"] = ["store.example.net"]
-    assert _status(context, "canonical.integrity") == "pass"
+def test_canonical_accepts_bare_and_www_identity_hosts_only():
+    assert _status(
+        _context(canonical=["https://www.example.com/page"]),
+        "canonical.integrity",
+    ) == "pass"
+    assert _status(
+        _context(canonical=["https://store.example.net/page"]),
+        "canonical.integrity",
+    ) == "fail"
 
 
 def test_non_html_and_noindex_pages_are_not_forced_to_have_metadata():
@@ -134,35 +133,40 @@ def test_non_html_and_noindex_pages_are_not_forced_to_have_metadata():
     assert _status(_context(robots=["none"]), "canonical.integrity") == "not_applicable"
 
 
-def test_llms_txt_is_optional_until_profile_enables_it():
-    assert _status(_context(llms_enabled=False), "llms_txt.integrity") == "not_applicable"
+def test_squarespace_missing_llms_txt_is_not_applicable():
+    assert _status(_context(platform="squarespace"), "llms_txt.integrity") == "not_applicable"
     assert _status(
-        _context(llms_enabled=False, llms_status=403, llms_error="forbidden"),
+        _context(platform="squarespace", llms_status=403, llms_error="forbidden"),
         "llms_txt.integrity",
-    ) == "not_applicable"
-    assert _status(_context(llms_enabled=True), "llms_txt.integrity") == "fail"
+    ) == "unknown"
+
+
+def test_ambiguous_llms_client_error_is_unknown_not_absence():
+    assert _status(
+        _context(llms_status=400, llms_error=None),
+        "llms_txt.integrity",
+    ) == "unknown"
 
 
 def test_llms_txt_distinguishes_integrity_review_and_access_unknown():
     assert _status(
-        _context(llms_enabled=True, llms_status=200, llms_body="# Example\n\nA useful site."),
+        _context(llms_status=200, llms_body="# Example\n\nA useful site."),
         "llms_txt.integrity",
     ) == "pass"
     assert _status(
-        _context(llms_enabled=False, llms_status=200, llms_body="# Unexpected file"),
+        _context(llms_status=200, llms_body="# Existing file"),
         "llms_txt.integrity",
-    ) == "review"
+    ) == "pass"
     assert _status(
-        _context(llms_enabled=True, llms_status=403, llms_error="forbidden"),
+        _context(llms_status=403, llms_error="forbidden"),
         "llms_txt.integrity",
     ) == "unknown"
     assert _status(
-        _context(llms_enabled=True, llms_status=503, llms_body="Service unavailable"),
+        _context(llms_status=503, llms_body="Service unavailable"),
         "llms_txt.integrity",
     ) == "unknown"
     assert _status(
         _context(
-            llms_enabled=True,
             llms_status=200,
             llms_body="<html>fallback</html>",
             llms_content_type="text/html",

@@ -45,7 +45,7 @@ def normalize_url(url: str) -> str:
 
 
 def extract_page_observation(page: dict, retrieved_at: str) -> Observation:
-    url = normalize_url(page["url"])
+    url = normalize_url(page.get("final_url") or page["url"])
     raw_html = page.get("raw_html") or ""
     soup = BeautifulSoup(raw_html, "html.parser")
     head = soup.find("head")
@@ -93,11 +93,25 @@ def extract_page_observation(page: dict, retrieved_at: str) -> Observation:
         kind="page",
         subject=url,
         retrieved_at=retrieved_at,
-        fingerprint=sha256(raw_html.encode("utf-8")).hexdigest(),
+        fingerprint=page.get("fingerprint")
+        or sha256(raw_html.encode("utf-8")).hexdigest(),
         data={
             "url": _truncate_json_string(url, 2_048),
+            "request_url": _truncate_json_string(
+                normalize_url(page.get("request_url") or page["url"]), 2_048
+            ),
+            "final_url": _truncate_json_string(url, 2_048),
+            "redirect_chain": _bounded(
+                [normalize_url(item) for item in page.get("redirect_chain", (url,))],
+                count=6,
+                length=2_048,
+            ),
             "available": page.get("available", True),
             "status_code": page.get("status_code", 200),
+            "content_type": _truncate_json_string(
+                str(page.get("content_type") or ""), 500
+            ),
+            "body_truncated": bool(page.get("body_truncated", False)),
             "fetch_error": _truncate_json_string(
                 str(page.get("fetch_error") or ""), 2_000
             ) or None,

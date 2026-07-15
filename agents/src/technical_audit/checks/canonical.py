@@ -14,10 +14,7 @@ from .metadata import _not_indexable_reason, _unknown_page_result
 
 
 def evaluate_canonical(context: AuditContext) -> list[CheckResult]:
-    allowed_hosts = {context.domain.lower()}
-    allowed_hosts.update(
-        host.lower() for host in context.profile.get("allowed_canonical_hosts", [])
-    )
+    allowed_hosts = context.site_identity.allowed_hosts
     results = []
     for page in context.pages:
         if not page.data.get("available", True):
@@ -64,9 +61,7 @@ def evaluate_canonical(context: AuditContext) -> list[CheckResult]:
             target = urlsplit(canonicals[0])
             host = (target.hostname or "").lower()
             unsafe = (
-                target.scheme != "https"
-                or not host
-                or host not in allowed_hosts
+                not context.site_identity.allows(canonicals[0])
                 or any(marker in host for marker in ("staging", "preview", "localhost"))
                 or bool(target.fragment)
             )

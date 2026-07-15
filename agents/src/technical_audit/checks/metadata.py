@@ -9,7 +9,6 @@ from ..models import (
     NextAction,
     Observation,
 )
-from ..observations import normalize_url
 
 
 def _not_indexable_reason(page: Observation) -> str | None:
@@ -39,7 +38,7 @@ def _unknown_page_result(
         },
         evidence_refs=(page.id,),
         scope={"sampled": False, "urls_checked": 1},
-        applicability=Applicability(True, "Priority page retrieval was attempted"),
+        applicability=Applicability(True, "Audited page retrieval was attempted"),
         confidence=Confidence.HIGH,
         next_action=NextAction("system", "Retry the page request or inspect host access controls"),
         remediation_id=None,
@@ -142,7 +141,6 @@ def evaluate_meta_title(context: AuditContext) -> list[CheckResult]:
 
 
 def evaluate_meta_description(context: AuditContext) -> list[CheckResult]:
-    priority_urls = {normalize_url(url) for url in context.profile.get("priority_urls", [])}
     results = []
     for page in context.pages:
         if not page.data.get("available", True):
@@ -167,17 +165,6 @@ def evaluate_meta_description(context: AuditContext) -> list[CheckResult]:
             continue
 
         descriptions = page.data.get("meta_descriptions", [])
-        if not descriptions and normalize_url(page.subject) not in priority_urls:
-            results.append(
-                CheckResult.not_applicable(
-                    check_id="meta_description.integrity",
-                    check_version=1,
-                    section="meta_description",
-                    subject=page.subject,
-                    reason="Description is optional on this nonpriority page",
-                )
-            )
-            continue
         if len(descriptions) > 1:
             results.append(
                 _result(

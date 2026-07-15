@@ -4,6 +4,8 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any
 
+from .site import SiteIdentity
+
 
 class AuditStatus(str, Enum):
     PASS = "pass"
@@ -48,7 +50,7 @@ class Observation:
 class AuditContext:
     client_id: str
     domain: str
-    profile: dict[str, Any]
+    site_identity: SiteIdentity
     pages: tuple[Observation, ...]
     site_observations: dict[str, Observation]
     run_timestamp: str
