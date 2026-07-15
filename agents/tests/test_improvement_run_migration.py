@@ -85,6 +85,8 @@ def test_canonical_schema_reflects_post_cleanup_runtime():
         "client_site_profiles",
     ):
         assert f"create table public.{table}" not in sql
+        assert f"alter table public.{table}" not in sql
+        assert f" on public.{table}" not in sql
 
     for preserved_table in (
         "clients",

@@ -13,13 +13,10 @@
 --   KEPT:    clients, client_users, tracker_runs, tracker_results (+view),
 --            reports, pipeline_runs, prompt_scores, competitive_gaps, queries,
 --            improvement_runs, and deterministic technical-audit evidence.
---   DROPPED: audit_runs, page_scores (legacy audit pipeline — no longer written
---            or shown), reddit_opportunities (automated Reddit scout scrapped;
---            community-check data now lives in action_cards.reddit_data).
+--   DROPPED: audit_runs, page_scores, reddit_opportunities, page_inventory,
+--            query_page_matches, page_citation_scores, action_cards, and
+--            client_site_profiles.
 --   FIXES folded in (were latent bugs in the migration chain):
---     * action_cards.run_id now references improvement_runs (was audit_runs).
---     * action_cards.page_url is now nullable (brief/community-check cards
---       legitimately have no page).
 --     * pipeline_runs now has admin-only RLS (migration 003 omitted it).
 --   DROPPED column: tracker_runs.aggregate_citation_rate (never written by the
 --     current tracker; the UI uses per_engine_scores / prompt_scores instead).
@@ -334,17 +331,6 @@ create index idx_queries_client_id on public.queries(client_id);
 create index idx_queries_status on public.queries(status);
 create index idx_improvement_runs_client_id on public.improvement_runs(client_id);
 create index idx_improvement_runs_thread_id on public.improvement_runs(thread_id);
-create index idx_page_inventory_run_id on public.page_inventory(run_id);
-create index idx_query_page_matches_run_id on public.query_page_matches(run_id);
-create index idx_query_page_matches_query_id on public.query_page_matches(query_id);
-create index idx_page_citation_scores_run_id on public.page_citation_scores(run_id);
-create index idx_action_cards_run_id on public.action_cards(run_id);
-create index idx_action_cards_client_id on public.action_cards(client_id);
-create index idx_action_cards_query_id on public.action_cards(query_id);
-create index idx_action_cards_status on public.action_cards(status);
-create index idx_action_cards_track on public.action_cards(track);
-create index idx_action_cards_auto_approved on public.action_cards(auto_approved) where auto_approved = true;
-create index idx_client_site_profiles_platform on public.client_site_profiles(platform);
 create index idx_technical_audit_runs_client_id on public.technical_audit_runs(client_id);
 create index idx_technical_audit_runs_improvement_run_id on public.technical_audit_runs(improvement_run_id);
 create index idx_technical_audit_runs_pipeline_run_id on public.technical_audit_runs(pipeline_run_id);
@@ -366,11 +352,6 @@ alter table public.prompt_scores enable row level security;
 alter table public.competitive_gaps enable row level security;
 alter table public.queries enable row level security;
 alter table public.improvement_runs enable row level security;
-alter table public.page_inventory enable row level security;
-alter table public.query_page_matches enable row level security;
-alter table public.page_citation_scores enable row level security;
-alter table public.action_cards enable row level security;
-alter table public.client_site_profiles enable row level security;
 alter table public.technical_audit_runs enable row level security;
 alter table public.technical_audit_observations enable row level security;
 alter table public.technical_audit_results enable row level security;
@@ -425,23 +406,11 @@ create policy "Admins manage queries" on public.queries
 create policy "Clients view own queries" on public.queries
   for select using (client_id = public.get_my_client_id());
 
--- improvement pipeline tables (admin only)
+-- improvement runs (admin only)
 create policy "Admins manage improvement_runs" on public.improvement_runs
   for all using (public.is_admin()) with check (public.is_admin());
-create policy "Admins manage page_inventory" on public.page_inventory
-  for all using (public.is_admin()) with check (public.is_admin());
-create policy "Admins manage query_page_matches" on public.query_page_matches
-  for all using (public.is_admin()) with check (public.is_admin());
-create policy "Admins manage page_citation_scores" on public.page_citation_scores
-  for all using (public.is_admin()) with check (public.is_admin());
-create policy "Admins manage action_cards" on public.action_cards
-  for all using (public.is_admin()) with check (public.is_admin());
 
--- technical audit profiles and evidence
-create policy "Admins manage client_site_profiles" on public.client_site_profiles
-  for all using (public.is_admin()) with check (public.is_admin());
-create policy "Clients view own site profile" on public.client_site_profiles
-  for select using (client_id = public.get_my_client_id());
+-- technical audit evidence
 create policy "Admins manage technical_audit_runs" on public.technical_audit_runs
   for all using (public.is_admin()) with check (public.is_admin());
 create policy "Clients view own technical_audit_runs" on public.technical_audit_runs
