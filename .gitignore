@@ -9,6 +9,7 @@ __pycache__/
 .claude/worktrees/
 .superpowers/brainstorm/
 .worktrees/
+.artifacts/client-resets/
 
 # Dashboard
 node_modules/
