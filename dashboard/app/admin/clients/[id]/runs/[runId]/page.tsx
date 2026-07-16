@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RunRail } from "@/components/runs/RunRail";
-import { RunTechnicalAuditEvidence } from "@/components/runs/RunTechnicalAuditEvidence";
 import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatRate, formatDelta } from "@/lib/utils";
 import type { PipelineRun, ImprovementRun, PageCitationScore, QueryPageMatch, CrawlabilityReport } from "@/lib/improvement-types";
@@ -344,12 +343,6 @@ export default async function RunDetailPage({
         </div>
 
       </div>
-
-      <RunTechnicalAuditEvidence
-        mode={presentationMode}
-        run={technicalAudit.run}
-        results={technicalAudit.results}
-      />
 
       {/* Funnel */}
       {improvementRun && (

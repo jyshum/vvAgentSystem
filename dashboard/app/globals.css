@@ -49,6 +49,34 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ── Audit board: priority-finding pulse ──
+   A calm red breathing tint on collapsed rows that carry an open action card,
+   drawing the eye to what needs attention. Stops once the row is opened, and
+   degrades to a steady tint (no flashing) under reduced-motion. */
+@keyframes vv-priority-pulse {
+  0%,
+  100% {
+    background-color: rgba(232, 154, 160, 0.045);
+  }
+  50% {
+    background-color: rgba(232, 154, 160, 0.13);
+  }
+}
+.vv-priority > summary {
+  border-left: 2px solid var(--neg);
+  animation: vv-priority-pulse 2.6s ease-in-out infinite;
+}
+.vv-priority[open] > summary {
+  animation: none;
+  background-color: rgba(232, 154, 160, 0.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .vv-priority > summary {
+    animation: none;
+    background-color: rgba(232, 154, 160, 0.08);
+  }
+}
+
 /* ── Scrollbars (from report generator) ── */
 ::-webkit-scrollbar {
   width: 8px;
