@@ -3,26 +3,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SubTab } from "@/components/admin/SubTab";
 import { TriggerRunButton } from "@/components/admin/TriggerRunButton";
-import { fetchSchedules } from "@/lib/schedules";
 import { rankAndGap, topCompetitor } from "@/lib/derive";
 import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatDelta, formatRate } from "@/lib/utils";
 import { clientTabs } from "@/lib/client-tabs";
-import {
-  crawlabilityBannerPresentation,
-  runPresentationMode,
-} from "@/lib/run-presentation";
 import type { Client, TrackerRun } from "@/lib/types";
-import type { CrawlabilityReport, ImprovementRun } from "@/lib/improvement-types";
-
-const CRAWL_CHECK_KEYS = ["robots_txt", "cdn_blocks", "js_rendering"] as const;
-
-function formatNextRun(iso: string): string {
-  const d = new Date(iso);
-  const weekday = d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
-  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
-  return `${weekday} ${time}`;
-}
 
 export default async function ClientLayout({
   children,
@@ -34,29 +19,25 @@ export default async function ClientLayout({
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const { data: client } = await supabase
+  const { data: client, error: clientError } = await supabase
     .from("clients")
-    .select("id, name, website_domain, cycle_frequency, cycle_day")
+    .select("id, name, website_domain")
     .eq("id", id)
     .single();
 
+  if (clientError) {
+    if (clientError.code === "PGRST116") notFound();
+    throw new Error(`Unable to load client ${id}: ${clientError.message}`);
+  }
   if (!client) notFound();
-  const c = client as Pick<Client, "id" | "name" | "website_domain" | "cycle_frequency" | "cycle_day">;
+  const c = client as Pick<Client, "id" | "name" | "website_domain">;
 
-  const [{ data: runs }, { data: improvementRuns }] = await Promise.all([
-    supabase
-      .from("tracker_runs")
-      .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores, query_set_changed")
-      .eq("client_id", id)
-      .order("ran_at", { ascending: false })
-      .limit(2),
-    supabase
-      .from("improvement_runs")
-      .select("id, ran_at, crawlability_report, run_mode")
-      .eq("client_id", id)
-      .order("ran_at", { ascending: false })
-      .limit(1),
-  ]);
+  const { data: runs } = await supabase
+    .from("tracker_runs")
+    .select("id, ran_at, aggregate_mention_rate, non_branded_mention_rate, bucket_scores, competitor_scores, query_set_changed")
+    .eq("client_id", id)
+    .order("ran_at", { ascending: false })
+    .limit(2);
 
   const history = (runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores" | "query_set_changed">[]) || [];
   const latest = history[0] ?? null;
@@ -71,22 +52,6 @@ export default async function ClientLayout({
     rate != null && previous
       ? formatDelta(rate, previousRate)
       : null;
-
-  const schedules = await fetchSchedules();
-  const schedule = schedules.find((s) => s.client_id === id);
-  const nextRunLabel = schedule?.next_run ? formatNextRun(schedule.next_run) : null;
-
-  const improvementRun = (improvementRuns as Pick<ImprovementRun, "id" | "ran_at" | "crawlability_report" | "run_mode">[])?.[0];
-  const report = improvementRun?.crawlability_report as CrawlabilityReport | undefined;
-  const blocker = report?.has_critical_blocker === true;
-  const failing = blocker
-    ? CRAWL_CHECK_KEYS.filter((k) => report?.[k]?.status === "fail").map((k) => ({
-        name: k,
-        detail: report?.[k]?.detail ?? k,
-      }))
-    : [];
-  const presentationMode = runPresentationMode(improvementRun ?? null);
-  const crawlabilityBanner = crawlabilityBannerPresentation(presentationMode, id);
 
   const tabs = clientTabs(id);
 
@@ -120,14 +85,6 @@ export default async function ClientLayout({
           >
             {c.website_domain}
           </div>
-          <div
-            className="font-mono text-[8px] tracking-[0.06em] mt-1"
-            style={{ color: "var(--faint)", opacity: 0.7 }}
-          >
-            {c.cycle_frequency === "monthly" ? "Monthly" : c.cycle_frequency === "biweekly" ? "Bi-weekly" : "Weekly"} · {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][c.cycle_day ?? 1]} 2:00 AM UTC
-            {nextRunLabel ? ` · NEXT RUN ${nextRunLabel}` : ""}
-          </div>
-
           {/* Hero */}
           {!latest ? (
             <p className="font-serif italic text-base mt-4" style={{ color: "var(--mute)" }}>
@@ -197,28 +154,6 @@ export default async function ClientLayout({
         </div>
         <TriggerRunButton clientId={id} />
       </div>
-
-      {/* Crawlability blocker banner */}
-      {blocker && (
-        <div className="mt-4 px-5 py-3.5" style={{ background: "rgba(232,154,160,0.08)", border: "1px solid var(--neg)" }}>
-          <div className="font-mono text-[9px] tracking-[0.14em] uppercase mb-1" style={{ color: "var(--neg)" }}>
-            CRAWLABILITY BLOCKER — AI CRAWLERS CANNOT ACCESS THE SITE
-          </div>
-          <div className="font-serif text-[13px]" style={{ color: "var(--white)" }}>
-            {failing.length > 0
-              ? failing.map((f) => `${f.name}: ${f.detail}`).join(" · ")
-              : crawlabilityBanner.detailFallback}
-          </div>
-          {crawlabilityBanner.href && crawlabilityBanner.ctaLabel && (
-            <Link href={crawlabilityBanner.href} className="font-mono text-[9px] tracking-[0.1em] uppercase underline" style={{ color: "var(--neg)" }}>
-              {crawlabilityBanner.ctaLabel}
-            </Link>
-          )}
-          <div className="font-mono text-[8px] mt-1" style={{ color: "var(--faint)" }}>
-            {crawlabilityBanner.guidance}
-          </div>
-        </div>
-      )}
 
       {/* Sub-nav */}
       <div
