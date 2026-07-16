@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from src.improvement.community import select_community_opportunities
 from src.technical_audit.collector import collect_site
@@ -67,8 +68,14 @@ def _run_and_persist_technical_audit(
         if pipeline_resp.data:
             pipeline_run_id = pipeline_resp.data["id"]
 
-    run_resp = sb.table("technical_audit_runs").insert(
+    # The id is generated here, before the row exists, so it is knowable even
+    # when the insert response comes back empty or malformed. Reading it back
+    # out of the response instead would leave the row stranded at `running`
+    # with no id to update it by, and it would display as running forever.
+    audit_run_id = str(uuid4())
+    sb.table("technical_audit_runs").insert(
         {
+            "id": audit_run_id,
             "client_id": client_id,
             "improvement_run_id": improvement_run_id,
             "pipeline_run_id": pipeline_run_id,
@@ -80,7 +87,6 @@ def _run_and_persist_technical_audit(
             },
         }
     ).execute()
-    audit_run_id = run_resp.data[0]["id"]
 
     try:
         identity = SiteIdentity.from_domain(
