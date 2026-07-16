@@ -29,6 +29,11 @@ def test_workflow_endpoints_require_auth():
     assert client.post("/api/technical-audit/cards/x/verify").status_code == 401
 
 
+def test_trigger_audit_endpoint_requires_auth():
+    client = _client()
+    assert client.post("/api/technical-audit/runs", json={"client_id": "c"}).status_code == 401
+
+
 def test_list_runs_returns_client_runs():
     class Query:
         def select(self, *a, **k):
