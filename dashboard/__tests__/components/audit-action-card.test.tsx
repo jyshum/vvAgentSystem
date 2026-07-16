@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
@@ -124,6 +124,71 @@ describe("ActionCard", () => {
     expect(screen.queryByText("https://x.test/10")).toBeNull();
     expect(screen.getByTestId("card-facts-remainder").textContent).toBe(
       "Showing 10 of 60",
+    );
+  });
+
+  it("keys repeated facts uniquely so React does not warn", () => {
+    // Guards the list key itself. React renders duplicate-keyed siblings on
+    // first mount either way, so a row count cannot detect this - the warning
+    // is the only observable difference, and it flags undefined reconciliation
+    // behaviour on refresh.
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <ActionCard
+        card={{ ...card, copy_values: { broken: ["https://x.test/dead", "https://x.test/dead"] } }}
+        group={group}
+        results={[result()]}
+      />,
+    );
+    const duplicateKeyWarnings = spy.mock.calls.filter((args) =>
+      String(args[0]).includes("same key"),
+    );
+    spy.mockRestore();
+    expect(duplicateKeyWarnings).toHaveLength(0);
+  });
+
+  it("renders every occurrence when the same fact repeats", () => {
+    // One page can link to the same dead URL twice (nav and footer), so
+    // copy_values arrays are not deduplicated upstream. Guards against anyone
+    // "fixing" duplicates with a Set, which would understate the true count.
+    const broken = [
+      "https://x.test/dead",
+      "https://x.test/dead",
+      "https://x.test/other",
+    ];
+    render(
+      <ActionCard
+        card={{ ...card, copy_values: { broken } }}
+        group={group}
+        results={[result()]}
+      />,
+    );
+    // Both occurrences render: a dropped row would understate the true count.
+    expect(screen.getAllByText("https://x.test/dead")).toHaveLength(2);
+    expect(within(screen.getByTestId("card-facts")).getAllByRole("listitem")).toHaveLength(
+      3,
+    );
+  });
+
+  it("counts repeated facts once each in the remainder total", () => {
+    const broken = [
+      ...Array.from({ length: 11 }, () => "https://x.test/dead"),
+      "https://x.test/other",
+    ];
+    render(
+      <ActionCard
+        card={{ ...card, copy_values: { broken } }}
+        group={group}
+        results={[result()]}
+      />,
+    );
+    // 12 real facts, 10 shown - the indicator must reflect occurrences, not
+    // distinct values, or it would disagree with the rows above it.
+    expect(within(screen.getByTestId("card-facts")).getAllByRole("listitem")).toHaveLength(
+      10,
+    );
+    expect(screen.getByTestId("card-facts-remainder").textContent).toBe(
+      "Showing 10 of 12",
     );
   });
 

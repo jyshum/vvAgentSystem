@@ -121,9 +121,11 @@ export function ActionCard({
           <div className="font-serif text-[13px]" style={{ color: "var(--neg)" }}>
             {facts.length > 0 ? (
               <>
-                <ul className="space-y-0.5">
-                  {shownFacts.map((fact) => (
-                    <li key={fact} className="break-all font-mono text-[11px]">
+                <ul data-testid="card-facts" className="space-y-0.5">
+                  {shownFacts.map((fact, i) => (
+                    // Index-qualified: one page can link to the same dead URL
+                    // twice (nav and footer), so facts are not unique.
+                    <li key={`${i}-${fact}`} className="break-all font-mono text-[11px]">
                       {fact}
                     </li>
                   ))}
