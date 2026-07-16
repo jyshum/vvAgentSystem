@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { BUCKET_LABELS } from "@/lib/intent-labels";
 import { formatRate } from "@/lib/utils";
 import { QueryExpansion } from "@/components/admin/QueryExpansion";
@@ -24,16 +23,11 @@ export interface HeatRow {
   stability: string;
   citedPct: number | null;
   topCompetitor: { name: string; rate: number } | null;
-  waiting: number;
 }
 
 interface HeatTableProps {
   rows: HeatRow[];
   clientId: string;
-}
-
-function approvalsHref(queryId: string | null): string {
-  return queryId ? `/admin/approvals?query=${queryId}` : "/admin/approvals";
 }
 
 function heatBg(rate: number | null): string {
@@ -62,7 +56,7 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
       changed: c.querySetChanged === true,
     })) ?? [];
 
-  const gridTemplate = `2fr repeat(${cycleCount}, 44px) 0.8fr 0.6fr 1fr 0.8fr`;
+  const gridTemplate = `2fr repeat(${cycleCount}, 44px) 0.8fr 0.6fr 1fr`;
   const groupedRows = [
     { bucket: "consideration", label: BUCKET_LABELS.consideration, rows: rows.filter((r) => (r.bucket ?? "consideration") === "consideration") },
     { bucket: "awareness", label: BUCKET_LABELS.awareness, rows: rows.filter((r) => r.bucket === "awareness") },
@@ -103,9 +97,6 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
         </div>
         <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
           TOP COMPETITOR
-        </div>
-        <div className="font-mono text-[8px] tracking-[0.18em] uppercase" style={{ color: "var(--faint)" }}>
-          CARDS
         </div>
       </div>
 
@@ -183,40 +174,10 @@ export function HeatTable({ rows, clientId }: HeatTableProps) {
                       : "—"}
                   </div>
 
-                  <div>
-                    {row.waiting > 0 ? (
-                      <Link
-                        href={approvalsHref(row.queryId)}
-                        title="Pending action cards generated for this query — review in the approvals inbox"
-                        onClick={(e) => e.stopPropagation()}
-                        className="font-mono text-[8px] tracking-[0.08em] px-1.5 py-0.5"
-                        style={{ color: "#d4a017", border: "1px solid #d4a017" }}
-                      >
-                        {row.waiting} PENDING
-                      </Link>
-                    ) : (
-                      <span className="font-mono text-[9px]" style={{ color: "var(--faint)" }}>
-                        —
-                      </span>
-                    )}
-                  </div>
                 </div>
 
                 {isExpanded && (
-                  <>
-                    <QueryExpansion clientId={clientId} query={row.query} queryId={row.queryId} />
-                    {row.waiting > 0 && (
-                      <div className="px-4 pb-3">
-                        <Link
-                          href={approvalsHref(row.queryId)}
-                          className="inline-block font-mono text-[9px] tracking-[0.1em] uppercase px-3 py-1.5"
-                          style={{ color: "var(--white)", border: "1px solid var(--hair)", background: "var(--ink-soft)" }}
-                        >
-                          VIEW {row.waiting} PENDING CARD{row.waiting > 1 ? "S" : ""} FOR THIS QUERY →
-                        </Link>
-                      </div>
-                    )}
-                  </>
+                  <QueryExpansion clientId={clientId} query={row.query} queryId={row.queryId} />
                 )}
               </div>
             );

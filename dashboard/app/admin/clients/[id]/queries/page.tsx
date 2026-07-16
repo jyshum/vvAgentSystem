@@ -37,10 +37,8 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
     queryIdByPromptText.set(q.prompt_text, q.id);
     queryMetaById.set(q.id, q as Pick<Query, "id" | "prompt_text" | "bucket" | "paraphrases" | "version">);
   }
-  const queryIds = [...queryIdByPromptText.values()];
-
   // Batch 2: fetches dependent on batch-1 ids
-  const [{ data: promptScores }, { data: gaps }, { data: pendingCards }] =
+  const [{ data: promptScores }, { data: gaps }] =
     await Promise.all([
       admin
         .from("prompt_scores")
@@ -50,13 +48,6 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
         .from("competitive_gaps")
         .select("query_id, query, competitor_data")
         .eq("run_id", latestRun.id),
-      queryIds.length > 0
-        ? admin
-            .from("action_cards")
-            .select("query_id, status")
-            .in("query_id", queryIds)
-            .eq("status", "pending")
-        : Promise.resolve({ data: null }),
     ]);
 
   const scores = promptScores ?? [];
@@ -121,17 +112,9 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
     topCompetitorByQuery.set(g.query_id || g.query, { name: top.name, rate: top.mention_rate });
   }
 
-  // waiting: pending action_cards per query, via queries table's prompt_text -> id mapping
-  const waitingByQueryId = new Map<string, number>();
-  for (const c of pendingCards ?? []) {
-    if (!c.query_id) continue;
-    waitingByQueryId.set(c.query_id, (waitingByQueryId.get(c.query_id) ?? 0) + 1);
-  }
-
   const rows: HeatRow[] = queryList.map((query) => {
     const queryId = queryMetaById.has(query) ? query : queryIdByPromptText.get(query) || null;
     const meta = queryId ? queryMetaById.get(queryId) : undefined;
-    const waiting = queryId ? waitingByQueryId.get(queryId) ?? 0 : 0;
     const citedAvg = latestEngineAvg.get(query);
 
     return {
@@ -144,7 +127,6 @@ export default async function QueriesPage({ params }: { params: Promise<{ id: st
       stability: stabilityByQuery.get(query) ?? "absent",
       citedPct: citedAvg ? citedAvg.citation_rate : null,
       topCompetitor: topCompetitorByQuery.get(query) ?? null,
-      waiting,
     };
   });
 
