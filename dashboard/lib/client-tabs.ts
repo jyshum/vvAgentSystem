@@ -8,7 +8,7 @@ export function clientTabs(clientId: string): ClientTab[] {
     { label: "OVERVIEW", href: `/admin/clients/${clientId}/overview` },
     { label: "QUERIES", href: `/admin/clients/${clientId}/queries` },
     { label: "RUNS", href: `/admin/clients/${clientId}/runs` },
-    { label: "CARDS", href: `/admin/clients/${clientId}/cards` },
+    { label: "AUDIT", href: `/admin/clients/${clientId}/audit` },
     { label: "CONFIG", href: `/admin/clients/${clientId}/config` },
     { label: "REPORTS", href: `/admin/clients/${clientId}/reports` },
   ];
