@@ -91,7 +91,7 @@ _ACTIONABLE = {"fail", "review", "unknown"}
 
 def _cause_signature(result: dict[str, Any]) -> Any:
     observed = result.get("observed") or {}
-    for key in ("failures", "defects", "missing", "reviews", "blocked"):
+    for key in ("failures", "defects", "missing", "reviews", "blocked", "active_http_urls"):
         items = observed.get(key)
         if isinstance(items, list) and items:
             values = []

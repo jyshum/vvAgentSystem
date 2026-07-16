@@ -97,6 +97,41 @@ def test_grouping_excludes_pass_and_not_applicable():
     assert group_findings(results) == []
 
 
+def test_mixed_content_different_url_sets_produce_two_groups():
+    results = [
+        _result(check_id="tls.mixed_content", subject="https://example.com/about",
+                observed={"active_http_urls": ["http://example.com/a.js"], "evidence": "raw_html"},
+                summary="Active content is referenced over plain HTTP",
+                remediation_id="tls.fix_mixed_content"),
+        _result(check_id="tls.mixed_content", subject="https://example.com/services",
+                observed={"active_http_urls": ["http://example.com/b.js", "http://example.com/c.js"],
+                          "evidence": "raw_html"},
+                summary="Active content is referenced over plain HTTP",
+                remediation_id="tls.fix_mixed_content"),
+    ]
+    groups = group_findings(results)
+    assert len(groups) == 2
+    subjects = {g["subjects"][0] for g in groups}
+    assert subjects == {"https://example.com/about", "https://example.com/services"}
+
+
+def test_mixed_content_same_url_set_produces_one_group():
+    shared = {"active_http_urls": ["http://example.com/a.js"], "evidence": "raw_html"}
+    results = [
+        _result(check_id="tls.mixed_content", subject="https://example.com/about",
+                observed=shared,
+                summary="Active content is referenced over plain HTTP",
+                remediation_id="tls.fix_mixed_content"),
+        _result(check_id="tls.mixed_content", subject="https://example.com/contact",
+                observed=shared,
+                summary="Active content is referenced over plain HTTP",
+                remediation_id="tls.fix_mixed_content"),
+    ]
+    groups = group_findings(results)
+    assert len(groups) == 1
+    assert groups[0]["subjects"] == ["https://example.com/about", "https://example.com/contact"]
+
+
 def test_grouping_is_deterministic_across_orderings():
     results = [
         _result(subject="https://example.com/b"),
