@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RunRail } from "@/components/runs/RunRail";
@@ -6,11 +5,11 @@ import { RunTechnicalAuditEvidence } from "@/components/runs/RunTechnicalAuditEv
 import { fetchSchedules } from "@/lib/schedules";
 import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatRate, formatDelta } from "@/lib/utils";
-import type { PipelineRun, ImprovementRun, PageCitationScore, QueryPageMatch, ActionCard, CrawlabilityReport } from "@/lib/improvement-types";
+import type { PipelineRun, ImprovementRun, PageCitationScore, QueryPageMatch, CrawlabilityReport } from "@/lib/improvement-types";
 import type { TrackerRun, CompetitiveGap } from "@/lib/types";
 import type { TechnicalAuditResult, TechnicalAuditRun } from "@/lib/technical-audit-types";
 import { PIPELINE_STATUS_COLOR } from "@/lib/run-status";
-import { buildRunFunnel, formatCount, runPresentationMode } from "@/lib/run-presentation";
+import { buildRunFunnel, runPresentationMode } from "@/lib/run-presentation";
 
 function formatDuration(startedAt: string, completedAt: string | null): string {
   if (!completedAt) return "running";
@@ -62,7 +61,6 @@ export default async function RunDetailPage({
     { data: previousTrackerRunData },
     { data: citationScoresData },
     { data: queryMatchesData },
-    { data: actionCardsData },
     { data: competitiveGapsData },
     nextTrackerAndSchedules,
     technicalAuditBundle,
@@ -82,9 +80,6 @@ export default async function RunDetailPage({
       : Promise.resolve({ data: null }),
     improvementRun
       ? supabase.from("query_page_matches").select("id, match_type").eq("run_id", improvementRun.id)
-      : Promise.resolve({ data: null }),
-    improvementRun
-      ? supabase.from("action_cards").select("id, auto_approved, status, action_type").eq("run_id", improvementRun.id)
       : Promise.resolve({ data: null }),
     trackerRun
       ? supabase.from("competitive_gaps").select("query_id, query, bucket, client_mention_rate, competitor_data").eq("run_id", trackerRun.id)
@@ -131,7 +126,6 @@ export default async function RunDetailPage({
   const previousTrackerRun = previousTrackerRunData as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores"> | null;
   const citationScores = (citationScoresData as Pick<PageCitationScore, "structural_score">[]) || [];
   const queryMatches = (queryMatchesData as Pick<QueryPageMatch, "id" | "match_type">[]) || [];
-  const actionCards = (actionCardsData as Pick<ActionCard, "id" | "auto_approved" | "status" | "action_type">[]) || [];
   const competitiveGaps = (competitiveGapsData as Pick<CompetitiveGap, "query_id" | "query" | "bucket" | "client_mention_rate" | "competitor_data">[]) || [];
   const { nextTrackerRun, nextScheduledRun } = nextTrackerAndSchedules as { nextTrackerRun: { id: string; ran_at: string } | null; nextScheduledRun: string | null };
   const technicalAudit = technicalAuditBundle as {
@@ -193,13 +187,6 @@ export default async function RunDetailPage({
     : [];
   const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
   const minScore = scores.length > 0 ? Math.min(...scores) : null;
-
-  // Cards
-  const totalCards = actionCards.length;
-  const autoCards = presentationMode === "legacy"
-    ? actionCards.filter((c) => c.auto_approved).length
-    : 0;
-  const pendingCards = actionCards.filter((c) => c.status === "pending" && !c.auto_approved).length;
 
   const duration = formatDuration(pipeline.started_at, pipeline.completed_at);
   const statusColor = PIPELINE_STATUS_COLOR[pipeline.status] ?? "var(--mute)";
@@ -363,22 +350,6 @@ export default async function RunDetailPage({
           </div>
         </div>
 
-        {/* CARDS / MANUAL REVIEW WORK */}
-        <div className="py-[18px] px-[22px]" style={{ background: "var(--ink)" }}>
-          <div className="font-mono text-[8px] tracking-[0.14em] mb-1.5" style={{ color: "var(--faint)" }}>
-            {presentationMode === "technical_v1" ? "MANUAL REVIEW WORK" : "CARDS"}
-          </div>
-          <div className="font-display font-light text-[38px] leading-none" style={{ color: "var(--white)" }}>
-            {improvementRun ? totalCards : "—"}
-          </div>
-          <div className="font-serif text-[12px] mt-1.5" style={{ color: "var(--mute)" }}>
-            {improvementRun
-              ? presentationMode === "technical_v1"
-                ? `${formatCount(totalCards, "manual card")} · ${pendingCards} to review`
-                : `${autoCards} auto · ${pendingCards} to you`
-              : ""}
-          </div>
-        </div>
       </div>
 
       <RunTechnicalAuditEvidence
@@ -401,7 +372,6 @@ export default async function RunDetailPage({
             technicalReviews: auditSummary?.review ?? 0,
             technicalUnknown: auditSummary?.unknown ?? 0,
             competitorLeads: improvementRun.competitive_gaps_found ?? 0,
-            cards: totalCards,
             matched: matchedCount,
             weak: weakCount,
             contentGaps: gapsCount,
@@ -419,15 +389,6 @@ export default async function RunDetailPage({
               ? `next scheduled run ${new Date(nextScheduledRun).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
               : ""}
         </span>
-        {improvementRun && pendingCards > 0 && (
-          <Link
-            href={`/admin/approvals#run-${improvementRun.id}`}
-            className="font-mono text-[9px] tracking-[0.1em] uppercase underline"
-            style={{ color: "var(--white)" }}
-          >
-            VIEW THIS RUN&apos;S CARDS IN APPROVALS →
-          </Link>
-        )}
       </div>
     </div>
   );

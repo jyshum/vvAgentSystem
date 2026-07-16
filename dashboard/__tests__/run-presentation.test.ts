@@ -46,7 +46,6 @@ describe("run presentation", () => {
       technicalReviews: 3,
       technicalUnknown: 1,
       competitorLeads: 7,
-      cards: 5,
       matched: 0,
       weak: 0,
       contentGaps: 0,
@@ -54,7 +53,7 @@ describe("run presentation", () => {
     });
     expect(text).toContain("14 technical checks");
     expect(text).toContain("7 measured competitor leads");
-    expect(text).toContain("5 manual cards");
+    expect(text).not.toMatch(/cards?/i);
     expect(text).not.toMatch(/matched|weak|content gaps|scored/i);
   });
 
@@ -68,14 +67,13 @@ describe("run presentation", () => {
         technicalReviews: 0,
         technicalUnknown: 0,
         competitorLeads: 2,
-        cards: 1,
         matched: 0,
         weak: 0,
         contentGaps: 0,
         scoredPages: 0,
       }),
     ).toBe(
-      "AI visibility measured → technical audit running → 2 measured competitor leads → 1 manual card",
+      "AI visibility measured → technical audit running → 2 measured competitor leads",
     );
   });
 
@@ -89,24 +87,23 @@ describe("run presentation", () => {
         technicalReviews: 0,
         technicalUnknown: 0,
         competitorLeads: 0,
-        cards: 0,
         matched: 9,
         weak: 2,
         contentGaps: 1,
         scoredPages: 8,
       }),
     ).toBe(
-      "AI visibility measured → technical audit unavailable → 0 measured competitor leads → 0 manual cards",
+      "AI visibility measured → technical audit unavailable → 0 measured competitor leads",
     );
   });
 
   it.each([
-    [0, "0 technical checks", "0 measured competitor leads", "0 manual cards"],
-    [1, "1 technical check", "1 measured competitor lead", "1 manual card"],
-    [2, "2 technical checks", "2 measured competitor leads", "2 manual cards"],
+    [0, "0 technical checks", "0 measured competitor leads"],
+    [1, "1 technical check", "1 measured competitor lead"],
+    [2, "2 technical checks", "2 measured competitor leads"],
   ])(
     "formats technical funnel count grammar for %i",
-    (count, checks, leads, cards) => {
+    (count, checks, leads) => {
       const text = buildRunFunnel({
         mode: "technical_v1",
         technicalStatus: "completed",
@@ -115,7 +112,6 @@ describe("run presentation", () => {
         technicalReviews: 0,
         technicalUnknown: 0,
         competitorLeads: count,
-        cards: count,
         matched: 0,
         weak: 0,
         contentGaps: 0,
@@ -124,8 +120,7 @@ describe("run presentation", () => {
 
       expect(text).toContain(checks);
       expect(text).toContain(leads);
-      expect(text).toContain(cards);
-      expect(text).not.toContain("1 manual cards");
+      expect(text).not.toMatch(/cards?/i);
     },
   );
 
@@ -138,7 +133,6 @@ describe("run presentation", () => {
       technicalReviews: 0,
       technicalUnknown: 0,
       competitorLeads: 2,
-      cards: 3,
       matched: 4,
       weak: 1,
       contentGaps: 2,
@@ -150,11 +144,9 @@ describe("run presentation", () => {
     expect(text).toContain("4 pages scored");
   });
 
-  it("keeps the legacy crawlability fix-card CTA", () => {
+  it("omits the legacy crawlability fix-card CTA", () => {
     expect(crawlabilityBannerPresentation("legacy", "client-1")).toEqual({
       detailFallback: "see the priority-0 card for details",
-      ctaLabel: "VIEW FIX-CRAWLABILITY CARD →",
-      href: "/admin/approvals",
       guidance:
         "DIAGNOSIS BELOW IS THE PRE-FIX BASELINE — VISIBILITY DATA REMAINS VALID",
     });

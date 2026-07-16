@@ -10,7 +10,6 @@ export type RunFunnelInput = {
   technicalReviews: number;
   technicalUnknown: number;
   competitorLeads: number;
-  cards: number;
   matched: number;
   weak: number;
   contentGaps: number;
@@ -19,8 +18,8 @@ export type RunFunnelInput = {
 
 export type CrawlabilityBannerPresentation = {
   detailFallback: string;
-  ctaLabel: string;
-  href: string;
+  ctaLabel?: string;
+  href?: string;
   guidance: string;
 };
 
@@ -56,8 +55,6 @@ export function crawlabilityBannerPresentation(
 
   return {
     detailFallback: "see the priority-0 card for details",
-    ctaLabel: "VIEW FIX-CRAWLABILITY CARD →",
-    href: "/admin/approvals",
     guidance:
       "DIAGNOSIS BELOW IS THE PRE-FIX BASELINE — VISIBILITY DATA REMAINS VALID",
   };
@@ -71,8 +68,8 @@ export function buildRunFunnel(input: RunFunnelInput): string {
         ? `technical audit ${input.technicalStatus}`
         : "technical audit unavailable";
 
-    return `AI visibility measured → ${technicalAudit} → ${formatCount(input.competitorLeads, "measured competitor lead")} → ${formatCount(input.cards, "manual card")}`;
+    return `AI visibility measured → ${technicalAudit} → ${formatCount(input.competitorLeads, "measured competitor lead")}`;
   }
 
-  return `AI visibility measured → ${input.matched} matched · ${input.weak} weak · ${input.contentGaps} content gaps → ${input.scoredPages} pages scored → ${input.competitorLeads} competitive gaps → ${input.cards} cards`;
+  return `AI visibility measured → ${input.matched} matched · ${input.weak} weak · ${input.contentGaps} content gaps → ${input.scoredPages} pages scored → ${input.competitorLeads} competitive gaps`;
 }

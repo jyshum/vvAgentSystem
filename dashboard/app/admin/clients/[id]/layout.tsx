@@ -209,9 +209,11 @@ export default async function ClientLayout({
               ? failing.map((f) => `${f.name}: ${f.detail}`).join(" · ")
               : crawlabilityBanner.detailFallback}
           </div>
-          <Link href={crawlabilityBanner.href} className="font-mono text-[9px] tracking-[0.1em] uppercase underline" style={{ color: "var(--neg)" }}>
-            {crawlabilityBanner.ctaLabel}
-          </Link>
+          {crawlabilityBanner.href && crawlabilityBanner.ctaLabel && (
+            <Link href={crawlabilityBanner.href} className="font-mono text-[9px] tracking-[0.1em] uppercase underline" style={{ color: "var(--neg)" }}>
+              {crawlabilityBanner.ctaLabel}
+            </Link>
+          )}
           <div className="font-mono text-[8px] mt-1" style={{ color: "var(--faint)" }}>
             {crawlabilityBanner.guidance}
           </div>
