@@ -64,4 +64,26 @@ describe("CardActions", () => {
       expect(screen.getByRole("alert").textContent).toContain("site changed since audit");
     });
   });
+
+  it("clears a stale error when the status prop changes on a mounted instance", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({ error: "site changed since audit" }),
+      }),
+    );
+
+    const { rerender } = render(<CardActions cardId="card-1" status="approved" />);
+    fireEvent.click(screen.getByRole("button", { name: /mark applied/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("site changed since audit");
+    });
+
+    rerender(<CardActions cardId="card-1" status="verified" />);
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });
