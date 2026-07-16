@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   CARD_ALLOWED_TRANSITIONS,
@@ -34,6 +34,11 @@ export function CardActions({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // A status change replaces the available buttons, so an error from the
+  // previous status must not outlive them - it would leave a message on
+  // screen with no button to retry.
+  useEffect(() => setError(null), [status]);
 
   const targets = (CARD_ALLOWED_TRANSITIONS[status] ?? []).filter(
     (target) => ACTIONS[target],

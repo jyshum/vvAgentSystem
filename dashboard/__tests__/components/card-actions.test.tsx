@@ -21,6 +21,14 @@ describe("CardActions", () => {
     expect(screen.queryByRole("button", { name: /mark applied/i })).toBeNull();
   });
 
+  it("offers only reject for an observed card", () => {
+    render(<CardActions cardId="card-1" status="observed" />);
+    expect(screen.queryAllByRole("button")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /reject/i })).toBeDefined();
+    expect(screen.queryByRole("button", { name: /approve/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /mark applied/i })).toBeNull();
+  });
+
   it("offers mark applied for an approved card", () => {
     render(<CardActions cardId="card-1" status="approved" />);
     expect(screen.getByRole("button", { name: /mark applied/i })).toBeDefined();
