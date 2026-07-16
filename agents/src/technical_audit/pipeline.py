@@ -257,3 +257,45 @@ def run_technical_pipeline(
     if audit["error"]:
         result["error"] = audit["error"]
     return result
+
+
+def run_standalone_audit(
+    client_id: str,
+    check_sets: tuple[str, ...] = DEFAULT_CHECK_SETS,
+) -> dict:
+    """Run and persist a technical audit with no improvement run around it.
+
+    The audit is a first-class thing: it does not need a GEO pipeline run to
+    exist. `technical_audit_runs.improvement_run_id` is nullable precisely so
+    this is possible.
+    """
+    sb = _get_supabase()
+    response = (
+        sb.table("clients")
+        .select("id,brand_name,website_domain,site_platform,implementation_mode,gsc_site_url")
+        .eq("id", client_id)
+        .maybe_single()
+        .execute()
+    )
+    if not response.data:
+        raise ValueError("client not found")
+    client = response.data
+
+    state = {
+        "client_id": client_id,
+        "thread_id": None,
+        "client_config": {
+            "brand_name": client["brand_name"],
+            "website_domain": client["website_domain"],
+            "site_platform": client.get("site_platform") or "other",
+            "implementation_mode": client.get("implementation_mode") or "copy_paste",
+            "gsc_site_url": client.get("gsc_site_url") or "",
+        },
+    }
+
+    audit = _run_and_persist_technical_audit(sb, state, None, check_sets)
+    return {
+        "technical_audit_run_id": audit["run_id"],
+        "technical_audit_summary": audit["summary"],
+        "technical_audit_error": audit["error"],
+    }
