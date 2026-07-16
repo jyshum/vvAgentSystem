@@ -52,3 +52,45 @@ def test_mixed_content_guidance_carries_insecure_urls():
 def test_unknown_remediation_returns_none():
     assert build_guidance({"remediation_id": "does.not.exist"}, "other") is None
     assert build_guidance({}, "other") is None
+
+
+def test_mixed_content_guidance_reports_true_total_beyond_cap():
+    urls = [f"http://cdn.example/{i}.js" for i in range(60)]
+    guidance = build_guidance(
+        {
+            "remediation_id": "tls.fix_mixed_content",
+            "observed": {"active_http_urls": urls},
+        },
+        "squarespace",
+    )
+    assert len(guidance["copy_values"]["insecure_urls"]) == 10
+    assert guidance["copy_values"]["insecure_urls"] == urls[:10]
+    assert guidance["copy_values"]["insecure_urls_total"] == 60
+
+
+def test_links_guidance_reports_true_total_beyond_cap():
+    failures = [f"https://example.com/dead-{i}" for i in range(60)]
+    guidance = build_guidance(
+        {
+            "remediation_id": "links.repair_internal",
+            "observed": {"failures": failures},
+        },
+        "squarespace",
+    )
+    assert len(guidance["copy_values"]["broken"]) == 10
+    assert guidance["copy_values"]["broken"] == failures[:10]
+    assert guidance["copy_values"]["broken_total"] == 60
+
+
+def test_sources_guidance_reports_true_total_beyond_cap():
+    failures = [f"https://source.example/{i}" for i in range(60)]
+    guidance = build_guidance(
+        {
+            "remediation_id": "sources.repair_citations",
+            "observed": {"failures": failures},
+        },
+        "squarespace",
+    )
+    assert len(guidance["copy_values"]["dead_sources"]) == 10
+    assert guidance["copy_values"]["dead_sources"] == failures[:10]
+    assert guidance["copy_values"]["dead_sources_total"] == 60

@@ -204,4 +204,37 @@ describe("ActionCard", () => {
     expect(screen.getByText("https://x.test/9")).toBeDefined();
     expect(screen.queryByTestId("card-facts-remainder")).toBeNull();
   });
+
+  it("uses the backend-reported true total when the list is capped server-side", () => {
+    // The backend now caps transmitted lists at 10 but reports the true
+    // count alongside as `<key>_total`. A 10-item array with a total of 60
+    // must show "Showing 10 of 60", not "Showing 10 of 10".
+    const broken = Array.from({ length: 10 }, (_, i) => `https://x.test/${i}`);
+    render(
+      <ActionCard
+        card={{ ...card, copy_values: { broken, broken_total: 60 } }}
+        group={group}
+        results={[result()]}
+      />,
+    );
+    expect(screen.getByTestId("card-facts-remainder").textContent).toBe(
+      "Showing 10 of 60",
+    );
+  });
+
+  it("shows no remainder indicator for an old card with no _total key, even though the list is exactly 10", () => {
+    // Discriminates against the trivial always-absent case above: this card
+    // has the identical 10-item array as the test above, but no `broken_total`
+    // key (as persisted before this change). Without it, the true count is
+    // unknowable, so no indicator should render at all.
+    const broken = Array.from({ length: 10 }, (_, i) => `https://x.test/${i}`);
+    render(
+      <ActionCard
+        card={{ ...card, copy_values: { broken } }}
+        group={group}
+        results={[result()]}
+      />,
+    );
+    expect(screen.queryByTestId("card-facts-remainder")).toBeNull();
+  });
 });

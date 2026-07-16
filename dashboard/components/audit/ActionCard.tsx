@@ -22,10 +22,21 @@ const FACT_LIMIT = 10;
 /** copy_values carries observed facts only (lists of failing URLs, dead
  *  sources, insecure resources). Never drafted prose - see the spec.
  *  Returns every fact found: truncation is a presentation concern, and the
- *  caller needs the true count to report it honestly. */
-function observedFacts(copyValues: Record<string, unknown>): string[] {
+ *  caller needs the true count to report it honestly.
+ *
+ *  The backend caps each fact list at 10 entries before persisting the card,
+ *  and (for lists that can run long) records the true count alongside it as
+ *  `<key>_total`. `total` here is the sum, across every fact array in
+ *  copy_values, of its declared `<key>_total` when present or its raw
+ *  array length otherwise (older cards persisted before totals existed have
+ *  no `_total` key, so their array length - already capped at the time -
+ *  is the only count available). This keeps the rule generic: a fifth
+ *  remediation that adds a fact array gets correct totals for free as long
+ *  as it follows the `<key>` / `<key>_total` convention. */
+function observedFacts(copyValues: Record<string, unknown>): { facts: string[]; total: number } {
   const facts: string[] = [];
-  for (const value of Object.values(copyValues)) {
+  let total = 0;
+  for (const [key, value] of Object.entries(copyValues)) {
     if (!Array.isArray(value)) continue;
     for (const item of value) {
       if (typeof item === "string") facts.push(item);
@@ -38,8 +49,12 @@ function observedFacts(copyValues: Record<string, unknown>): string[] {
         }
       }
     }
+    const declaredTotal = copyValues[`${key}_total`];
+    total += typeof declaredTotal === "number" && Number.isFinite(declaredTotal)
+      ? declaredTotal
+      : value.length;
   }
-  return facts;
+  return { facts, total };
 }
 
 function subjectLine(subjects: string[]): string {
@@ -62,7 +77,7 @@ export function ActionCard({
   const representative = results[0];
   const subjects = group?.subjects ?? results.map((item) => item.subject);
   const statusColor = TECHNICAL_AUDIT_STATUS_COLOR[group?.status ?? "fail"];
-  const facts = observedFacts(card.copy_values);
+  const { facts, total: factsTotal } = observedFacts(card.copy_values);
   const shownFacts = facts.slice(0, FACT_LIMIT);
 
   const lifecycle = results.find(
@@ -130,13 +145,13 @@ export function ActionCard({
                     </li>
                   ))}
                 </ul>
-                {facts.length > shownFacts.length && (
+                {factsTotal > shownFacts.length && (
                   <div
                     data-testid="card-facts-remainder"
                     className={`${LABEL} mt-1.5`}
                     style={{ color: "var(--faint)" }}
                   >
-                    Showing {shownFacts.length} of {facts.length}
+                    Showing {shownFacts.length} of {factsTotal}
                   </div>
                 )}
               </>

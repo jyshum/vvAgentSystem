@@ -115,7 +115,7 @@ def _guidance_tls(result: dict, platform: str) -> dict[str, Any]:
 
 
 def _guidance_mixed_content(result: dict, platform: str) -> dict[str, Any]:
-    urls = (result.get("observed") or {}).get("active_http_urls", [])[:10]
+    all_urls = (result.get("observed") or {}).get("active_http_urls", [])
     steps = [
         "Update each listed resource to load over https://.",
         "If a resource belongs to an embedded business integration, review it with"
@@ -123,7 +123,10 @@ def _guidance_mixed_content(result: dict, platform: str) -> dict[str, Any]:
         "Never blindly replace every http:// string on the site.",
     ]
     guidance = _generic("Serve active content over HTTPS", steps)
-    guidance["copy_values"] = {"insecure_urls": urls}
+    guidance["copy_values"] = {
+        "insecure_urls": all_urls[:10],
+        "insecure_urls_total": len(all_urls),
+    }
     return guidance
 
 
@@ -146,14 +149,17 @@ def _guidance_schema(result: dict, platform: str) -> dict[str, Any]:
 
 
 def _guidance_links(result: dict, platform: str) -> dict[str, Any]:
-    failures = (result.get("observed") or {}).get("failures", [])[:10]
+    all_failures = (result.get("observed") or {}).get("failures", [])
     steps = [
         "For each listed destination: fix the typo, point to the current equivalent,"
         " or repair the redirect.",
         "Only remove a link after review when no replacement exists.",
     ]
     guidance = _generic("Repair the broken links", steps)
-    guidance["copy_values"] = {"broken": failures}
+    guidance["copy_values"] = {
+        "broken": all_failures[:10],
+        "broken_total": len(all_failures),
+    }
     return guidance
 
 
@@ -183,7 +189,7 @@ def _guidance_freshness(result: dict, platform: str) -> dict[str, Any]:
 
 
 def _guidance_sources(result: dict, platform: str) -> dict[str, Any]:
-    failures = (result.get("observed") or {}).get("failures", [])[:10]
+    all_failures = (result.get("observed") or {}).get("failures", [])
     guidance = _generic(
         "Repair the dead citations",
         [
@@ -191,7 +197,10 @@ def _guidance_sources(result: dict, platform: str) -> dict[str, Any]:
             "Link the relevant human-readable words; preserve the page's citation style.",
         ],
     )
-    guidance["copy_values"] = {"dead_sources": failures}
+    guidance["copy_values"] = {
+        "dead_sources": all_failures[:10],
+        "dead_sources_total": len(all_failures),
+    }
     return guidance
 
 
