@@ -2,6 +2,48 @@ import { describe, expect, it } from "vitest";
 import { buildIntentImportRows, parseIntentJson } from "@/lib/intent-import";
 
 describe("parseIntentJson", () => {
+  it("safely retries JSON that uses smart double quotes", () => {
+    expect(
+      parseIntentJson(
+        '[{“prompt_text”:“donate wedding flowers”,“bucket”:“consideration”,“paraphrases”:[“reuse event flowers”]}]'
+      )
+    ).toEqual([
+      {
+        prompt_text: "donate wedding flowers",
+        bucket: "consideration",
+        paraphrases: ["reuse event flowers"],
+      },
+    ]);
+  });
+
+  it("preserves smart quotes inside already-valid JSON strings", () => {
+    expect(
+      parseIntentJson(
+        JSON.stringify([
+          {
+            prompt_text: "What does “flower reuse” mean?",
+            bucket: "awareness",
+            paraphrases: [],
+          },
+        ])
+      )[0].prompt_text
+    ).toBe("What does “flower reuse” mean?");
+  });
+
+  it("keeps strict semantic validation after smart-quote recovery", () => {
+    expect(() =>
+      parseIntentJson(
+        '[{“prompt_text”:“donate wedding flowers”,“bucket”:“purchase”,“paraphrases”:[]}]'
+      )
+    ).toThrow("invalid bucket: purchase");
+  });
+
+  it("rejects smart-quote input when the normalized retry is still malformed", () => {
+    expect(() =>
+      parseIntentJson('[{“prompt_text”:“donate wedding flowers”,“bucket”}]')
+    ).toThrow("Intent JSON is invalid.");
+  });
+
   it("parses product visibility and content authority intents", () => {
     expect(
       parseIntentJson(

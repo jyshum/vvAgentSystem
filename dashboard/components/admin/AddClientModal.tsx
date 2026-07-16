@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { TagInput } from "./TagInput";
 import { parseIntentJson, type IntentImportItem } from "@/lib/intent-import";
@@ -9,6 +9,8 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [intentError, setIntentError] = useState("");
+  const intentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [name, setName] = useState("");
   const [brandName, setBrandName] = useState("");
@@ -34,13 +36,15 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
     }
     setSaving(true);
     setError("");
+    setIntentError("");
     try {
       let intents: IntentImportItem[] = [];
       if (intentJson.trim()) {
         try {
           intents = parseIntentJson(intentJson);
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Intent JSON is invalid.");
+          setIntentError(err instanceof Error ? err.message : "Intent JSON is invalid.");
+          intentTextareaRef.current?.focus();
           return;
         }
       }
@@ -162,12 +166,19 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
           />
 
           <div className="mb-5">
-            <label className="block font-mono text-[9px] tracking-[0.14em] uppercase mb-1.5" style={{ color: "var(--faint)" }}>
+            <label htmlFor="intent-json" className="block font-mono text-[9px] tracking-[0.14em] uppercase mb-1.5" style={{ color: "var(--faint)" }}>
               Generated Intent Set JSON
             </label>
             <textarea
+              id="intent-json"
+              ref={intentTextareaRef}
               value={intentJson}
-              onChange={(e) => setIntentJson(e.target.value)}
+              onChange={(e) => {
+                setIntentJson(e.target.value);
+                setIntentError("");
+              }}
+              aria-invalid={intentError ? "true" : "false"}
+              aria-describedby={intentError ? "intent-json-error intent-json-help" : "intent-json-help"}
               placeholder={`[
   {
     "prompt_text": "best daycare management software",
@@ -182,11 +193,20 @@ export function AddClientModal({ onClose }: { onClose: () => void }) {
 ]`}
               rows={12}
               className="w-full font-mono text-[11px] leading-5 bg-transparent px-3 py-2.5 outline-none transition-colors resize-y"
-              style={{ border: "1px solid var(--hair)", color: "var(--white)", minHeight: 220 }}
-              onFocus={(e) => (e.target.style.borderColor = "var(--ghost)")}
-              onBlur={(e) => (e.target.style.borderColor = "var(--hair)")}
+              style={{ border: "1px solid", borderColor: intentError ? "var(--neg)" : "var(--hair)", color: "var(--white)", minHeight: 220 }}
+              onFocus={(e) => {
+                if (!intentError) e.target.style.borderColor = "var(--ghost)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = intentError ? "var(--neg)" : "var(--hair)";
+              }}
             />
-            <p className="font-mono text-[9px] leading-4 mt-2" style={{ color: "var(--faint)" }}>
+            {intentError && (
+              <p id="intent-json-error" role="alert" className="font-mono text-[9px] leading-4 mt-2" style={{ color: "var(--neg)" }}>
+                {intentError}
+              </p>
+            )}
+            <p id="intent-json-help" className="font-mono text-[9px] leading-4 mt-2" style={{ color: "var(--faint)" }}>
               Optional import. Use consideration for Product Visibility and awareness for Content Authority. Branded monitoring is deferred.
             </p>
           </div>

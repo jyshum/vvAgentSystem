@@ -59,7 +59,15 @@ export function parseIntentJson(text: string): IntentImportItem[] {
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error("Intent JSON is invalid.");
+    const normalized = text.replace(/[“”]/g, '"');
+    if (normalized === text) {
+      throw new Error("Intent JSON is invalid.");
+    }
+    try {
+      parsed = JSON.parse(normalized);
+    } catch {
+      throw new Error("Intent JSON is invalid.");
+    }
   }
 
   if (!Array.isArray(parsed)) {
