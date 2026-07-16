@@ -37,7 +37,6 @@ const resultFixture: TechnicalAuditResult = {
   section: "canonical_url",
   subject: "https://example.com/page",
   status: "review",
-  severity: "medium",
   summary: "Canonical declaration is missing",
   expected: "One appropriate canonical declaration",
   observed: { canonicals: [] },

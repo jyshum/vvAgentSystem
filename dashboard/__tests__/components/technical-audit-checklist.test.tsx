@@ -41,7 +41,6 @@ function result(
     section: "canonical_url",
     subject: "https://example.com/page",
     status,
-    severity: "medium",
     summary,
     expected: "One appropriate canonical declaration",
     observed: { canonicals: [] },
