@@ -17,4 +17,17 @@ describe("clientTabs", () => {
     const audit = clientTabs("client-1").find((tab) => tab.label === "AUDIT");
     expect(audit?.href).toBe("/admin/clients/client-1/audit");
   });
+
+  it("omits the legacy Pages route from primary navigation", () => {
+    const tabs = clientTabs("client-1");
+    expect(tabs.map((tab) => tab.label)).toEqual([
+      "OVERVIEW",
+      "QUERIES",
+      "RUNS",
+      "AUDIT",
+      "CONFIG",
+      "REPORTS",
+    ]);
+    expect(tabs.some((tab) => tab.href.endsWith("/pages"))).toBe(false);
+  });
 });
