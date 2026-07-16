@@ -1,0 +1,189 @@
+import {
+  CARD_STATUS_LABEL,
+  LIFECYCLE_COLOR,
+  LIFECYCLE_LABEL,
+  TECHNICAL_AUDIT_STATUS_COLOR,
+  TECHNICAL_AUDIT_STATUS_LABEL,
+  type TechnicalAuditActionCard,
+  type TechnicalAuditFindingGroup,
+  type TechnicalAuditLifecycleState,
+  type TechnicalAuditResult,
+} from "@/lib/technical-audit-types";
+import { CardActions } from "@/components/audit/CardActions";
+
+const CHIP =
+  "shrink-0 border px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em]";
+const LABEL = "font-mono text-[8px] uppercase tracking-[0.12em]";
+
+/** copy_values carries observed facts only (lists of failing URLs, dead
+ *  sources, insecure resources). Never drafted prose - see the spec. */
+function observedFacts(copyValues: Record<string, unknown>): string[] {
+  const facts: string[] = [];
+  for (const value of Object.values(copyValues)) {
+    if (!Array.isArray(value)) continue;
+    for (const item of value) {
+      if (typeof item === "string") facts.push(item);
+      else if (item && typeof item === "object") {
+        const record = item as Record<string, unknown>;
+        const url = record.url ?? record.href ?? record.target;
+        const detail = record.status ?? record.reason;
+        if (typeof url === "string") {
+          facts.push(detail === undefined ? url : `${url} - ${String(detail)}`);
+        }
+      }
+    }
+  }
+  return facts.slice(0, 10);
+}
+
+function subjectLine(subjects: string[]): string {
+  const count = subjects.length;
+  const noun = count === 1 ? "page" : "pages";
+  const head = subjects[0] ?? "";
+  const rest = count > 1 ? ` +${count - 1}` : "";
+  return `${count} ${noun} · ${head}${rest}`;
+}
+
+export function ActionCard({
+  card,
+  group,
+  results,
+}: {
+  card: TechnicalAuditActionCard;
+  group: TechnicalAuditFindingGroup | undefined;
+  results: TechnicalAuditResult[];
+}) {
+  const representative = results[0];
+  const subjects = group?.subjects ?? results.map((item) => item.subject);
+  const statusColor = TECHNICAL_AUDIT_STATUS_COLOR[group?.status ?? "fail"];
+  const facts = observedFacts(card.copy_values);
+
+  const lifecycle = results.find(
+    (item) => item.lifecycle_state === "regressed",
+  )?.lifecycle_state ?? representative?.lifecycle_state;
+  const regressed = lifecycle === "regressed";
+
+  return (
+    <div
+      className="mb-2.5 border p-4"
+      style={{
+        background: "var(--ink-soft)",
+        borderColor: regressed ? "rgba(232, 154, 160, 0.4)" : "var(--hair)",
+      }}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div
+            data-testid="card-title"
+            className="font-serif text-[15px]"
+            style={{ color: "var(--white)" }}
+          >
+            {card.title}
+          </div>
+          <div
+            data-testid="card-subjects"
+            className="mt-1 break-all font-mono text-[9px]"
+            style={{ color: "var(--faint)" }}
+          >
+            {subjectLine(subjects)}
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-1.5">
+          <span className={CHIP} style={{ color: statusColor, borderColor: statusColor }}>
+            {TECHNICAL_AUDIT_STATUS_LABEL[group?.status ?? "fail"]}
+          </span>
+          {lifecycle && (
+            <span
+              className={CHIP}
+              style={{
+                color: LIFECYCLE_COLOR[lifecycle as TechnicalAuditLifecycleState],
+                borderColor: LIFECYCLE_COLOR[lifecycle as TechnicalAuditLifecycleState],
+              }}
+            >
+              {LIFECYCLE_LABEL[lifecycle as TechnicalAuditLifecycleState]}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="my-3 px-3 py-3" style={{ background: "var(--ink)" }}>
+        <div className="grid gap-y-2" style={{ gridTemplateColumns: "76px 1fr" }}>
+          <div className={LABEL} style={{ color: "var(--faint)" }}>
+            Now
+          </div>
+          <div className="font-serif text-[13px]" style={{ color: "var(--neg)" }}>
+            {facts.length > 0 ? (
+              <ul className="space-y-0.5">
+                {facts.map((fact) => (
+                  <li key={fact} className="break-all font-mono text-[11px]">
+                    {fact}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              representative?.summary ?? card.title
+            )}
+          </div>
+          <div className={LABEL} style={{ color: "var(--faint)" }}>
+            Expected
+          </div>
+          <div
+            data-testid="card-expected"
+            className="font-serif text-[13px]"
+            style={{ color: "var(--mute)" }}
+          >
+            {representative?.expected ?? "-"}
+          </div>
+        </div>
+      </div>
+
+      {card.instructions.length > 0 && (
+        <details>
+          <summary
+            className={`${LABEL} cursor-pointer py-1`}
+            style={{ color: "var(--faint)" }}
+          >
+            How to apply · {card.platform}
+          </summary>
+          <ol
+            className="ml-4 mt-2 list-decimal space-y-1 font-serif text-[13px] leading-relaxed"
+            style={{ color: "var(--mute)" }}
+          >
+            {card.instructions.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </details>
+      )}
+
+      <details>
+        <summary
+          className={`${LABEL} cursor-pointer py-1`}
+          style={{ color: "var(--faint)" }}
+        >
+          Evidence · {results.length} findings
+        </summary>
+        <pre
+          className="mt-2 overflow-x-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed"
+          style={{ color: "var(--mute)" }}
+        >
+          {JSON.stringify(
+            results.map((item) => ({ subject: item.subject, observed: item.observed })),
+            null,
+            2,
+          )}
+        </pre>
+      </details>
+
+      <div
+        className="mt-3 flex flex-wrap items-center gap-3 border-t pt-3"
+        style={{ borderColor: "var(--hair)" }}
+      >
+        <CardActions cardId={card.id} status={card.status} />
+        <span className={LABEL} style={{ color: "var(--faint)" }}>
+          {CARD_STATUS_LABEL[card.status]}
+        </span>
+      </div>
+    </div>
+  );
+}
