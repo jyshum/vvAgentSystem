@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   TechnicalAuditActionCard,
   TechnicalAuditFindingGroup,
+  TechnicalAuditLifecycleState,
   TechnicalAuditResult,
   TechnicalAuditRun,
 } from "@/lib/technical-audit-types";
@@ -27,6 +28,9 @@ export async function loadAuditTabData(
     .select("id, status, started_at")
     .eq("client_id", clientId)
     .order("started_at", { ascending: false })
+    // The run switcher only shows the 20 most recent runs. Older runs still
+    // exist and remain reachable via a direct `?run=` link, but this cap
+    // silently truncates the switcher's list - not an oversight.
     .limit(20);
 
   const runs = (runList as AuditTabData["runs"]) ?? [];
@@ -78,8 +82,8 @@ export async function loadAuditTabData(
  *  states so the strip stays quiet when nothing changed. */
 export function lifecycleCounts(
   results: TechnicalAuditResult[],
-): Record<string, number> {
-  const counts: Record<string, number> = {};
+): Partial<Record<TechnicalAuditLifecycleState, number>> {
+  const counts: Partial<Record<TechnicalAuditLifecycleState, number>> = {};
   for (const result of results) {
     if (!result.lifecycle_state) continue;
     counts[result.lifecycle_state] = (counts[result.lifecycle_state] ?? 0) + 1;

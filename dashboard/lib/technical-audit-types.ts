@@ -170,7 +170,8 @@ export const LIFECYCLE_COLOR: Record<TechnicalAuditLifecycleState, string> = {
 };
 
 /** Order for the lifecycle strip. Regressed leads: a fix that broke again is
- *  the one fact nothing else in the product reports. */
+ *  the one fact nothing else in the product reports. `continuing` is
+ *  intentionally excluded: it means no material change, so it is not news. */
 export const LIFECYCLE_STRIP_ORDER: TechnicalAuditLifecycleState[] = [
   "regressed",
   "new",
