@@ -87,6 +87,24 @@ describe("ActionCard", () => {
     expect(screen.getByText(/how to apply/i).tagName.toLowerCase()).toBe("summary");
   });
 
+  it("surfaces the next action so cards without step-by-step guidance are not dead ends", () => {
+    render(
+      <ActionCard
+        card={{ ...card, instructions: [] }}
+        group={{ ...group, check_id: "performance.crux", status: "unknown" }}
+        results={[
+          result({
+            status: "unknown",
+            next_action: { owner: "integration", instruction: "Configure CRUX_API_KEY to collect field performance evidence" },
+          }),
+        ]}
+      />,
+    );
+    const next = screen.getByTestId("card-next-action");
+    expect(next.textContent).toContain("Configure CRUX_API_KEY");
+    expect(next.textContent).toContain("owner: integration");
+  });
+
   it("renders the lifecycle chip when the finding regressed", () => {
     render(
       <ActionCard

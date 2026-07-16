@@ -78,6 +78,7 @@ export function ActionCard({
   const representative = results[0];
   const subjects = group?.subjects ?? results.map((item) => item.subject);
   const statusColor = TECHNICAL_AUDIT_STATUS_COLOR[group?.status ?? "fail"];
+  const nextAction = representative?.next_action;
   const { facts, total: factsTotal } = observedFacts(card.copy_values);
   const shownFacts = facts.slice(0, FACT_LIMIT);
 
@@ -174,6 +175,20 @@ export function ActionCard({
           >
             {representative?.expected ?? "-"}
           </div>
+          {nextAction?.instruction && (
+            <>
+              <div className={LABEL} style={{ color: "var(--faint)" }}>
+                Next
+              </div>
+              <div data-testid="card-next-action" className="font-serif text-[13px]" style={{ color: "var(--white)" }}>
+                {nextAction.instruction}
+                <span className="font-mono text-[9px]" style={{ color: "var(--faint)" }}>
+                  {" "}
+                  · owner: {nextAction.owner}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
