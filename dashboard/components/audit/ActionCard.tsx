@@ -15,8 +15,14 @@ const CHIP =
   "shrink-0 border px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em]";
 const LABEL = "font-mono text-[8px] uppercase tracking-[0.12em]";
 
+/** The card lists at most this many observed facts; the true total is always
+ *  stated alongside them so a long tail is never hidden. */
+const FACT_LIMIT = 10;
+
 /** copy_values carries observed facts only (lists of failing URLs, dead
- *  sources, insecure resources). Never drafted prose - see the spec. */
+ *  sources, insecure resources). Never drafted prose - see the spec.
+ *  Returns every fact found: truncation is a presentation concern, and the
+ *  caller needs the true count to report it honestly. */
 function observedFacts(copyValues: Record<string, unknown>): string[] {
   const facts: string[] = [];
   for (const value of Object.values(copyValues)) {
@@ -33,7 +39,7 @@ function observedFacts(copyValues: Record<string, unknown>): string[] {
       }
     }
   }
-  return facts.slice(0, 10);
+  return facts;
 }
 
 function subjectLine(subjects: string[]): string {
@@ -57,6 +63,7 @@ export function ActionCard({
   const subjects = group?.subjects ?? results.map((item) => item.subject);
   const statusColor = TECHNICAL_AUDIT_STATUS_COLOR[group?.status ?? "fail"];
   const facts = observedFacts(card.copy_values);
+  const shownFacts = facts.slice(0, FACT_LIMIT);
 
   const lifecycle = results.find(
     (item) => item.lifecycle_state === "regressed",
@@ -113,13 +120,24 @@ export function ActionCard({
           </div>
           <div className="font-serif text-[13px]" style={{ color: "var(--neg)" }}>
             {facts.length > 0 ? (
-              <ul className="space-y-0.5">
-                {facts.map((fact) => (
-                  <li key={fact} className="break-all font-mono text-[11px]">
-                    {fact}
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="space-y-0.5">
+                  {shownFacts.map((fact) => (
+                    <li key={fact} className="break-all font-mono text-[11px]">
+                      {fact}
+                    </li>
+                  ))}
+                </ul>
+                {facts.length > shownFacts.length && (
+                  <div
+                    data-testid="card-facts-remainder"
+                    className={`${LABEL} mt-1.5`}
+                    style={{ color: "var(--faint)" }}
+                  >
+                    Showing {shownFacts.length} of {facts.length}
+                  </div>
+                )}
+              </>
             ) : (
               representative?.summary ?? card.title
             )}

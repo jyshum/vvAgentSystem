@@ -109,4 +109,34 @@ describe("ActionCard", () => {
     expect(screen.getByText("https://x.test/a")).toBeDefined();
     expect(screen.getByText("https://x.test/b")).toBeDefined();
   });
+
+  it("states the real remainder when more facts exist than are shown", () => {
+    const broken = Array.from({ length: 60 }, (_, i) => `https://x.test/${i}`);
+    render(
+      <ActionCard
+        card={{ ...card, copy_values: { broken } }}
+        group={group}
+        results={[result()]}
+      />,
+    );
+    // Only the first 10 are listed, but the operator is told the true scope.
+    expect(screen.getByText("https://x.test/9")).toBeDefined();
+    expect(screen.queryByText("https://x.test/10")).toBeNull();
+    expect(screen.getByTestId("card-facts-remainder").textContent).toBe(
+      "Showing 10 of 60",
+    );
+  });
+
+  it("omits the remainder indicator when every fact is shown", () => {
+    const broken = Array.from({ length: 10 }, (_, i) => `https://x.test/${i}`);
+    render(
+      <ActionCard
+        card={{ ...card, copy_values: { broken } }}
+        group={group}
+        results={[result()]}
+      />,
+    );
+    expect(screen.getByText("https://x.test/9")).toBeDefined();
+    expect(screen.queryByTestId("card-facts-remainder")).toBeNull();
+  });
 });
