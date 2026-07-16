@@ -17,7 +17,7 @@ export default async function BoardPage() {
 
   const rows: BoardRowData[] = await Promise.all(
     allClients.map(async (client) => {
-      const [{ data: runs }, { data: pipeline }, { data: pendingCards }, { data: implementedCards }] =
+      const [{ data: runs }, { data: pipeline }, { data: pendingCards }, { data: verifiedCards }] =
         await Promise.all([
           supabase
             .from("tracker_runs")
@@ -32,15 +32,15 @@ export default async function BoardPage() {
             .order("started_at", { ascending: false })
             .limit(1),
           supabase
-            .from("action_cards")
+            .from("technical_audit_action_cards")
             .select("id, created_at")
             .eq("client_id", client.id)
-            .eq("status", "pending"),
+            .not("status", "in", "(verified,rejected)"),
           supabase
-            .from("action_cards")
+            .from("technical_audit_action_cards")
             .select("status, created_at")
             .eq("client_id", client.id)
-            .eq("status", "implemented"),
+            .eq("status", "verified"),
         ]);
 
       const history = ((runs as Pick<TrackerRun, "id" | "ran_at" | "aggregate_mention_rate" | "non_branded_mention_rate" | "bucket_scores" | "competitor_scores">[]) || []);
@@ -72,7 +72,10 @@ export default async function BoardPage() {
         latestPipelineStatus: pipeline?.[0]?.status ?? null,
         pendingCount: pending.length,
         oldestPendingDays,
-        measuring: measuringCount(implementedCards || [], latest?.ran_at ?? null),
+        measuring: measuringCount(
+          (verifiedCards || []).map((card) => ({ ...card, status: "implemented" })),
+          latest?.ran_at ?? null
+        ),
         hasRun: !!latest,
       });
 
