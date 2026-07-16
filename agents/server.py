@@ -167,6 +167,10 @@ class ApproveCardRequest(BaseModel):
     approved_by: str
 
 
+class TriggerAuditRequest(BaseModel):
+    client_id: str
+
+
 def _workflow_call(function, *args, **kwargs):
     from src.technical_audit.workflow import WorkflowError
 
@@ -226,6 +230,35 @@ async def get_technical_audit_run(
         "results": results.data or [],
         "groups": groups.data or [],
     }
+
+
+def _run_audit_background(client_id: str) -> None:
+    from src.technical_audit.pipeline import run_standalone_audit
+
+    try:
+        result = run_standalone_audit(client_id)
+        print(f"  [Audit] Completed {client_id}: run {result['technical_audit_run_id']}")
+    except Exception as e:
+        print(f"  [Audit] Failed for {client_id}: {e}")
+
+
+@app.post("/api/technical-audit/runs")
+async def trigger_technical_audit(
+    req: TriggerAuditRequest, authorization: str | None = Header(None)
+):
+    verify_auth(authorization)
+    sb = _get_supabase()
+    client = (
+        sb.table("clients").select("id").eq("id", req.client_id).maybe_single().execute()
+    )
+    if not client.data:
+        raise HTTPException(status_code=404, detail="client not found")
+
+    t = threading.Thread(
+        target=_run_audit_background, args=(req.client_id,), daemon=True
+    )
+    t.start()
+    return {"status": "started", "client_id": req.client_id}
 
 
 @app.get("/api/technical-audit/cards")
