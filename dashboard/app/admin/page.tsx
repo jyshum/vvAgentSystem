@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchSchedules } from "@/lib/schedules";
-import { biggestMovers, measuringCount, opsBadge, rankAndGap, topCompetitor } from "@/lib/derive";
+import { biggestMovers, opsBadge, rankAndGap, topCompetitor } from "@/lib/derive";
+import { mapBoardAuditCardResults } from "@/lib/board-audit-cards";
 import { BoardRow, type BoardRowData } from "@/components/board/BoardRow";
 import { productVisibilityScore } from "@/lib/intent-labels";
 import type { Client, TrackerRun, PromptScore } from "@/lib/types";
@@ -17,7 +18,7 @@ export default async function BoardPage() {
 
   const rows: BoardRowData[] = await Promise.all(
     allClients.map(async (client) => {
-      const [{ data: runs }, { data: pipeline }, { data: pendingCards }, { data: verifiedCards }] =
+      const [{ data: runs }, { data: pipeline }, openCardsResult, verifiedCardsResult] =
         await Promise.all([
           supabase
             .from("tracker_runs")
@@ -38,7 +39,7 @@ export default async function BoardPage() {
             .not("status", "in", "(verified,rejected)"),
           supabase
             .from("technical_audit_action_cards")
-            .select("status, created_at")
+            .select("id, status, created_at, applied_at")
             .eq("client_id", client.id)
             .eq("status", "verified"),
         ]);
@@ -60,22 +61,17 @@ export default async function BoardPage() {
         );
       }
 
-      const pending = pendingCards || [];
-      // Server component rendered per-request (force-dynamic); reading the clock
-      // to compute card age is intentional.
-      const oldestPendingDays = pending.length
-        ? // eslint-disable-next-line react-hooks/purity
-          Math.floor((Date.now() - Math.min(...pending.map((c) => new Date(c.created_at).getTime()))) / 86400000)
-        : null;
+      const { openCount, oldestOpenDays, measuring } = mapBoardAuditCardResults({
+        openCardsResult,
+        verifiedCardsResult,
+        latestTrackerRanAt: latest?.ran_at ?? null,
+      });
 
       const badge = opsBadge({
         latestPipelineStatus: pipeline?.[0]?.status ?? null,
-        pendingCount: pending.length,
-        oldestPendingDays,
-        measuring: measuringCount(
-          (verifiedCards || []).map((card) => ({ ...card, status: "implemented" })),
-          latest?.ran_at ?? null
-        ),
+        pendingCount: openCount,
+        oldestPendingDays: oldestOpenDays,
+        measuring,
         hasRun: !!latest,
       });
 
@@ -97,7 +93,7 @@ export default async function BoardPage() {
         movers,
         sparkline: [...history].reverse().map((r) => productVisibilityScore(r)?.mention_rate ?? null),
         badge,
-        pendingCount: pending.length,
+        pendingCount: openCount,
         firstRunPending: !latest,
       };
     })
