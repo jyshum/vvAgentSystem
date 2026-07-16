@@ -161,7 +161,11 @@ export function BoardRow({ row, nextRunLabel }: BoardRowProps) {
           <SparklineChart values={sparkline} direction={sparkDirection} width={160} height={30} />
         )}
         <div className="mt-2">
-          {badge.kind === "waiting" ? <Link href="/admin/approvals">{badgeChip}</Link> : badgeChip}
+          {badge.kind === "waiting" ? (
+            <Link href={`/admin/clients/${clientId}/audit`}>{badgeChip}</Link>
+          ) : (
+            badgeChip
+          )}
         </div>
       </div>
     </div>
