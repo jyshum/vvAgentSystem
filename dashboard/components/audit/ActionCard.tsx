@@ -10,6 +10,7 @@ import {
   type TechnicalAuditResult,
 } from "@/lib/technical-audit-types";
 import { CardActions } from "@/components/audit/CardActions";
+import { findingTitle, GENERIC_UNKNOWN_SUMMARY } from "@/lib/technical-audit-labels";
 
 const CHIP =
   "shrink-0 border px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em]";
@@ -100,7 +101,7 @@ export function ActionCard({
             className="font-serif text-[15px]"
             style={{ color: "var(--white)" }}
           >
-            {card.title}
+            {findingTitle(group?.check_id, card.title)}
           </div>
           <div
             data-testid="card-subjects"
@@ -155,6 +156,10 @@ export function ActionCard({
                   </div>
                 )}
               </>
+            ) : representative?.summary === GENERIC_UNKNOWN_SUMMARY ? (
+              // The title already names the check; don't echo the generic
+              // placeholder here. State the honest current condition instead.
+              "Not yet measured"
             ) : (
               representative?.summary ?? card.title
             )}

@@ -7,6 +7,7 @@ import {
   type TechnicalAuditRun,
 } from "@/lib/technical-audit-types";
 import { ActionCard } from "@/components/audit/ActionCard";
+import { findingTitle } from "@/lib/technical-audit-labels";
 
 const ATTENTION = ["fail", "review", "unknown"];
 const CARD_CLOSED = ["rejected", "verified"];
@@ -29,7 +30,7 @@ function PriorityRow({ priority }: { priority: Priority }) {
   const status = group?.status ?? "fail";
   const color = TECHNICAL_AUDIT_STATUS_COLOR[status];
   const subjectCount = group?.subjects.length ?? results.length;
-  const heading = group?.summary ?? card.title;
+  const heading = findingTitle(group?.check_id, group?.summary ?? card.title);
 
   return (
     <details className="vv-priority border-t first:border-t-0" style={{ borderColor: "var(--hair)" }}>
@@ -87,7 +88,7 @@ function EvidenceRow({ result }: { result: TechnicalAuditResult }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-serif text-[15px]" style={{ color: "var(--white)" }}>
-              {result.summary}
+              {findingTitle(result.check_id, result.summary)}
             </div>
             <div className="mt-1 break-all font-mono text-[9px]" style={{ color: "var(--faint)" }}>
               {result.subject}

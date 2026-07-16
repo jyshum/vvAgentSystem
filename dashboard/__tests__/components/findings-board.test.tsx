@@ -122,6 +122,37 @@ describe("FindingsBoard", () => {
     ).toHaveLength(2);
   });
 
+  it("titles an unknown finding by its check name, not the generic placeholder", () => {
+    const unknownGroup: TechnicalAuditFindingGroup = {
+      ...group,
+      id: "group-2",
+      group_key: "gk-2",
+      check_id: "performance.crux",
+      status: "unknown",
+      summary: "Applicable check could not complete",
+      subjects: ["https://site.test/a"],
+    };
+    const unknownCard: TechnicalAuditActionCard = {
+      ...card,
+      id: "card-2",
+      group_key: "gk-2",
+      title: "Applicable check could not complete",
+    };
+    const unknownResult = result({
+      id: "result-crux",
+      check_id: "performance.crux",
+      section: "performance",
+      status: "unknown",
+      summary: "Applicable check could not complete",
+    });
+
+    render(
+      <FindingsBoard run={run} results={[unknownResult]} groups={[unknownGroup]} cards={[unknownCard]} />,
+    );
+    expect(screen.getAllByText("Field performance (CrUX)").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Applicable check could not complete")).toBeNull();
+  });
+
   it("does not promote a verified card to a priority row; its finding shows as evidence", () => {
     const { container } = render(
       <FindingsBoard
