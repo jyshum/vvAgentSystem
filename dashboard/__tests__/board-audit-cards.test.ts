@@ -34,12 +34,6 @@ describe("mapBoardAuditCardResults", () => {
             created_at: "2026-07-01T00:00:00Z",
             applied_at: "2026-07-05T00:00:00Z",
           },
-          {
-            id: "verified-before",
-            status: "verified",
-            created_at: "2026-07-04T00:00:00Z",
-            applied_at: "2026-07-02T00:00:00Z",
-          },
         ],
         error: null,
       },
