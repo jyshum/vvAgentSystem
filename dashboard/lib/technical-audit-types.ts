@@ -139,7 +139,7 @@ export const CARD_ALLOWED_TRANSITIONS: Record<
   stale: ["draft_prepared", "rejected"],
   rejected: [],
   verified: [],
-  still_failing: ["draft_prepared"],
+  still_failing: ["draft_prepared", "rejected"],
 };
 
 export const CARD_STATUS_LABEL: Record<TechnicalAuditCardStatus, string> = {

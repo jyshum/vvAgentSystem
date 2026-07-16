@@ -39,6 +39,14 @@ describe("CardActions", () => {
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
 
+  it("offers only reject for a still_failing card", () => {
+    render(<CardActions cardId="card-1" status="still_failing" />);
+    expect(screen.queryAllByRole("button")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /reject/i })).toBeDefined();
+    expect(screen.queryByRole("button", { name: /approve/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /mark applied/i })).toBeNull();
+  });
+
   it("surfaces a stale precondition refusal instead of failing silently", async () => {
     vi.stubGlobal(
       "fetch",

@@ -252,3 +252,9 @@ def test_verify_requires_applied_state():
     sb, card_id = _seeded()
     with pytest.raises(WorkflowError, match="cannot verify"):
         verify_card(sb, card_id, fetcher=_page_fetch())
+
+
+def test_still_failing_card_can_be_rejected():
+    sb, card_id = _seeded(status="still_failing")
+    card = reject_card(sb, card_id)
+    assert card["status"] == "rejected"

@@ -15,7 +15,7 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "stale": {"draft_prepared", "rejected"},
     "rejected": set(),
     "verified": set(),
-    "still_failing": {"draft_prepared"},
+    "still_failing": {"draft_prepared", "rejected"},
 }
 
 _CARD_STATUSES = {"fail", "review"}
