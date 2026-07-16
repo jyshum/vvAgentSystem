@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchSchedules } from "@/lib/schedules";
 import { biggestMovers, opsBadge, rankAndGap, topCompetitor } from "@/lib/derive";
 import { mapBoardAuditCardResults } from "@/lib/board-audit-cards";
 import { BoardRow, type BoardRowData } from "@/components/board/BoardRow";
@@ -107,23 +106,6 @@ export default async function BoardPage() {
   const totalCards = rows.reduce((s, r) => s + r.pendingCount, 0);
   const errors = rows.filter((r) => r.badge.kind === "error").length;
 
-  const schedules = await fetchSchedules();
-  const upcoming = schedules
-    .filter((s) => s.next_run)
-    .sort((a, b) => (a.next_run! < b.next_run! ? -1 : 1))
-    .slice(0, 3);
-
-  const nextRunByClient = new Map(
-    schedules.filter((s) => s.next_run).map((s) => [s.client_id, s.next_run as string])
-  );
-
-  const formatNextRun = (iso: string) => {
-    const d = new Date(iso);
-    const weekday = d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
-    const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
-    return `${weekday} ${time}`;
-  };
-
   return (
     <>
       <div className="mb-10">
@@ -156,20 +138,7 @@ export default async function BoardPage() {
       ) : (
         <div style={{ borderTop: "1px solid var(--hair)" }}>
           {rows.map((row) => (
-            <BoardRow key={row.clientId} row={row} nextRunLabel={nextRunByClient.get(row.clientId) ? formatNextRun(nextRunByClient.get(row.clientId)!) : undefined} />
-          ))}
-        </div>
-      )}
-
-      {upcoming.length > 0 && (
-        <div className="mt-10 pt-6 flex items-baseline gap-6" style={{ borderTop: "1px solid var(--hair)" }}>
-          <span className="font-mono text-[8px] tracking-[0.14em] uppercase" style={{ color: "var(--faint)" }}>
-            NEXT RUNS
-          </span>
-          {upcoming.map((s) => (
-            <span key={s.client_id} className="font-mono text-[9px]" style={{ color: "var(--faint)" }}>
-              {s.client_name} {formatNextRun(s.next_run as string)}
-            </span>
+            <BoardRow key={row.clientId} row={row} />
           ))}
         </div>
       )}

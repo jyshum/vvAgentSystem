@@ -13,10 +13,8 @@ const UPDATABLE_FIELDS = [
   "brand_variations",
   "competitors",
   "gsc_site_url",
-  "cms_type",
-  "cms_config",
-  "cycle_frequency",
-  "cycle_day",
+  "site_platform",
+  "implementation_mode",
 ] as const;
 
 export async function PATCH(

@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RunRail } from "@/components/runs/RunRail";
 import { RunTechnicalAuditEvidence } from "@/components/runs/RunTechnicalAuditEvidence";
-import { fetchSchedules } from "@/lib/schedules";
 import { BUCKET_LABELS, contentAuthorityScore, productVisibilityScore } from "@/lib/intent-labels";
 import { formatRate, formatDelta } from "@/lib/utils";
 import type { PipelineRun, ImprovementRun, PageCitationScore, QueryPageMatch, CrawlabilityReport } from "@/lib/improvement-types";
@@ -85,7 +84,7 @@ export default async function RunDetailPage({
       ? supabase.from("competitive_gaps").select("query_id, query, bucket, client_mention_rate, competitor_data").eq("run_id", trackerRun.id)
       : Promise.resolve({ data: null }),
     (async () => {
-      if (!pipeline.completed_at) return { nextTrackerRun: null, nextScheduledRun: null };
+      if (!pipeline.completed_at) return { nextTrackerRun: null };
       const { data: nextTracker } = await supabase
         .from("tracker_runs")
         .select("id, ran_at")
@@ -94,13 +93,7 @@ export default async function RunDetailPage({
         .order("ran_at", { ascending: true })
         .limit(1)
         .maybeSingle();
-      if (nextTracker) return { nextTrackerRun: nextTracker, nextScheduledRun: null };
-      if (pipeline.status === "completed") {
-        const schedules = await fetchSchedules();
-        const schedule = schedules.find((s) => s.client_id === id);
-        return { nextTrackerRun: null, nextScheduledRun: schedule?.next_run ?? null };
-      }
-      return { nextTrackerRun: null, nextScheduledRun: null };
+      return { nextTrackerRun: nextTracker ?? null };
     })(),
     (async () => {
       if (!improvementRun) return { run: null, results: [] };
@@ -127,7 +120,7 @@ export default async function RunDetailPage({
   const citationScores = (citationScoresData as Pick<PageCitationScore, "structural_score">[]) || [];
   const queryMatches = (queryMatchesData as Pick<QueryPageMatch, "id" | "match_type">[]) || [];
   const competitiveGaps = (competitiveGapsData as Pick<CompetitiveGap, "query_id" | "query" | "bucket" | "client_mention_rate" | "competitor_data">[]) || [];
-  const { nextTrackerRun, nextScheduledRun } = nextTrackerAndSchedules as { nextTrackerRun: { id: string; ran_at: string } | null; nextScheduledRun: string | null };
+  const { nextTrackerRun } = nextTrackerAndSchedules as { nextTrackerRun: { id: string; ran_at: string } | null };
   const technicalAudit = technicalAuditBundle as {
     run: TechnicalAuditRun | null;
     results: TechnicalAuditResult[];
@@ -385,9 +378,7 @@ export default async function RunDetailPage({
         <span>
           {nextTrackerRun
             ? `re-measured by next run ${new Date(nextTrackerRun.ran_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-            : nextScheduledRun
-              ? `next scheduled run ${new Date(nextScheduledRun).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-              : ""}
+            : ""}
         </span>
       </div>
     </div>

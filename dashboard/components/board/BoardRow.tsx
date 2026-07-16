@@ -27,10 +27,9 @@ const BADGE_COLOR: Record<string, string> = {
 
 interface BoardRowProps {
   row: BoardRowData;
-  nextRunLabel?: string;
 }
 
-export function BoardRow({ row, nextRunLabel }: BoardRowProps) {
+export function BoardRow({ row }: BoardRowProps) {
   const { name, rate, delta, competitor, rank, movers, sparkline, badge, firstRunPending, clientId } = row;
 
   const previousRate = rate != null && delta != null ? rate - delta : null;
@@ -83,7 +82,7 @@ export function BoardRow({ row, nextRunLabel }: BoardRowProps) {
       <Link href={overviewHref} className="block">
         {firstRunPending ? (
           <div className="font-serif italic text-[13px]" style={{ color: "var(--mute)" }}>
-            first run {nextRunLabel ?? "scheduled"}
+            first run pending
           </div>
         ) : rate == null ? (
           <span className="font-mono text-[11px]" style={{ color: "var(--faint)" }}>—</span>

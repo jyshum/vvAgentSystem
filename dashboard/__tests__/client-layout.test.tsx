@@ -11,7 +11,6 @@ const state = vi.hoisted(() => ({
   },
   fromCalls: [] as string[],
   selections: [] as { table: string; columns: string }[],
-  fetchSchedules: vi.fn(async () => []),
   notFound: vi.fn((): never => {
     throw new Error("NEXT_NOT_FOUND");
   }),
@@ -46,10 +45,6 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-vi.mock("@/lib/schedules", () => ({
-  fetchSchedules: state.fetchSchedules,
-}));
-
 vi.mock("next/navigation", () => ({
   notFound: state.notFound,
 }));
@@ -73,7 +68,6 @@ describe("ClientLayout", () => {
     };
     state.fromCalls.length = 0;
     state.selections.length = 0;
-    state.fetchSchedules.mockClear();
     state.notFound.mockClear();
   });
 
@@ -89,12 +83,6 @@ describe("ClientLayout", () => {
     await ClientLayout(props);
 
     expect(state.fromCalls).not.toContain("improvement_runs");
-  });
-
-  it("does not fetch schedules removed by the manual-run cutover", async () => {
-    await ClientLayout(props);
-
-    expect(state.fetchSchedules).not.toHaveBeenCalled();
   });
 
   it("surfaces database errors instead of converting them to a 404", async () => {
