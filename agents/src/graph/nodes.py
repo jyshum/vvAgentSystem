@@ -38,7 +38,23 @@ def _get_supabase():
     return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 
 
+def _set_stage(state: GEOState, label: str) -> None:
+    """Best-effort progress marker on the owning pipeline_runs row, so the UI can
+    show which stage is running. Never raises: stage reporting must not be able
+    to fail a run, and runs invoked without a thread_id simply skip it."""
+    thread_id = state.get("thread_id")
+    if not thread_id:
+        return
+    try:
+        _get_supabase().table("pipeline_runs").update({"stage": label}).eq(
+            "thread_id", thread_id
+        ).execute()
+    except Exception as exc:  # pragma: no cover - telemetry only
+        print(f"  [Stage] skip ({label}): {exc}")
+
+
 def run_tracker_node(state: GEOState) -> dict:
+    _set_stage(state, "Querying AI engines")
     from datetime import datetime, timezone, timedelta
     from src.drift import compute_query_set_signature
     from src.tracker import run_tracker, compute_competitive_gaps
@@ -132,6 +148,7 @@ def run_tracker_node(state: GEOState) -> dict:
 
 
 def run_gsc_node(state: GEOState) -> dict:
+    _set_stage(state, "Fetching Search Console")
     # Strip whitespace — GSC property IDs must match byte-for-byte, and the
     # config UI has accepted values with stray spaces.
     gsc_site_url = (state["client_config"].get("gsc_site_url") or "").strip()
@@ -171,6 +188,7 @@ def run_gsc_node(state: GEOState) -> dict:
 
 
 def run_technical_pipeline_node(state: GEOState) -> dict:
+    _set_stage(state, "Running technical audit")
     from src.technical_audit.pipeline import run_technical_pipeline
 
     sb = _get_supabase()

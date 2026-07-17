@@ -12,6 +12,7 @@ const STALE_THRESHOLD = 30 * 60_000;
 export function TriggerRunButton({ clientId }: { clientId: string }) {
   const [status, setStatus] = useState<RunStatus>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [stage, setStage] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState<string | null>(null);
   const router = useRouter();
@@ -46,6 +47,7 @@ export function TriggerRunButton({ clientId }: { clientId: string }) {
 
       if (!run) {
         setStatus("idle");
+        setStage(null);
         clearTimers();
         return;
       }
@@ -54,24 +56,29 @@ export function TriggerRunButton({ clientId }: { clientId: string }) {
         const age = Date.now() - new Date(run.started_at).getTime();
         if (run.status !== "awaiting_approval" && age > STALE_THRESHOLD) {
           setStatus("error");
+          setStage(null);
           setErrorMsg(`Run appears stale (started ${formatElapsed(run.started_at)} ago)`);
           clearTimers();
           return;
         }
         setStatus(run.status as RunStatus);
+        setStage(run.stage ?? null);
         startElapsedTimer(run.started_at);
       } else if (run.status === "completed") {
         setStatus("completed");
+        setStage(null);
         clearTimers();
         router.refresh();
         setTimeout(() => setStatus("idle"), 6000);
       } else if (run.status === "error") {
         setStatus("error");
+        setStage(null);
         setErrorMsg(run.error_message || "Pipeline failed");
         clearTimers();
         setTimeout(() => setStatus("idle"), 10000);
       } else {
         setStatus("idle");
+        setStage(null);
         clearTimers();
       }
     } catch {
@@ -173,6 +180,7 @@ export function TriggerRunButton({ clientId }: { clientId: string }) {
       </button>
       {isActive && (
         <div className="font-mono text-[8px] tracking-[0.04em] text-right" style={{ color: "var(--mute)" }}>
+          {stage ? `${stage} · ` : ""}
           {elapsed ? `${elapsed} elapsed` : "starting..."} · checking every 10s
         </div>
       )}

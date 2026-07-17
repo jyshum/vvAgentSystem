@@ -1,6 +1,6 @@
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -48,8 +48,34 @@ def _get_supabase():
     return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 
 
+def _reap_orphaned_runs():
+    """Fail runs stranded by a previous process crash or redeploy.
+
+    A pipeline run executes in a background thread. If the server restarts mid
+    run, that thread dies and its pipeline_runs row is left 'running' forever,
+    which the UI then reports as a phantom 'stale' error. This is a fresh
+    process, so anything still 'running' is orphaned — mark it error so the UI
+    and trigger button recover on their own. Never raises: startup must proceed
+    even if the database is briefly unreachable."""
+    try:
+        now = datetime.now(timezone.utc)
+        # A tiny grace window avoids racing a run inserted moments before boot.
+        cutoff = (now - timedelta(minutes=2)).isoformat()
+        result = _get_supabase().table("pipeline_runs").update({
+            "status": "error",
+            "error_message": "Orphaned: the backend restarted while this run was in progress.",
+            "completed_at": now.isoformat(),
+        }).eq("status", "running").lt("started_at", cutoff).execute()
+        reaped = len(result.data or [])
+        if reaped:
+            print(f"  [Reaper] Cleared {reaped} orphaned run(s) from a prior restart")
+    except Exception as exc:
+        print(f"  [Reaper] skip: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app):
+    _reap_orphaned_runs()
     if os.environ.get("LANGCHAIN_TRACING_V2") == "true":
         print(
             "  [Tracing] LangSmith enabled — project: "
@@ -85,6 +111,7 @@ def _run_graph_background(client_id: str, run_type: str, thread_id: str):
         "thread_id": thread_id,
         "run_type": run_type,
         "status": "running",
+        "stage": "Starting",
     }).execute()
 
     try:

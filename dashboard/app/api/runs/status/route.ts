@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   const { data: latest } = await admin
     .from("pipeline_runs")
-    .select("id, status, run_type, started_at, completed_at, error_message")
+    .select("id, status, run_type, stage, started_at, completed_at, error_message")
     .eq("client_id", clientId)
     .order("started_at", { ascending: false })
     .limit(1)
