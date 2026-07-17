@@ -1,6 +1,8 @@
 import asyncio
 import json
+import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,6 +13,21 @@ from src.engines import load_engines
 RUNS_PER_PROMPT = 5
 RUNS_PER_PARAPHRASE = 1
 NON_BRANDED_BUCKETS = ("awareness", "consideration")
+
+# How many requests may be in flight to a SINGLE engine at once. Different
+# engines run in parallel, so total concurrency is this times the engine count.
+# Kept modest so a large query set finishes in minutes without tripping provider
+# rate limits (and with_retries backs off on the occasional 429). Override with
+# TRACKER_ENGINE_CONCURRENCY or config["engine_concurrency"].
+DEFAULT_ENGINE_CONCURRENCY = 3
+
+
+def _engine_concurrency(config: dict) -> int:
+    raw = config.get("engine_concurrency") or os.environ.get("TRACKER_ENGINE_CONCURRENCY")
+    try:
+        return max(1, int(raw)) if raw else DEFAULT_ENGINE_CONCURRENCY
+    except (TypeError, ValueError):
+        return DEFAULT_ENGINE_CONCURRENCY
 
 
 def _query_text(query: str | dict) -> str:
@@ -35,9 +52,14 @@ def load_client_config(config_path: str) -> dict:
     return json.loads(Path(config_path).read_text())
 
 
-async def _query_engine_once(engine_query_fn, query_text: str) -> str:
+async def _query_engine_once(engine_query_fn, query_text: str, sem: asyncio.Semaphore | None = None) -> str:
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, engine_query_fn, query_text)
+    if sem is None:
+        return await loop.run_in_executor(None, engine_query_fn, query_text)
+    # The semaphore is held across the actual network call, so it caps how many
+    # requests hit this engine at once — the rate-limit guard.
+    async with sem:
+        return await loop.run_in_executor(None, engine_query_fn, query_text)
 
 
 async def _run_prompt_on_engine(
@@ -51,11 +73,12 @@ async def _run_prompt_on_engine(
     website_domain: str,
     competitors: list[str],
     runs_per_prompt: int,
+    sem: asyncio.Semaphore | None = None,
 ) -> list[dict]:
     results = []
 
     try:
-        tasks = [_query_engine_once(engine_info["query"], query_text) for _ in range(runs_per_prompt)]
+        tasks = [_query_engine_once(engine_info["query"], query_text, sem) for _ in range(runs_per_prompt)]
         responses = await asyncio.gather(*tasks, return_exceptions=True)
     except Exception:
         responses = []
@@ -96,12 +119,53 @@ async def _run_prompt_on_engine(
     return results
 
 
+async def _run_all_units(
+    units: list[tuple],
+    engine_names: list[str],
+    brand_variations: list[str],
+    website_domain: str,
+    competitors: list[str],
+    runs_per_paraphrase: int,
+    per_engine_concurrency: int,
+) -> list[dict]:
+    """Run every (engine, wording) unit concurrently, bounded per engine.
+
+    Each engine gets its own semaphore, so requests to one provider are capped
+    while different providers still run in parallel. A single failing unit never
+    aborts the batch — its exception is logged and it contributes no samples."""
+    sems = {name: asyncio.Semaphore(per_engine_concurrency) for name in engine_names}
+
+    # Size the shared thread pool to the peak number of concurrent blocking
+    # calls (one per permit across all engines) so run_in_executor never queues
+    # behind the interpreter's small default pool.
+    total = per_engine_concurrency * max(len(engine_names), 1)
+    asyncio.get_running_loop().set_default_executor(
+        ThreadPoolExecutor(max_workers=total + 4, thread_name_prefix="tracker")
+    )
+
+    async def run_unit(wording, query_id, canonical, bucket, engine_name, engine_info):
+        try:
+            return await _run_prompt_on_engine(
+                wording, query_id, canonical, bucket, engine_name, engine_info,
+                brand_variations, website_domain, competitors, runs_per_paraphrase,
+                sems[engine_name],
+            )
+        except Exception as e:
+            print(f"  [{engine_name}] ERROR wording={wording[:40]!r}: {e}")
+            return []
+
+    batches = await asyncio.gather(*(run_unit(*unit) for unit in units))
+    results: list[dict] = []
+    for batch in batches:
+        results.extend(batch)
+    return results
+
+
 def run_tracker(config: dict) -> tuple[list[dict], dict]:
     engines = load_engines()
     if not engines:
         raise RuntimeError("No engines available. Check your API keys in .env")
 
-    results = []
     queries = config["target_queries"]
     brand_variations = config["brand_variations"]
     website_domain = config["website_domain"]
@@ -110,7 +174,10 @@ def run_tracker(config: dict) -> tuple[list[dict], dict]:
         "runs_per_paraphrase",
         config.get("runs_per_prompt", RUNS_PER_PARAPHRASE),
     )
+    per_engine_concurrency = _engine_concurrency(config)
 
+    # Flatten to independent units so they can all run concurrently.
+    units = []
     for query in queries:
         bucket = _query_bucket(query)
         if bucket == "branded":
@@ -120,15 +187,16 @@ def run_tracker(config: dict) -> tuple[list[dict], dict]:
         wordings = [canonical] + _query_paraphrases(query)
         for engine_name, engine_info in engines.items():
             for wording in wordings:
-                print(f"  [{engine_name}] intent={canonical[:40]!r} wording={wording[:40]!r}")
-                try:
-                    batch = asyncio.run(_run_prompt_on_engine(
-                        wording, query_id, canonical, bucket, engine_name, engine_info,
-                        brand_variations, website_domain, competitors, runs_per_paraphrase,
-                    ))
-                    results.extend(batch)
-                except Exception as e:
-                    print(f"         → ERROR: {e}")
+                units.append((wording, query_id, canonical, bucket, engine_name, engine_info))
+
+    print(
+        f"  [tracker] {len(units)} calls across {len(engines)} engines "
+        f"(<= {per_engine_concurrency} concurrent per engine)"
+    )
+    results = asyncio.run(_run_all_units(
+        units, list(engines.keys()), brand_variations, website_domain,
+        competitors, runs_per_paraphrase, per_engine_concurrency,
+    ))
 
     scores = compute_scores(results, engines, competitors)
     return results, scores

@@ -7,7 +7,9 @@ type RunStatus = "idle" | "loading" | "running" | "awaiting_approval" | "impleme
 
 const ACTIVE_STATUSES = ["running", "awaiting_approval", "implementing"];
 const POLL_INTERVAL = 10_000;
-const STALE_THRESHOLD = 30 * 60_000;
+// A full run can legitimately take a while on clients with many query
+// paraphrases; only flag it as stuck well past any healthy runtime.
+const STALE_THRESHOLD = 75 * 60_000;
 
 export function TriggerRunButton({ clientId }: { clientId: string }) {
   const [status, setStatus] = useState<RunStatus>("idle");
