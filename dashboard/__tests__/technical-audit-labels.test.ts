@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  GENERIC_NA_SUMMARY,
   GENERIC_UNKNOWN_SUMMARY,
   checkTitle,
   findingTitle,
@@ -21,6 +22,10 @@ describe("technical-audit-labels", () => {
     // Generic unknown summary -> resolve to the check's real name.
     expect(findingTitle("performance.crux", GENERIC_UNKNOWN_SUMMARY)).toBe(
       "Field performance (CrUX)",
+    );
+    // Generic not-applicable summary -> also resolves to the check name.
+    expect(findingTitle("links.internal_health", GENERIC_NA_SUMMARY)).toBe(
+      "Internal link health",
     );
     // A real outcome summary is kept verbatim.
     expect(findingTitle("links.internal_health", "Internal links redirect or look like soft 404s")).toBe(

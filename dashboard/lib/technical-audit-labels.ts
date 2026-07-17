@@ -37,6 +37,12 @@ const CHECK_TITLES: Record<string, string> = {
 /** The placeholder summary the backend writes for every unknown result. */
 export const GENERIC_UNKNOWN_SUMMARY = "Applicable check could not complete";
 
+/** The placeholder summary the backend writes for every not-applicable result. */
+export const GENERIC_NA_SUMMARY = "Check does not apply";
+
+/** Summaries that carry no information and must be replaced with the check name. */
+const GENERIC_SUMMARIES = new Set([GENERIC_UNKNOWN_SUMMARY, GENERIC_NA_SUMMARY]);
+
 /** Title-case a bare check_id as a last resort when no curated name exists. */
 export function humanizeCheckId(checkId: string): string {
   return checkId.replace(/[._]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -49,8 +55,9 @@ export function checkTitle(checkId: string | undefined): string {
 }
 
 /** The title to show for a finding: the check's real name when the summary is
- *  the generic "could not complete" placeholder, otherwise the summary itself
- *  (which, for pass/fail/review, already describes the specific outcome). */
+ *  a generic placeholder ("could not complete" / "does not apply"), otherwise
+ *  the summary itself (which, for pass/fail/review, already describes the
+ *  specific outcome). The per-finding reason is surfaced separately. */
 export function findingTitle(checkId: string | undefined, summary: string): string {
-  return summary === GENERIC_UNKNOWN_SUMMARY ? checkTitle(checkId) : summary;
+  return GENERIC_SUMMARIES.has(summary) ? checkTitle(checkId) : summary;
 }
