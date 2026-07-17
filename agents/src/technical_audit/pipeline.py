@@ -104,18 +104,24 @@ def _run_and_persist_technical_audit(
             integrations=integrations,
         )
 
-        observations = [
-            {
+        # Dedupe by observation_ref: the unique constraint is (audit_run_id,
+        # observation_ref), so a single repeat would otherwise abort the audit.
+        observations = []
+        seen_refs: set[str] = set()
+        for observation in report["observations"]:
+            ref = observation["id"]
+            if ref in seen_refs:
+                continue
+            seen_refs.add(ref)
+            observations.append({
                 "audit_run_id": audit_run_id,
-                "observation_ref": observation["id"],
+                "observation_ref": ref,
                 "kind": observation["kind"],
                 "subject": observation["subject"],
                 "retrieved_at": observation["retrieved_at"],
                 "fingerprint": observation["fingerprint"],
                 "data": observation["data"],
-            }
-            for observation in report["observations"]
-        ]
+            })
         if observations:
             sb.table("technical_audit_observations").insert(observations).execute()
 
@@ -124,10 +130,17 @@ def _run_and_persist_technical_audit(
         report["results"] = annotated
         groups = group_findings(annotated)
 
-        result_rows = [
-            {"audit_run_id": audit_run_id, **result}
-            for result in annotated
-        ]
+        # Dedupe by the (check_id, check_version, subject) unique key for the
+        # same reason as observations. Alignment below is by key, so dropping a
+        # duplicate row here still resolves every annotated result to an id.
+        result_rows = []
+        seen_result_keys: set[tuple] = set()
+        for result in annotated:
+            key = (result["check_id"], result["check_version"], result["subject"])
+            if key in seen_result_keys:
+                continue
+            seen_result_keys.add(key)
+            result_rows.append({"audit_run_id": audit_run_id, **result})
         result_ids: list[str] = []
         if result_rows:
             inserted = sb.table("technical_audit_results").insert(result_rows).execute()

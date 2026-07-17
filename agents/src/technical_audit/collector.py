@@ -796,6 +796,11 @@ def _collect(
         queued: list[str] = []
         queued_set: set[str] = set()
         visited = {homepage.request_url, homepage.final_url}
+        # Final URLs already collected. Two distinct request URLs (e.g.
+        # /page and /page/) can redirect to the same canonical page; collecting
+        # both would emit duplicate observations/results keyed by final URL and
+        # abort the whole audit on a unique-constraint violation.
+        collected_finals = {homepage.final_url}
         sitemap_queue: list[str] = []
         external_candidates: list[str] = []
         external_seen: set[str] = set()
@@ -900,8 +905,13 @@ def _collect(
             queued_set.discard(page_url)
             visited.add(page_url)
             page = _fetch(effective_fetcher, effective_identity, page_url)
-            pages.append(page)
             visited.add(page.final_url)
+            if page.final_url in collected_finals:
+                # Reached an already-collected page via a different URL; skip so
+                # we never emit two observations for one final URL.
+                continue
+            collected_finals.add(page.final_url)
+            pages.append(page)
             if _is_html(page):
                 discovered_pages, _ = _html_discovery(page.body, page.final_url)
                 for url in discovered_pages:

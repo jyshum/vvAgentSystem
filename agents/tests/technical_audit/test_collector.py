@@ -471,3 +471,37 @@ def test_collection_rejects_invalid_page_limit_before_fetching():
         raise AssertionError("expected ValueError")
 
     assert calls == []
+
+
+def test_pages_deduped_by_final_url_across_redirect_variants():
+    """Two request URLs that resolve to the same final URL (e.g. /x and /x/)
+    must yield a single collected page. Collecting both produced duplicate
+    observations keyed by final URL and aborted the whole audit with a
+    unique-constraint violation."""
+    home = "https://example.com/"
+    homepage_body = (
+        '<html><body>'
+        '<a href="/x">canonical</a>'
+        '<a href="/x/">trailing slash</a>'
+        '</body></html>'
+    )
+
+    def fetcher(url):
+        if url == home:
+            return _response(url, body=homepage_body)
+        if url == "https://example.com/x":
+            return _response(url, body="<html><head><title>X</title></head></html>")
+        if url == "https://example.com/x/":
+            return _response(url, status=301, location="https://example.com/x")
+        if url == "https://example.com/llms.txt":
+            return _response(url, status=404, content_type="text/plain")
+        raise AssertionError(f"unexpected URL: {url}")
+
+    collected = collect_foundation(
+        SiteIdentity.from_domain("example.com", "other"),
+        fetcher=fetcher,
+    )
+
+    finals = [page.final_url for page in collected.pages]
+    assert len(finals) == len(set(finals)), f"duplicate final URLs collected: {finals}"
+    assert finals.count("https://example.com/x") == 1
