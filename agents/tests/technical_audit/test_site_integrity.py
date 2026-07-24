@@ -57,6 +57,26 @@ def test_internal_redirect_is_review_and_healthy_passes():
     assert results[0].status is AuditStatus.PASS
 
 
+def test_link_to_canonical_url_reached_via_crawl_redirect_is_clean():
+    # The homepage is crawled starting at the bare domain and 301s to www, so its
+    # observation carries a 2-hop redirect_chain ending at the canonical www URL.
+    # A link that already points to that canonical URL must NOT be flagged as an
+    # unnecessary redirect — the redirect was the crawler's entry, not the link.
+    homepage = page_observation(
+        "https://www.example.com/",
+        redirect_chain=["https://example.com/", "https://www.example.com/"],
+    )
+    about = page_observation(
+        "https://www.example.com/about",
+        links=[_link("https://www.example.com/")],
+    )
+    results = {
+        r.subject: r
+        for r in evaluate_internal_links(make_context(pages=(homepage, about)))
+    }
+    assert results["https://www.example.com/about"].status is AuditStatus.PASS
+
+
 def test_internal_soft_404_title_is_review():
     home = page_observation(links=[_link("https://example.com/soft")])
     soft = page_observation("https://example.com/soft", titles=["404 — Page Not Found"])

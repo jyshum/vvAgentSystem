@@ -72,7 +72,12 @@ def evaluate_internal_links(context: AuditContext) -> list[CheckResult]:
                 unknowns.append({"url": link["url"], "status": status_code})
             elif _soft_404_title(target):
                 reviews.append({"url": link["url"], "defect": "possible soft 404 (title)"})
-            elif len(chain) > 1:
+            elif len(chain) > 1 and _normalized(link["url"]) != _normalized(chain[-1]):
+                # Only flag when the LINK itself points to a non-final URL that
+                # redirects. A link to the page's canonical destination is clean
+                # even when the crawler reached that page via a redirect (e.g.
+                # entering at the bare domain and 301-ing to www) — that chain
+                # describes the crawl entry, not the link's path.
                 reviews.append({"url": link["url"], "defect": "unnecessary internal redirect"})
         scope = {
             "sampled": True,
